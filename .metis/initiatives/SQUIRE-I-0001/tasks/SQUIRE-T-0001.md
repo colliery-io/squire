@@ -4,14 +4,14 @@ level: task
 title: "Domain Core: crate scaffold, ports & handle dispatch"
 short_code: "SQUIRE-T-0001"
 created_at: 2026-06-17T03:01:53.286693+00:00
-updated_at: 2026-06-17T03:01:53.286693+00:00
+updated_at: 2026-06-17T03:12:51.102151+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Stand up the pure `domain-core` crate (contract types as the domain crate, no behavior), implement `Engine`/`Projections` trait skeletons, in-memory `Repository` + controllable fake `Clock` test doubles, `handle`'s command-dispatch and actor/path routing, and a property-test harness. This is the foundation for all other Domain Core tasks.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
