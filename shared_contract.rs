@@ -314,6 +314,7 @@ pub enum DomainError {
     UserNotFound, NotASquire, // a command's `squire` must be an active Squire in the household
     NotAssigned,              // the Squire isn't an assignee of this quest
     OccurrenceTaken,          // a `Race` occurrence was already won by another assignee
+    InvalidDefinition,        // a malformed authoring input (e.g. empty assignment / weekly days / zero interval)
     Inactive,
     AlreadyClaimedToday,      // one open claim per (squire, quest, `on`); per assignee for EachAssignee
     AlreadyReviewed,          // claim already approved/rejected

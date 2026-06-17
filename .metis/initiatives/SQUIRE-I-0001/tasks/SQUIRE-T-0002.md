@@ -4,14 +4,14 @@ level: task
 title: "Domain Core: authoring commands (define/archive quest, item, achievement)"
 short_code: "SQUIRE-T-0002"
 created_at: 2026-06-17T03:01:54.601472+00:00
-updated_at: 2026-06-17T03:01:54.601472+00:00
+updated_at: 2026-06-17T03:18:49.682855+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Implement `handle` for the six authoring commands → validated `Change`s (`PutQuest`/`PutItem`/`PutAchievement`, `SetQuestActive`/`SetItemActive`/`SetAchievementActive`).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

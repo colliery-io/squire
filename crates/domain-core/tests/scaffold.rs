@@ -141,8 +141,10 @@ fn handle_dispatches_every_command_family_without_panicking() {
         Command::AdjustPoints { command_id: CommandId(1), actor: UserId(2), squire: UserId(1), amount: 1, reason: "r".into() },
     ];
     for cmd in cmds {
-        // Stubs return Ok(vec![]); the point is dispatch reaches a handler for each family.
-        assert!(eng.handle(&snap, cmd, &c).is_ok());
+        // The point is dispatch reaches a handler for each family without panicking. The
+        // Ok/Err verdict depends on each family's (evolving) rules — covered by the
+        // per-family test suites — so here we only assert the call returns.
+        let _ = eng.handle(&snap, cmd, &c);
     }
 }
 

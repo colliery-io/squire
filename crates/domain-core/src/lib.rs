@@ -19,6 +19,12 @@ pub mod engine;
 pub mod projections;
 pub mod testkit;
 
+// Per-command-family handlers + shared helpers (crate-internal).
+mod authoring;
+mod claims;
+pub(crate) mod common;
+mod redemption;
+
 pub use contract::*;
 pub use engine::{child_originable, DomainEngine};
 pub use projections::Proj;
