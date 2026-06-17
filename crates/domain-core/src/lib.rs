@@ -27,4 +27,4 @@ mod redemption;
 
 pub use contract::*;
 pub use engine::{child_originable, DomainEngine};
-pub use projections::{quest_status, Proj};
+pub use projections::{quest_status, reward_view, Proj};

@@ -201,3 +201,53 @@ pub fn submit_rejection(
     }
     None
 }
+
+// ── Redemption / ledger log queries (T-0005) ──
+
+/// `(squire, item)` of a redemption request, from its `RedemptionRequested` — `None` if none.
+pub fn request_meta(snap: &Snapshot, request_id: RequestId) -> Option<(UserId, ItemId)> {
+    snap.events.iter().find_map(|e| match e {
+        Event::RedemptionRequested { request_id: r, squire, item_id, .. } if *r == request_id => {
+            Some((*squire, *item_id))
+        }
+        _ => None,
+    })
+}
+
+/// Has a request been resolved (approved → `ItemRedeemed` with this `request_id`, or rejected)?
+pub fn request_resolved(snap: &Snapshot, request_id: RequestId) -> bool {
+    snap.events.iter().any(|e| match e {
+        Event::ItemRedeemed { request_id: Some(r), .. } if *r == request_id => true,
+        Event::RedemptionRejected { request_id: r, .. } if *r == request_id => true,
+        _ => false,
+    })
+}
+
+/// Has a privileged command with this `command_id` already been committed (direct redeem or
+/// adjustment)? The basis of `RedeemItem` / `AdjustPoints` idempotency (ADR SQUIRE-A-0001) —
+/// derived from the log, not a side table.
+pub fn command_already_applied(snap: &Snapshot, command_id: CommandId) -> bool {
+    snap.events.iter().any(|e| match e {
+        Event::ItemRedeemed { command_id: Some(c), .. } if *c == command_id => true,
+        Event::PointsAdjusted { command_id: c, .. } if *c == command_id => true,
+        _ => false,
+    })
+}
+
+/// Has the item ever been redeemed (any Squire)? `Once` items are out-of-stock after one.
+pub fn item_ever_redeemed(snap: &Snapshot, item_id: ItemId) -> bool {
+    snap.events
+        .iter()
+        .any(|e| matches!(e, Event::ItemRedeemed { item_id: i, .. } if *i == item_id))
+}
+
+/// The most-recent redemption timestamp for an item (any Squire), for `RewardCard.last_redeemed`.
+pub fn last_redeemed(snap: &Snapshot, item_id: ItemId) -> Option<Timestamp> {
+    snap.events
+        .iter()
+        .filter_map(|e| match e {
+            Event::ItemRedeemed { item_id: i, at, .. } if *i == item_id => Some(*at),
+            _ => None,
+        })
+        .max()
+}

@@ -4,14 +4,14 @@ level: task
 title: "Domain Core: redemption & ledger (balance, can_redeem, redeem, adjust)"
 short_code: "SQUIRE-T-0005"
 created_at: 2026-06-17T03:01:58.823486+00:00
-updated_at: 2026-06-17T03:01:58.823486+00:00
+updated_at: 2026-06-17T03:42:00.968302+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Implement the per-Squire `balance` projection, `can_redeem`, and the redemption + adjustment commands — with idempotency, affordability re-checked at commit, actor stamping, and the simplified `Once`/`Repeatable` availability.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
