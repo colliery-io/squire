@@ -4,14 +4,14 @@ level: task
 title: "Store: schema-per-tenant provisioning & connection selection"
 short_code: "SQUIRE-T-0011"
 created_at: 2026-06-17T04:08:43.565492+00:00
-updated_at: 2026-06-17T04:45:26.838320+00:00
+updated_at: 2026-06-17T04:49:50.713644+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,10 +32,12 @@ Provide tenant-store lifecycle: `provision` (create + migrate) and `deprovision`
 
 ## Acceptance Criteria
 
-- [ ] `provision(handle)` creates + migrates a fresh tenant store (new SQLite file, or new PG schema + migrate); `deprovision(handle)` drops it; behaves sensibly on already-exists / missing.
-- [ ] Backend selected at startup (config/URL): SQLite → file; Postgres URL → schema (`search_path` per connection).
-- [ ] No `tenant_id` columns anywhere; isolation is structural (NFR-2.4).
-- [ ] Tests (SQLite, file-per-tenant): provision two households, write different data to each, assert each `snapshot()` sees only its own; deprovision removes it.
+## Acceptance Criteria
+
+- [x] `Provisioner::provision(handle)` creates + migrates (SQLite file `<dir>/<handle>.sqlite`; PG `CREATE SCHEMA t_<handle>` + `search_path` + migrate); `deprovision` drops it (delete file / `DROP SCHEMA … CASCADE`, idempotent on missing); `open` hands back a tenant-scoped `Store`.
+- [x] Backend chosen at startup via a `Backend` config enum (`Sqlite{dir}` / `Postgres{base_url}`); PG connections `SET search_path` to the tenant schema immediately.
+- [x] No `tenant_id` columns; isolation is structural (NFR-2.4). Handles sanitized to `[a-z0-9_]`, ≤48 chars, else `InvalidHandle` (no path-traversal/SQL-injection).
+- [x] Tests on **both backends** (`tests/tenant.rs`, 3): full isolation (two households see only their own data), provision→use→deprovision→re-provision lifecycle, handle rejection — SQLite file-per-tenant + the compose Postgres schema-per-tenant.
 
 ## Implementation Notes
 
@@ -52,4 +54,6 @@ SQUIRE-T-0008 (schema/backend abstraction + migration runner).
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Completed.** New `crates/store/src/tenant.rs`: `Backend` config (`Sqlite{dir}` / `#[cfg(postgres)] Postgres{base_url}`), `Provisioner` with `provision`/`open`/`open_conn`/`deprovision`, `ProvisionError`, `sanitize_handle`. SQLite: handle → `<dir>/<handle>.sqlite` (create+migrate / delete). Postgres: handle → schema `t_<handle>` (`CREATE SCHEMA IF NOT EXISTS` + `SET search_path` + migrate; `DROP SCHEMA … CASCADE`); every opened PgConnection `SET search_path TO t_<handle>` so unqualified table names resolve only to that tenant's schema (no `public`, no cross-tenant visibility). `open` returns a `Store<C>` whose connection is already tenant-scoped, so T-0010's `snapshot`/`apply` are unchanged. **Handle rule:** `[a-z0-9_]`, non-empty, ≤48 chars (under PG's 63-byte id limit), else `InvalidHandle` — rejection (not escaping) makes file/schema names always safe to interpolate. Registry/routing (handle→tenant for a request) is explicitly S-0007, not built here.
+
+Tests `tests/tenant.rs` (3, both backends): full isolation (two households see only their own data), provision→use→deprovision→re-provision lifecycle, handle rejection. SQLite via `TempDir`; Postgres schemas via compose (serialized behind a Mutex, cleaned pre/post). Results: SQLite `cargo test -p store` → 23 green (incl. tenant 3); Postgres run → tenant 3 green on real PG schemas; `cargo test --workspace` → domain-core 70 intact. Committed.

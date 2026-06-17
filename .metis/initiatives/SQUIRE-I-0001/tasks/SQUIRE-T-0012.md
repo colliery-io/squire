@@ -4,14 +4,14 @@ level: task
 title: "Store: durability & per-tenant single-file export/import"
 short_code: "SQUIRE-T-0012"
 created_at: 2026-06-17T04:08:44.915643+00:00
-updated_at: 2026-06-17T04:08:44.915643+00:00
+updated_at: 2026-06-17T04:50:12.808834+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Prove durability across restart and provide a per-tenant single-file export plus restore/import, consistent with respect to the single writer. RESOLVE the export-format decision area and record the choice.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -19,6 +19,7 @@
 use std::collections::BTreeSet;
 
 use diesel::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, ClaimId, CommandId,
@@ -199,7 +200,7 @@ fn text_to_user_ids(field: &'static str, s: &str) -> Result<BTreeSet<UserId>> {
 
 // ─── users ──────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Insertable, Queryable, Selectable, AsChangeset)]
+#[derive(Debug, Clone, Insertable, Queryable, Selectable, AsChangeset, Serialize, Deserialize)]
 #[diesel(table_name = users)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct UserRow {
@@ -239,7 +240,7 @@ impl UserRow {
 
 // ─── quests ─────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Insertable, Queryable, Selectable, AsChangeset)]
+#[derive(Debug, Clone, Insertable, Queryable, Selectable, AsChangeset, Serialize, Deserialize)]
 #[diesel(table_name = quests)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct QuestRow {
@@ -412,7 +413,7 @@ impl QuestRow {
 
 // ─── items ──────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Insertable, Queryable, Selectable, AsChangeset)]
+#[derive(Debug, Clone, Insertable, Queryable, Selectable, AsChangeset, Serialize, Deserialize)]
 #[diesel(table_name = items)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct ItemRow {
@@ -483,7 +484,7 @@ impl ItemRow {
 
 // ─── achievements ───────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Insertable, Queryable, Selectable, AsChangeset)]
+#[derive(Debug, Clone, Insertable, Queryable, Selectable, AsChangeset, Serialize, Deserialize)]
 #[diesel(table_name = achievements)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct AchievementRow {
@@ -672,7 +673,7 @@ impl AchievementRow {
 
 // ─── events ─────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Insertable, Queryable, Selectable)]
+#[derive(Debug, Clone, Insertable, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = events)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct EventRow {
