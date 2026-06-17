@@ -24,14 +24,73 @@
     document.getElementById("login").hidden = true;
     document.getElementById("who").textContent = `${who.display_name || "Knight"} (#${who.user})`;
     document.getElementById("shell").hidden = false;
-    for (const id of ["quests-panel", "items-panel", "achievements-panel", "members-panel"]) {
+    for (const id of ["review-panel", "quests-panel", "items-panel", "achievements-panel", "members-panel"]) {
       document.getElementById(id).hidden = false;
     }
+    loadReview();
     loadQuests();
     loadCatalog("items", "item-list");
     loadCatalog("achievements", "achievement-list");
     loadMembers();
   });
+
+  // ── Review queue (T-0029) ────────────────────────────────────────────────────
+  async function reviewAction(path, body) {
+    await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    loadReview();
+  }
+
+  async function loadReview() {
+    const res = await fetch("/api/review");
+    if (!res.ok) return;
+    const r = await res.json();
+    const claims = document.getElementById("claim-queue");
+    const reqs = document.getElementById("request-queue");
+    const sqs = document.getElementById("squire-balances");
+    claims.innerHTML = "";
+    reqs.innerHTML = "";
+    sqs.innerHTML = "";
+    document.getElementById("review-empty").hidden = r.pending_claims.length + r.pending_requests.length > 0;
+
+    for (const c of r.pending_claims) {
+      const li = document.createElement("li");
+      li.textContent = `${c.quest_title} — squire #${c.squire} `;
+      const ok = document.createElement("button");
+      ok.textContent = "Approve";
+      ok.addEventListener("click", () => reviewAction("/api/review/claim", { claim_id: c.claim_id, decision: "approve" }));
+      const no = document.createElement("button");
+      no.textContent = "Reject";
+      no.addEventListener("click", () => reviewAction("/api/review/claim", { claim_id: c.claim_id, decision: { reject: { reason: prompt("Reason?") || null } } }));
+      li.append(ok, no);
+      claims.appendChild(li);
+    }
+    for (const q of r.pending_requests) {
+      const li = document.createElement("li");
+      li.textContent = `${q.item_name} (${q.cost} pts) — squire #${q.squire} `;
+      const ok = document.createElement("button");
+      ok.textContent = "Approve";
+      ok.addEventListener("click", () => reviewAction("/api/review/redemption", { request_id: q.request_id, decision: "approve" }));
+      const no = document.createElement("button");
+      no.textContent = "Reject";
+      no.addEventListener("click", () => reviewAction("/api/review/redemption", { request_id: q.request_id, decision: { reject: { reason: prompt("Reason?") || null } } }));
+      li.append(ok, no);
+      reqs.appendChild(li);
+    }
+    for (const s of r.squires) {
+      const li = document.createElement("li");
+      li.textContent = `${s.display_name}: ${s.balance} pts `;
+      const adj = document.createElement("button");
+      adj.textContent = "Adjust";
+      adj.addEventListener("click", () => {
+        const amount = Number(prompt("Adjust by (+/-):"));
+        const reason = prompt("Reason (required):");
+        if (!reason) return;
+        reviewAction("/api/adjust", { command_id: Date.now(), squire: s.squire, amount, reason });
+      });
+      li.appendChild(adj);
+      sqs.appendChild(li);
+    }
+  }
 
   // ── Members (T-0028) ─────────────────────────────────────────────────────────
   async function loadMembers() {

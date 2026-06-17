@@ -38,6 +38,18 @@
       </nav>
     </section>
 
+    <!-- Cross-Squire review queue (SQUIRE-T-0029): one screen, approvable in place. -->
+    <section id="review-panel" hidden>
+      <h2 id="review">Review queue</h2>
+      <p id="review-empty" hidden>Nothing pending. 🎉</p>
+      <h3>Claims</h3>
+      <ul id="claim-queue"></ul>
+      <h3>Redemption requests</h3>
+      <ul id="request-queue"></ul>
+      <h3>Squires</h3>
+      <ul id="squire-balances"></ul>
+    </section>
+
     <!-- Quest authoring (SQUIRE-T-0026). A minimal create form (daily / all squires / each
          assignee); the JSON API behind it supports the full cadence/assignment/completion shape. -->
     <section id="quests-panel" hidden>

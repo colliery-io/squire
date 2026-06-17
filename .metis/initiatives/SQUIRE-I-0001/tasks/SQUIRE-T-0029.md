@@ -4,14 +4,14 @@ level: task
 title: "Keep: cross-Squire review queue, direct redeem & reason-required adjust"
 short_code: "SQUIRE-T-0029"
 created_at: 2026-06-17T11:10:00.094770+00:00
-updated_at: 2026-06-17T11:10:00.094770+00:00
+updated_at: 2026-06-17T11:39:47.656784+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 The Keep's **batched cross-Squire review queue** and the privileged action subset — approve/reject claims & redemption requests in place, direct redeem, and reason-required adjust — all engine-direct and actor-stamped.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
