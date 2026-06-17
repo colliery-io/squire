@@ -11,6 +11,7 @@ pub mod conn;
 pub mod migrations;
 pub mod rows;
 pub mod schema;
+pub mod tenant;
 
 pub use conn::AnyConnection;
 pub use migrations::{run_migrations, MIGRATIONS};
