@@ -48,16 +48,13 @@ fn submit(
     }
 
     let at = clock.now();
-    let mut changes = vec![Change::Append(Event::CompletionClaimed {
-        claim_id,
-        squire,
-        quest_id,
-        on,
-        at,
-    })];
+    let claimed = Event::CompletionClaimed { claim_id, squire, quest_id, on, at };
+    let mut changes = vec![Change::Append(claimed.clone())];
     if quest.auto_approve {
         // Auto-approval is a system commit (actor = None), snapshotting the current reward.
-        changes.extend(approval_events(snap, claim_id, squire, quest.reward, None, at));
+        // The just-minted `CompletionClaimed` isn't in `snap` yet, so the unlock evaluation
+        // (which joins approvals to their claim via `claim_meta`) gets it via `pending`.
+        changes.extend(approval_events(snap, &[claimed], claim_id, squire, on, quest.reward, None, at));
     }
     Ok(changes)
 }
@@ -87,7 +84,7 @@ fn review(
                 // Another assignee already won this occurrence.
                 return Err(DomainError::OccurrenceTaken);
             }
-            Ok(approval_events(snap, claim_id, squire, quest.reward, Some(actor), at))
+            Ok(approval_events(snap, &[], claim_id, squire, on, quest.reward, Some(actor), at))
         }
         Decision::Reject { reason } => Ok(vec![Change::Append(Event::CompletionRejected {
             claim_id,
@@ -100,24 +97,26 @@ fn review(
 }
 
 /// Emit the approval event for a claim, snapshotting `points` (AR-4). `actor = None` denotes
-/// an auto-approve / system commit.
-///
-/// T-0006 extends this to also append `AchievementUnlocked { squire, .. }` (+ bonus) for any
-/// of this Squire's criteria that this approval newly satisfies — evaluated against the
-/// post-approval log.
+/// an auto-approve / system commit. After the approval, append any `AchievementUnlocked
+/// { squire, .. }` (+ bonus) for this Squire's criteria that the approval newly satisfies —
+/// evaluated against the POST-approval log, as of the claim's `on` date (T-0006).
 fn approval_events(
-    _snap: &Snapshot,
+    snap: &Snapshot,
+    pending: &[Event],
     claim_id: ClaimId,
     squire: UserId,
+    on: Date,
     points: Points,
     actor: Option<UserId>,
     at: Timestamp,
 ) -> Vec<Change> {
-    vec![Change::Append(Event::CompletionApproved {
-        claim_id,
-        squire,
-        actor,
-        points,
-        at,
-    })]
+    let approval = Event::CompletionApproved { claim_id, squire, actor, points, at };
+    // `pending` carries events emitted earlier in *this* command but not yet in `snap`
+    // (the auto-approve `CompletionClaimed`), so the join in `unlocks_after` can resolve.
+    let mut projected = snap.events.clone();
+    projected.extend(pending.iter().cloned());
+    projected.push(approval.clone());
+    let mut changes = vec![Change::Append(approval)];
+    changes.extend(crate::achievements::unlocks_after(snap, squire, &projected, on, at));
+    changes
 }

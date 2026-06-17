@@ -44,13 +44,18 @@ impl Projections for Proj {
     }
 
     fn current_streak(
-        _snap: &Snapshot,
-        _squire: UserId,
-        _scope: &Scope,
-        _basis: StreakBasis,
-        _asof: Date,
+        snap: &Snapshot,
+        squire: UserId,
+        scope: &Scope,
+        basis: StreakBasis,
+        asof: Date,
     ) -> u32 {
-        0 // TODO(T-0006): scheduled vs calendar streak.
+        match (basis, scope) {
+            (StreakBasis::ScheduledOccurrences, Scope::Quest(qid)) => {
+                scheduled_streak(snap, squire, *qid, asof)
+            }
+            _ => calendar_streak(snap, squire, scope, asof),
+        }
     }
 
     fn is_unlocked(snap: &Snapshot, squire: UserId, id: AchievementId) -> bool {
@@ -142,4 +147,136 @@ pub fn reward_view(
                 .then_some(LockReason::OutOfStock)
         });
     (affordable, lock, last_redeemed(snap, item.id))
+}
+
+// ── Streak walks (T-0006) ───────────────────────────────────────────────────
+
+/// Consecutive *scheduled* occurrences of `qid` that `squire` has completed, counting back
+/// from `asof`. A non-scheduled gap (e.g. a weekend for a Mon/Wed/Fri quest) is skipped, not
+/// a break. A pending occurrence *today* (`asof` itself) doesn't break an otherwise-live run.
+fn scheduled_streak(snap: &Snapshot, squire: UserId, qid: QuestId, asof: Date) -> u32 {
+    let quest = match find_quest(snap, qid) {
+        Some(q) => q,
+        None => return 0,
+    };
+    let mut cursor = asof;
+    let mut streak = 0u32;
+    let mut first = true;
+    loop {
+        let sd = match latest_scheduled_on_or_before(quest, cursor) {
+            Some(d) => d,
+            None => break,
+        };
+        let done = squire_satisfied(snap, squire, qid, sd);
+        // A not-yet-done scheduled occurrence *today* is forgiven once: step past it.
+        if first && sd == asof && !done {
+            first = false;
+            cursor = Date(sd.0 - 1);
+            continue;
+        }
+        first = false;
+        if done {
+            streak += 1;
+            cursor = Date(sd.0 - 1);
+        } else {
+            break;
+        }
+    }
+    streak
+}
+
+/// Consecutive calendar days (ending at `asof`) with ≥1 in-scope completion. A repeatable
+/// quest contributes once/day. A missing `asof` doesn't break a run that ends the day before.
+fn calendar_streak(snap: &Snapshot, squire: UserId, scope: &Scope, asof: Date) -> u32 {
+    let earliest = snap
+        .events
+        .iter()
+        .filter_map(|e| match e {
+            Event::CompletionApproved { claim_id, squire: s, .. } if *s == squire => {
+                claim_meta(snap, *claim_id)
+                    .filter(|(_, q, _)| quest_in_scope(snap, *q, scope))
+                    .map(|(_, _, d)| d.0)
+            }
+            _ => None,
+        })
+        .min();
+    let earliest = match earliest {
+        Some(e) => e,
+        None => return 0,
+    };
+    let mut cursor = asof;
+    let mut streak = 0u32;
+    let mut first = true;
+    while cursor.0 >= earliest {
+        let has = squire_completed_in_scope_on(snap, squire, scope, cursor);
+        if first && !has {
+            first = false;
+            cursor = Date(cursor.0 - 1);
+            continue;
+        }
+        first = false;
+        if has {
+            streak += 1;
+            cursor = Date(cursor.0 - 1);
+        } else {
+            break;
+        }
+    }
+    streak
+}
+
+/// `Scope` has no `PartialEq`; compare the three arms structurally.
+fn scopes_eq(a: &Scope, b: &Scope) -> bool {
+    match (a, b) {
+        (Scope::Any, Scope::Any) => true,
+        (Scope::Quest(x), Scope::Quest(y)) => x == y,
+        (Scope::Category(x), Scope::Category(y)) => x == y,
+        _ => false,
+    }
+}
+
+/// Derive a `StreakView`'s `(current, best, alive, next_milestone)` for one Squire/scope.
+/// `best` = the high-water mark over every distinct in-scope completion day; `alive` =
+/// the current run is non-zero; `next_milestone` = the smallest active `Streak` achievement
+/// length in this scope that still lies ahead of `current`.
+pub fn streak_view(
+    snap: &Snapshot,
+    squire: UserId,
+    scope: &Scope,
+    basis: StreakBasis,
+    asof: Date,
+) -> (u32, u32, bool, Option<u32>) {
+    let current = Proj::current_streak(snap, squire, scope, basis, asof);
+    // High-water mark: the streak ending at each day the Squire completed something in scope.
+    let mut best = current;
+    let mut days: std::collections::BTreeSet<i32> = std::collections::BTreeSet::new();
+    for e in &snap.events {
+        if let Event::CompletionApproved { claim_id, squire: s, .. } = e {
+            if *s == squire {
+                if let Some((_, q, d)) = claim_meta(snap, *claim_id) {
+                    if quest_in_scope(snap, q, scope) {
+                        days.insert(d.0);
+                    }
+                }
+            }
+        }
+    }
+    for d in days {
+        best = best.max(Proj::current_streak(snap, squire, scope, basis, Date(d)));
+    }
+    let alive = current > 0;
+    let next_milestone = snap
+        .achievements
+        .iter()
+        .filter(|a| a.active)
+        .filter_map(|a| match &a.criterion {
+            Criterion::Streak { scope: s2, length, .. }
+                if scopes_eq(s2, scope) && *length > current =>
+            {
+                Some(*length)
+            }
+            _ => None,
+        })
+        .min();
+    (current, best, alive, next_milestone)
 }
