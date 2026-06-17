@@ -32,6 +32,20 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging.interceptor)
+
+    // SDK decode round-trip test (SQUIRE-T-0033): proves the generated ClaimState/RedemptionState/
+    // LockReason data classes parse the real server JSON.
+    testImplementation(kotlin("test"))
+    testImplementation(libs.kotlinx.serialization.json)
+}
+
+// The generated SDK sources must exist before the test source set compiles against them.
+tasks.named("compileTestKotlin") {
+    dependsOn(tasks.named("openApiGenerate"))
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 kotlin {

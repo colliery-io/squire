@@ -59,10 +59,36 @@ pub struct RewardCard {
     pub lock: Option<LockReason>,         // None = currently redeemable
     pub last_redeemed: Option<Timestamp>, // most recent redemption of this item (any Squire); informational
 }
+// Flat tagged object on the wire — a `kind` discriminator plus the variant's optional payload —
+// so `openapi-generator`'s Kotlin/kotlinx backend renders a clean, decodable data class instead
+// of collapsing an anonymous `oneOf` into a broken merged class (ADR SQUIRE-A-0009 / SQUIRE-T-0033;
+// the discriminated-`oneOf` route emits a non-decodable bare interface for kotlinx, hence the
+// flat-struct fallback). Same JSON the old internally-tagged enum produced, minus an explicit
+// `null` for absent payloads: `{"kind":"NeedsAchievement","name":"…"}` / `{"kind":"OutOfStock"}`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub enum LockReason { NeedsAchievement { name: String }, OutOfStock }
+pub struct LockReason {
+    pub kind: LockReasonKind,
+    /// Present for [`LockReasonKind::NeedsAchievement`]; the achievement's name.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", default))]
+    pub name: Option<String>,
+}
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LockReasonKind { NeedsAchievement, OutOfStock }
+
+impl LockReason {
+    /// `{"kind":"NeedsAchievement","name":…}` — the reward needs an as-yet-unearned achievement.
+    pub fn needs_achievement(name: impl Into<String>) -> Self {
+        Self { kind: LockReasonKind::NeedsAchievement, name: Some(name.into()) }
+    }
+    /// `{"kind":"OutOfStock"}` — the reward is exhausted.
+    pub fn out_of_stock() -> Self {
+        Self { kind: LockReasonKind::OutOfStock, name: None }
+    }
+}
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -73,13 +99,40 @@ pub struct ClaimStatus {
     pub on: Date,
     pub state: ClaimState,
 }
+// Flat tagged object on the wire (a `state` discriminator + the variant's optional payload) so the
+// Kotlin SDK gets a clean, decodable data class (A-0009 / T-0033; flat-struct fallback — see
+// [`LockReason`]): `{"state":"Pending"}` / `{"state":"Approved","points":5}` /
+// `{"state":"Rejected"}` (or `…,"reason":"…"}`).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub enum ClaimState {
-    Pending,
-    Approved { points: Points },
-    Rejected { reason: Option<String> },
+pub struct ClaimState {
+    pub state: ClaimStateKind,
+    /// Present (and required) for [`ClaimStateKind::Approved`]: the points awarded.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", default))]
+    pub points: Option<Points>,
+    /// Optional rejection note for [`ClaimStateKind::Rejected`].
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", default))]
+    pub reason: Option<String>,
+}
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ClaimStateKind { Pending, Approved, Rejected }
+
+impl ClaimState {
+    /// `{"state":"Pending"}` — awaiting a Knight's review.
+    pub fn pending() -> Self {
+        Self { state: ClaimStateKind::Pending, points: None, reason: None }
+    }
+    /// `{"state":"Approved","points":…}` — awarded `points`.
+    pub fn approved(points: Points) -> Self {
+        Self { state: ClaimStateKind::Approved, points: Some(points), reason: None }
+    }
+    /// `{"state":"Rejected"}` (or with a `reason`) — declined.
+    pub fn rejected(reason: Option<String>) -> Self {
+        Self { state: ClaimStateKind::Rejected, points: None, reason }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -91,13 +144,35 @@ pub struct RedemptionStatus {
     pub cost: Points,
     pub state: RedemptionState,
 }
+// Flat tagged object on the wire (a `state` discriminator) — see [`ClaimState`] (A-0009 / T-0033):
+// `{"state":"Pending"}` / `{"state":"Approved"}` / `{"state":"Rejected"}` (or `…,"reason":"…"}`).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub enum RedemptionState {
-    Pending,
-    Approved,
-    Rejected { reason: Option<String> },
+pub struct RedemptionState {
+    pub state: RedemptionStateKind,
+    /// Optional rejection note for [`RedemptionStateKind::Rejected`].
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", default))]
+    pub reason: Option<String>,
+}
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RedemptionStateKind { Pending, Approved, Rejected }
+
+impl RedemptionState {
+    /// `{"state":"Pending"}` — awaiting a Knight's review.
+    pub fn pending() -> Self {
+        Self { state: RedemptionStateKind::Pending, reason: None }
+    }
+    /// `{"state":"Approved"}` — granted.
+    pub fn approved() -> Self {
+        Self { state: RedemptionStateKind::Approved, reason: None }
+    }
+    /// `{"state":"Rejected"}` (or with a `reason`) — declined.
+    pub fn rejected(reason: Option<String>) -> Self {
+        Self { state: RedemptionStateKind::Rejected, reason }
+    }
 }
 
 /// POST /claims — idempotent on `claim_id` (the phone mints it), so the offline

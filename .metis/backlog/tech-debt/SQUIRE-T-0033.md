@@ -4,15 +4,15 @@ level: task
 title: "Make data-carrying enums (ClaimState/RedemptionState/LockReason) generator-friendly for the Kotlin SDK"
 short_code: "SQUIRE-T-0033"
 created_at: 2026-06-17T13:02:45.219655+00:00
-updated_at: 2026-06-17T13:02:45.219655+00:00
+updated_at: 2026-06-17T13:13:08.352921+00:00
 parent: 
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/backlog"
   - "#tech-debt"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -39,6 +39,10 @@ Make the contract's **data-carrying enums** round-trip cleanly through `openapi-
 - **Current Problems**: utoipa emits our serde **externally-tagged** enums (`ClaimState` = `"Pending"` | `{"Approved":{points}}` | `{"Rejected":{reason?}}`, plus `RedemptionState`, `LockReason`, `DecisionDto`) as an OpenAPI `oneOf`. `openapi-generator` 7.11 (kotlin/kotlinx) **collapses each `oneOf` into a single merged data class** (e.g. `ClaimState(approved, rejected)`), dropping the unit variant (`"Pending"`) and producing types that (a) won't deserialize the real JSON and (b) are nearly impossible to construct in tests. Discovered in T-0032 (`:core` sidesteps them by using ids only).
 - **Benefits of Fixing**: the generated SDK faithfully models claim/redemption/lock state, so the phone UIs can render `GET /state` / `HouseholdReview` directly from generated types — preserving the A-0009 "no hand-written DTOs / no drift" guarantee for the whole payload, not just the id-bearing parts.
 - **Risk Assessment**: if unfixed, the UI layer must hand-map these few enums (reintroducing localized drift) or parse raw JSON. Acceptable short-term for `:core`; not acceptable for the rendering layer.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

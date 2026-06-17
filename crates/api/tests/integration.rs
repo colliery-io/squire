@@ -255,7 +255,7 @@ async fn ac1_full_flow_over_http() {
     )
     .await;
     assert_eq!(st, StatusCode::OK);
-    assert_eq!(claim["state"], "Pending", "fresh claim is Pending");
+    assert_eq!(claim["state"]["state"], "Pending", "fresh claim is Pending");
 
     // 4. Knight's household-review shows the claim in pending_claims, labelled with that squire.
     let (st, review) = get(&state, "/household-review", &knight, &handle).await;
@@ -291,8 +291,9 @@ async fn ac1_full_flow_over_http() {
     assert_eq!(view["balance"], 5);
     let claims = view["my_claims"].as_array().unwrap();
     assert_eq!(claims.len(), 1);
-    // ClaimState::Approved serialises as { "Approved": { "points": 5 } }.
-    assert_eq!(claims[0]["state"]["Approved"]["points"], 5);
+    // ClaimState is a flat tagged object: { "state": "Approved", "points": 5 } (SQUIRE-T-0033).
+    assert_eq!(claims[0]["state"]["state"], "Approved");
+    assert_eq!(claims[0]["state"]["points"], 5);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -438,7 +439,7 @@ async fn claim_is_idempotent_over_http() {
     let (st2, r2) = post_json(&state, "/claims", &squire, &handle, body).await;
     assert_eq!(st1, StatusCode::OK);
     assert_eq!(st2, StatusCode::OK);
-    assert_eq!(r1["state"], "Pending");
+    assert_eq!(r1["state"]["state"], "Pending");
     assert_eq!(r2["state"], r1["state"], "replay returns the same state");
 
     // Exactly ONE claim exists (verified via the Squire's own /state).
@@ -461,7 +462,7 @@ async fn redemption_request_is_idempotent_over_http() {
     let (st2, r2) = post_json(&state, "/redemption-requests", &squire, &handle, body).await;
     assert_eq!(st1, StatusCode::OK);
     assert_eq!(st2, StatusCode::OK);
-    assert_eq!(r1["state"], "Pending");
+    assert_eq!(r1["state"]["state"], "Pending");
     assert_eq!(r2["state"], r1["state"]);
 
     // Exactly ONE request exists (via the Squire's /state).

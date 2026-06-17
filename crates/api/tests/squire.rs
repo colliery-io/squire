@@ -15,7 +15,7 @@ use axum::http::{Request, StatusCode};
 use domain_core::contract::{
     Assignment, AuthToken, Cadence, Change, Completion, Date, HouseholdHandle, ItemId, Quest,
     QuestId, RedeemableItem, Availability, Role, Schedule, StateView, SubmitClaimResp,
-    RequestRedemptionResp, ClaimState, RedemptionState, User, UserId,
+    RequestRedemptionResp, ClaimStateKind, RedemptionStateKind, User, UserId,
 };
 use domain_core::contract::{Clock, Repository};
 use store::tenant::{Backend, Provisioner};
@@ -168,7 +168,7 @@ async fn submit_claim_is_pending_and_idempotent() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let r: SubmitClaimResp = json_body(resp).await;
-    assert!(matches!(r.state, ClaimState::Pending));
+    assert!(matches!(r.state.state, ClaimStateKind::Pending));
 
     // Re-POST the same claim_id → still one claim, same Pending state (idempotent).
     let resp2 = router(state.clone())
@@ -177,7 +177,7 @@ async fn submit_claim_is_pending_and_idempotent() {
         .unwrap();
     assert_eq!(resp2.status(), StatusCode::OK);
     let r2: SubmitClaimResp = json_body(resp2).await;
-    assert!(matches!(r2.state, ClaimState::Pending));
+    assert!(matches!(r2.state.state, ClaimStateKind::Pending));
 
     // The state view shows exactly one claim.
     let view: StateView = json_body(
@@ -188,7 +188,7 @@ async fn submit_claim_is_pending_and_idempotent() {
     )
     .await;
     assert_eq!(view.my_claims.len(), 1);
-    assert!(matches!(view.my_claims[0].state, ClaimState::Pending));
+    assert!(matches!(view.my_claims[0].state.state, ClaimStateKind::Pending));
 }
 
 #[tokio::test]
@@ -202,7 +202,7 @@ async fn redemption_request_is_pending_and_shows_in_state() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let r: RequestRedemptionResp = json_body(resp).await;
-    assert!(matches!(r.state, RedemptionState::Pending));
+    assert!(matches!(r.state.state, RedemptionStateKind::Pending));
 
     let view: StateView = json_body(
         router(state)
@@ -212,7 +212,7 @@ async fn redemption_request_is_pending_and_shows_in_state() {
     )
     .await;
     assert_eq!(view.my_requests.len(), 1);
-    assert!(matches!(view.my_requests[0].state, RedemptionState::Pending));
+    assert!(matches!(view.my_requests[0].state.state, RedemptionStateKind::Pending));
     assert_eq!(view.my_requests[0].cost, 3);
 }
 
