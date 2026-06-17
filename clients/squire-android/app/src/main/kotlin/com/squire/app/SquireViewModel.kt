@@ -21,9 +21,7 @@ class SquireViewModel(private val store: PlayerStore) : ViewModel() {
      * refetch — so a submission queued in a previous session (survived a restart) is delivered as
      * soon as the computer is reachable, not just on the next manual submit.
      */
-    fun refresh() {
-        viewModelScope.launch { store.syncNow() }
-    }
+    fun refresh() = viewModelScope.launch { store.syncNow() }
 
     fun submitClaim(questId: Long, on: Int) {
         viewModelScope.launch { store.submitClaim(questId = questId, on = on) }
