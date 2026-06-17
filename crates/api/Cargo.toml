@@ -5,7 +5,7 @@ edition = "2021"
 description = "Squire — LAN HTTP server (axum): the only network seam / trust boundary, per task SQUIRE-T-0014"
 
 [dependencies]
-domain-core = { path = "../domain-core" }
+domain-core = { path = "../domain-core", features = ["serde"] }
 store = { path = "../store" }
 axum = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }

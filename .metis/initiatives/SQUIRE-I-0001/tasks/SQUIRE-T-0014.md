@@ -4,14 +4,14 @@ level: task
 title: "API: crate scaffold, HTTP framework, identity port & auth/tenant middleware"
 short_code: "SQUIRE-T-0014"
 created_at: 2026-06-17T05:13:23.984800+00:00
-updated_at: 2026-06-17T05:17:41.128493+00:00
+updated_at: 2026-06-17T05:23:03.329754+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,12 +32,14 @@ Stand up the new `crates/api` crate as an axum HTTP server — the project's onl
 
 ## Acceptance Criteria
 
-- [ ] `crates/api` builds with deps domain-core, store, axum (+tokio), serde/serde_json; crate added to the workspace `members`.
-- [ ] HTTP framework decision resolved to **axum** (record the rationale in the decision log).
-- [ ] `Identity` port defined: `verify(handle, token) -> Result<Principal, AuthError>` where `Principal` = household + `UserId` + `Role`, plus register/login/add_member signatures (bodies land in T-0017); minimal dev `Identity` provides in-memory token→principal mapping and provisions a tenant store via `store::Provisioner`.
-- [ ] Auth/tenant extractor (axum `FromRequestParts` or middleware) pulls `Authorization: Bearer <token>` + `X-Household: <handle>`, resolves the tenant, calls `Identity::verify`, and yields `Principal`; routes can require `Role::Knight` or `Role::Squire`; missing/invalid token → 401, wrong role → 403.
-- [ ] App state wires Store (behind a `Mutex` for single-writer) + Engine + Identity; `GET /health` → 200; server binds a configurable LAN host:port.
-- [ ] `cargo test -p api` green: middleware/handler unit tests plus a health test driven via axum `tower::ServiceExt::oneshot` (no real socket).
+## Acceptance Criteria
+
+- [x] `crates/api` builds with deps domain-core, store, axum 0.8 (+tokio), serde/serde_json; crate added to the workspace `members`.
+- [x] HTTP framework resolved to **axum** (rationale in the decision log).
+- [x] `Identity` port: `verify(handle, token) -> Result<Principal, AuthError>` (`Principal` = household + `UserId` + `Role`) + register/login/add_member signatures (bodies in T-0017); `DevIdentity` (in-memory token→principal, `seed` helper).
+- [x] Auth extractor (`FromRequestParts`): `Authorization: Bearer` + `X-Household`, resolve tenant, `Identity::verify` → `Principal`; `RequireKnight`/`RequireSquire`; missing/invalid → 401, wrong role → 403.
+- [x] App state wires `Mutex<Store>` (single-writer) + Engine + Identity; `GET /health` → 200; `serve` binds a configurable LAN host:port.
+- [x] `cargo test -p api` green (3 unit + 7 `oneshot` integration, no socket).
 
 ## Implementation Notes
 

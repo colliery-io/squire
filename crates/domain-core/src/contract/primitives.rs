@@ -3,15 +3,22 @@
 // ─── Primitives (placeholders) ──────────────────────────────────────────────
 pub type Points = u32;
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Date(pub i32); //   days since an epoch
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Timestamp(pub i64); // unix millis
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct QuestId(pub u128);
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct ItemId(pub u128);
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct AchievementId(pub u128);
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct ClaimId(pub u128);
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct RequestId(pub u128);
 /// Client-minted idempotency key for privileged commands that lack a natural one
 /// (`RedeemItem` direct, `AdjustPoints`). The parent phone's offline outbox mints it
@@ -24,8 +31,10 @@ pub struct Timestamp(pub i64); // unix millis
 /// Squires (child/player) — counts are fixed nowhere. Player activity is attributed to a
 /// Squire via this id. See ADR SQUIRE-A-0004. (Tenancy is schema-level and absent from
 /// these types — ADR SQUIRE-A-0002.)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)] pub struct UserId(pub u128);
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Role { Knight, Squire }
 
@@ -33,5 +42,6 @@ pub enum Role { Knight, Squire }
 pub enum Weekday { Mon, Tue, Wed, Thu, Fri, Sat, Sun }
 
 /// Free-form text labels — the parent types whatever grouping they like.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Category(pub String);

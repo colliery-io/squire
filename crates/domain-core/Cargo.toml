@@ -6,6 +6,13 @@ description = "Squire — pure, portable domain engine (Engine + Projections) pe
 
 # Pure core: no storage / transport / UI / time dependencies (NFR-1.1.4, AR-7).
 [dependencies]
+# Optional: JSON (de)serialization of the contract DTOs for the API trust boundary
+# (SQUIRE-T-0015). Gated behind the `serde` feature so the default build of the core
+# stays dependency-free (NFR-1.1.4) — only the `api` crate enables it.
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+serde = ["dep:serde"]
 
 [dev-dependencies]
 proptest = "1.11.0"

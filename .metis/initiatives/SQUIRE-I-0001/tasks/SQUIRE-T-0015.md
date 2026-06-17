@@ -4,14 +4,14 @@ level: task
 title: "API: Squire endpoints + per-Squire StateView assembly"
 short_code: "SQUIRE-T-0015"
 created_at: 2026-06-17T05:13:25.400963+00:00
-updated_at: 2026-06-17T05:13:25.400963+00:00
+updated_at: 2026-06-17T05:23:30.206261+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Implement the three Squire-role endpoints and assemble the per-Squire `StateView` from `Projections` plus the domain-core view helpers (`quest_status`, `reward_view`, `streak_view`). A Squire can read only their own scoped state and propose their own activity; the Keep remains the only writer.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
