@@ -3,15 +3,15 @@ id: real-pairing-qr-lan-discovery
 level: task
 title: "Real pairing (QR + LAN discovery) + secure per-user token storage (NFR-5)"
 short_code: "SQUIRE-T-0042"
-created_at: 2026-06-17T17:25:00.000000+00:00
-updated_at: 2026-06-17T17:25:00.000000+00:00
+created_at: 2026-06-17T17:25:00+00:00
+updated_at: 2026-06-17T20:54:32.969269+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -43,15 +43,19 @@ This task is now an **umbrella** tracking three implementation sub-tasks (build 
 - **[[SQUIRE-T-0045]]** — Keep "Pair a device" screen (mint + render QR/text). *blocked_by T-0044.*
 - **[[SQUIRE-T-0046]]** — Phone pairing: NSD discovery, ZXing scan, `/pair` exchange, Keystore `SessionStore`, debug bypass; removes the baked creds. *blocked_by T-0044.*
 
-This umbrella closes when all three complete.
+This umbrella closes when all three complete. **2026-06-17 — all three done** (T-0044 server, T-0045 Keep QR, T-0046 phone). Real device pairing replaces the baked demo creds: a Knight mints a one-time code in the Keep (QR), the phone exchanges it at `POST /pair` for a per-user token stored Keystore-encrypted; a debug-only bypass keeps the emulator flow one-tap. Live-verified end to end. **Small follow-up noted in T-0046**: `squire-home` doesn't yet advertise `_squire._tcp` for NSD discovery (the QR carries host/port, so this isn't blocking).
 
 ## Acceptance Criteria
 
-- [ ] ADR decided for the pairing channel, LAN discovery, and secure storage (supersedes the baked-creds placeholder).
-- [ ] Control-plane `/pair`: the Keep generates a one-time pairing code (scoped to a household + member/role, short TTL); the phone exchanges it for a per-user token. Wrong/expired/used codes are rejected. Tests cover the happy path + rejections.
-- [ ] Keep UI: a "Pair a device" screen that mints + displays a code/QR for a selected member (Knight or Squire).
-- [ ] Both apps: a first-run pairing screen (scan QR / enter code) that discovers the host via NSD, pairs, and stores `{host, token}` in Keystore-backed encrypted storage; subsequent launches use the stored token; the demo `MainActivity` constants are gone.
-- [ ] Token presented on every API call (existing interceptor); offline-first still holds (no pairing needed to render cache). LAN-only; no cloud relay. `cargo test --workspace` + Android assembles green; live emulator pairing demo captured.
+## Acceptance Criteria
+
+## Acceptance Criteria
+
+- [x] ADR decided ([[SQUIRE-A-0010]]) for the pairing channel, LAN discovery, and secure storage.
+- [x] Control-plane `/pair` (T-0044): one-time, single-use, ≥128-bit, 30-min, hashed, tenant-scoped codes; wrong/expired/used rejected (uniform 401); tests cover happy path + rejections.
+- [x] Keep UI (T-0045): "Pair a device" screen mints + renders a QR/code for a selected member.
+- [x] Both apps (T-0046): first-run `PairingScreen` (scan/manual/discover), `/pair` exchange, Keystore-encrypted `SessionStore`; subsequent launches use the stored token; baked `MainActivity` constants removed.
+- [x] Token presented on every call (interceptor); offline-first preserved; LAN-only. `cargo test --workspace` + Android assembles green; live emulator pairing demo captured.
 
 ## Implementation Notes
 

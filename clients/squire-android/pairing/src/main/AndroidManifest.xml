@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- QR scanning for device pairing (ADR SQUIRE-A-0010). Optional: the manual-code path works
+         without a camera. ZXing's CaptureActivity is merged in from zxing-android-embedded. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+</manifest>

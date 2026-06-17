@@ -1,20 +1,19 @@
 plugins {
-    alias(libs.plugins.android.application)
+    alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.ksp)
 }
 
+// Shared device-pairing module (ADR SQUIRE-A-0010): Keystore-backed session storage, the /pair
+// exchange over the generated SDK, NSD host discovery, QR parsing + a ZXing scan screen. Used by
+// both :app (Squire) and :knight-app (Knight) so the pairing flow lives in one place.
 android {
-    namespace = "com.squire.app"
+    namespace = "com.squire.pairing"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.squire.app"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
     }
 
     compileOptions {
@@ -28,24 +27,19 @@ android {
 
     buildFeatures {
         compose = true
-        buildConfig = true
-    }
-
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-        }
     }
 }
 
 dependencies {
-    implementation(project(":core"))
-    implementation(project(":sdk"))
-    implementation(project(":pairing"))
-
+    api(project(":sdk"))
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+
+    // Keystore-backed encrypted token storage (NFR-5).
+    implementation(libs.androidx.security.crypto)
+    // QR scanning (camera) — ZXing, fully on-device, no Play Services.
+    implementation(libs.zxing.android.embedded)
 
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
@@ -54,10 +48,5 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
-
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
 }

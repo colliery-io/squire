@@ -28,6 +28,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     buildTypes {
@@ -40,6 +41,7 @@ android {
 dependencies {
     implementation(project(":knight-core"))
     implementation(project(":sdk"))
+    implementation(project(":pairing"))
 
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
