@@ -28,16 +28,23 @@ class MainActivity : ComponentActivity() {
 
     private val ids = AtomicLong(System.currentTimeMillis())
 
-    // Placeholder transport config. `10.0.2.2` is the host loopback from the emulator.
-    // Pairing UI + secure token storage land in a later task.
+    // DEMO/placeholder transport config — matches the `serve_demo` seed (SQUIRE-T-0035).
+    // `10.0.2.2` is the host loopback from the emulator. Pairing UI + secure token storage
+    // (real login credentials) land in a later task; for now these are baked demo creds.
     private val baseUrl = "http://10.0.2.2:8080"
-    private val household = "dev-household"
-    private val token = "dev-token"
+    private val household = "demo"
+    private val user = 2L
+    private val secret = "demo"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val adapter = SquireApiAdapter(baseUrl = baseUrl, household = household, token = token)
+        val adapter = SquireApiAdapter(
+            baseUrl = baseUrl,
+            household = household,
+            user = user,
+            secret = secret,
+        )
         val outbox = InMemoryOutbox()
         val json = Json { ignoreUnknownKeys = true }
         val store = PlayerStore(
@@ -54,7 +61,17 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()
 
-                LaunchedEffect(Unit) { viewModel.refresh() }
+                // DEMO connect: log in once to obtain a tenant token, then refresh. If login
+                // fails (server down / wrong creds) the PlayerStore's offline path still shows the
+                // cached/empty state gracefully, so we swallow the error and refresh regardless.
+                LaunchedEffect(Unit) {
+                    try {
+                        adapter.login()
+                    } catch (_: Throwable) {
+                        // Offline / login failure — fall through to refresh (offline path).
+                    }
+                    viewModel.refresh()
+                }
 
                 PlayerHomeScreen(
                     state = state,
