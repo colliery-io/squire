@@ -36,7 +36,7 @@ The spec leaves these **Decision Areas: ADR TBD** — resolve before/within this
 - **Secure storage**: Android Keystore-backed `EncryptedSharedPreferences` for the token + host; iOS Keychain later. The token is presented on every call (already wired via the okhttp interceptor).
 - **Server surface**: a new `/pair` (consume one-time code → mint per-user token) on the control plane (SQUIRE-S-0003 / Identity SQUIRE-S-0007), and a Keep screen to **generate** a pairing code/QR for a chosen member.
 
-**Recommend** authoring an ADR ("Device pairing & per-user token provisioning over the LAN") and driving it to *decided* (human-in-the-loop) before implementing — this spans Identity, API, Keep, and both phones.
+**[[SQUIRE-A-0010]]** ("Device pairing & per-user token provisioning over the LAN") captures the proposed decision — currently **DRAFT, awaiting approval**. This task is blocked until that ADR is *decided*; on approval it decomposes per the ADR's "Decomposition" section (server `/pair` + Identity → Keep pair screen → phone discovery/scan/storage → demo bypass).
 
 ## Acceptance Criteria
 

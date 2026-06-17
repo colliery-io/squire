@@ -209,11 +209,28 @@ pub struct HouseholdReview {
     pub squires: Vec<SquireSummary>,
     pub pending_claims: Vec<PendingClaim>,
     pub pending_requests: Vec<PendingRequest>,
+    /// Active redeemable items the Knight can direct-redeem on a Squire's behalf (REQ-K5).
+    pub items: Vec<ItemOption>,
+    /// Active quests the Knight can mark done for a Squire (REQ-K3), paired with [`today`].
+    pub quests: Vec<QuestOption>,
+    /// The server's "today" (date number) — the `on` a mark-done claim is filed against.
+    pub today: Date,
 }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct SquireSummary { pub squire: UserId, pub display_name: String, pub balance: Points }
+/// A redeemable item the Knight can pick for a direct redeem (REQ-K5). Affordability/availability
+/// are re-checked by the Keep at commit, so this is just the catalog, not a per-Squire eligibility.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct ItemOption { pub item_id: ItemId, pub name: String, pub cost: Points }
+/// An active quest the Knight can pick for a mark-done (REQ-K3).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct QuestOption { pub quest_id: QuestId, pub title: String }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]

@@ -99,6 +99,8 @@ class MainActivity : ComponentActivity() {
                     onApproveRequest = { viewModel.approveRequest(it) },
                     onRejectRequest = { viewModel.rejectRequest(it, null) },
                     onAddFunds = { squire, amount, reason -> viewModel.adjust(squire, amount, reason) },
+                    onRedeem = { squire, itemId -> viewModel.redeem(squire, itemId) },
+                    onMarkDone = { squire, questId, on -> viewModel.markDone(squire, questId, on) },
                 )
             }
         }

@@ -3,15 +3,15 @@ id: surface-knight-redeem-mark-done
 level: task
 title: "Surface Knight redeem + mark-done quick-actions in the UI"
 short_code: "SQUIRE-T-0043"
-created_at: 2026-06-17T17:25:00.000000+00:00
-updated_at: 2026-06-17T17:25:00.000000+00:00
+created_at: 2026-06-17T17:25:00+00:00
+updated_at: 2026-06-17T19:47:07.599174+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -34,10 +34,14 @@ The Knight's `HouseholdReview` read carries per-Squire balances and the pending 
 
 ## Acceptance Criteria
 
-- [ ] The Knight can **mark a quest done** for a chosen Squire from the UI (pick Squire → pick one of their quests-of-today → confirm), routing through `KnightViewModel.markDone`; the credit appears after sync.
-- [ ] The Knight can **directly redeem** an item for a chosen Squire from the UI (pick Squire → pick item → confirm), routing through `KnightViewModel.redeem`; the balance debits after sync.
-- [ ] Both actions go through the durable privileged outbox (offline-safe, idempotent on the minted `command_id`/`claim_id`) — same path as the other quick-actions; a blocked redeem (e.g. can't afford / out of stock) surfaces gracefully (the engine re-checks at commit).
-- [ ] Whatever read feeds the item/quest pickers is added/decided (see open question); `cargo test --workspace` green if the API changes; `:knight-app:assembleDebug` builds; live emulator demo of both actions captured.
+## Acceptance Criteria
+
+## Acceptance Criteria
+
+- [x] The Knight can **mark a quest done** for a chosen Squire from the UI (Squire row → "Mark done" → pick a quest), routing through `KnightViewModel.markDone(squire, questId, today)`; credit appeared after sync (live: Make your bed → +5).
+- [x] The Knight can **directly redeem** an item for a chosen Squire from the UI (Squire row → "Redeem" → pick an item), routing through `KnightViewModel.redeem`; balance debited after sync (live: Ice cream → −3).
+- [x] Both actions go through the durable privileged outbox (offline-safe, idempotent on the minted `command_id`/`claim_id`) — same path as the other quick-actions; the engine re-checks affordability/availability at commit.
+- [x] Resolved the open question with option (a): additively extended `HouseholdReview` with `items` (active catalog), `quests` (active), and `today` (date number for mark-done) — keeps the Knight on its own surface. `cargo test --workspace` green (openapi re-frozen, SDK regenerated); `:knight-app:assembleDebug` builds; live emulator demo captured (`/tmp/knight-quickactions.png`).
 
 ## Implementation Notes
 
@@ -52,4 +56,8 @@ Smallest of the deferred items if we reuse an existing read; slightly larger if 
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Done.** Chose open-question option (a): additively extended `HouseholdReview` (`crates/domain-core/src/contract/api.rs`) with `items: Vec<ItemOption{item_id,name,cost}>`, `quests: Vec<QuestOption{quest_id,title}>`, and `today: Date`; the `knight.rs` (api) and `review.rs` (keep) assemblers populate them from the active catalog + `clock.today()`. Registered the two new schemas in `openapi.rs`, re-froze `openapi.json`, regenerated the SDK (new `ItemOption`/`QuestOption`; `HouseholdReview` gains `items`/`quests`/`today`). `cargo test --workspace` green.
+
+Knight UI: `SquireRow` now shows three actions (Mark done · Redeem · Add funds); "Mark done" and "Redeem" open a `PickDialog` listing `review.quests` / `review.items` — tapping an option fires `viewModel.markDone(squire, questId, review.today)` / `viewModel.redeem(squire, itemId)` through the existing durable outbox. `:knight-app:assembleDebug` builds.
+
+**Live demo:** Gawain 0 pts → Mark done "Make your bed" → **+5** (balance 5) → Redeem "Ice cream" → **−3** (balance 2). Screenshot `/tmp/knight-quickactions.png`. The REQ-K3 (mark-done) and REQ-K5 (direct redeem) surfaces are now complete in the app.
