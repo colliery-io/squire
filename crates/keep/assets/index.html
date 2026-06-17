@@ -51,6 +51,37 @@
       <p id="quest-error" class="error" hidden></p>
       <ul id="quest-list"></ul>
     </section>
+
+    <!-- Item authoring (SQUIRE-T-0027). Availability is Once or Repeatable only (A-0006). -->
+    <section id="items-panel" hidden>
+      <h2 id="items">Rewards</h2>
+      <form id="item-form">
+        <label>Name <input name="name" required /></label>
+        <label>Cost (points) <input name="cost" type="number" min="0" value="3" required /></label>
+        <label>Availability
+          <select name="availability">
+            <option value="Repeatable">Repeatable</option>
+            <option value="Once">Once (out of stock after redemption)</option>
+          </select>
+        </label>
+        <button type="submit">Add reward</button>
+      </form>
+      <p id="item-error" class="error" hidden></p>
+      <ul id="item-list"></ul>
+    </section>
+
+    <!-- Achievement authoring (SQUIRE-T-0027). Minimal: a points-earned criterion. -->
+    <section id="achievements-panel" hidden>
+      <h2 id="achievements">Achievements</h2>
+      <form id="achievement-form">
+        <label>Name <input name="name" required /></label>
+        <label>Points to earn <input name="total" type="number" min="1" value="100" required /></label>
+        <label>Bonus points <input name="bonus" type="number" min="0" value="10" required /></label>
+        <button type="submit">Add achievement</button>
+      </form>
+      <p id="achievement-error" class="error" hidden></p>
+      <ul id="achievement-list"></ul>
+    </section>
   </main>
 
   <script src="/static/keep.js"></script>

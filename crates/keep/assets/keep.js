@@ -24,9 +24,40 @@
     document.getElementById("login").hidden = true;
     document.getElementById("who").textContent = `${who.display_name || "Knight"} (#${who.user})`;
     document.getElementById("shell").hidden = false;
-    document.getElementById("quests-panel").hidden = false;
+    for (const id of ["quests-panel", "items-panel", "achievements-panel"]) {
+      document.getElementById(id).hidden = false;
+    }
     loadQuests();
+    loadCatalog("items", "item-list");
+    loadCatalog("achievements", "achievement-list");
   });
+
+  // ── Generic catalog list/archive (items, achievements) ───────────────────────
+  async function loadCatalog(kind, listId) {
+    const res = await fetch(`/api/${kind}`);
+    if (!res.ok) return;
+    const rows = await res.json();
+    const ul = document.getElementById(listId);
+    ul.innerHTML = "";
+    for (const row of rows) {
+      const obj = row.item || row.achievement;
+      const li = document.createElement("li");
+      const label = row.item
+        ? `${obj.name} — ${obj.cost} pts${obj.active ? "" : " (archived)"}${row.out_of_stock ? " · out of stock" : ""}`
+        : `${obj.name}${obj.active ? "" : " (archived)"}`;
+      li.textContent = label + " ";
+      if (obj.active) {
+        const btn = document.createElement("button");
+        btn.textContent = "Archive";
+        btn.addEventListener("click", async () => {
+          await fetch(`/api/${kind}/${obj.id}/archive`, { method: "POST" });
+          loadCatalog(kind, listId);
+        });
+        li.appendChild(btn);
+      }
+      ul.appendChild(li);
+    }
+  }
 
   // ── Quests (T-0026) ──────────────────────────────────────────────────────────
   // The session cookie is HttpOnly; same-origin fetch sends it automatically, so the Operator
@@ -92,6 +123,70 @@
       }
       questForm.reset();
       loadQuests();
+    });
+  }
+
+  // ── Item create (T-0027) ─────────────────────────────────────────────────────
+  const itemForm = document.getElementById("item-form");
+  const itemErr = document.getElementById("item-error");
+  if (itemForm) {
+    itemForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      itemErr.hidden = true;
+      const fd = new FormData(itemForm);
+      const item = {
+        id: Date.now(),
+        name: fd.get("name"),
+        description: null,
+        cost: Number(fd.get("cost")),
+        gate: null,
+        availability: fd.get("availability"), // "Once" | "Repeatable"
+        active: true,
+        icon: null,
+      };
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(item),
+      });
+      if (!res.ok) {
+        itemErr.textContent = "Could not save reward.";
+        itemErr.hidden = false;
+        return;
+      }
+      itemForm.reset();
+      loadCatalog("items", "item-list");
+    });
+  }
+
+  // ── Achievement create (T-0027) ──────────────────────────────────────────────
+  const achForm = document.getElementById("achievement-form");
+  const achErr = document.getElementById("achievement-error");
+  if (achForm) {
+    achForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      achErr.hidden = true;
+      const fd = new FormData(achForm);
+      const achievement = {
+        id: Date.now(),
+        name: fd.get("name"),
+        description: null,
+        criterion: { PointsEarned: { total: Number(fd.get("total")) } },
+        bonus_points: Number(fd.get("bonus")),
+        active: true,
+      };
+      const res = await fetch("/api/achievements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(achievement),
+      });
+      if (!res.ok) {
+        achErr.textContent = res.status === 400 ? "Invalid achievement." : "Could not save achievement.";
+        achErr.hidden = false;
+        return;
+      }
+      achForm.reset();
+      loadCatalog("achievements", "achievement-list");
     });
   }
 })();
