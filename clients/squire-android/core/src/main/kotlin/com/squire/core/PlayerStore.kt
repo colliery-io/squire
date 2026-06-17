@@ -81,6 +81,17 @@ class PlayerStore(
     }
 
     /**
+     * The spec's "Sync" (REQ-SY4): flush the durable [outbox] (post each pending submission —
+     * idempotent on its phone-minted id), then refetch. Use on app startup and for the user's
+     * Refresh action so a submission queued in a PREVIOUS session (one that survived an app
+     * restart via the durable outbox) is delivered as soon as the computer is reachable. Never throws.
+     */
+    suspend fun syncNow() {
+        sync.sync()
+        refresh()
+    }
+
+    /**
      * Submit a completion claim for the quest [questId] on day [on]. Mints an id,
      * enqueues the claim, flushes via [sync], then refreshes. Never throws.
      */

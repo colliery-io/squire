@@ -71,23 +71,41 @@ class SquireApiAdapter(
         resp.token
     }
 
+    /**
+     * Make sure we hold a bearer token before an authenticated call. The app may have *started
+     * offline* — then `MainActivity`'s startup [login] failed and [tokenHolder] is still empty, so a
+     * later flush/refetch (once the computer is reachable again) would otherwise POST with no
+     * `Authorization` header and be rejected. This logs in lazily on the first authenticated call
+     * that finds an empty token. If login itself fails (still offline), the exception propagates and
+     * the caller degrades to the offline path / leaves the submission on the durable outbox.
+     */
+    private suspend fun ensureLoggedIn() {
+        if (tokenHolder.get().isEmpty()) {
+            login()
+        }
+    }
+
     override suspend fun fetchState(): StateView = withContext(Dispatchers.IO) {
+        ensureLoggedIn()
         api.getState(xHousehold = household)
     }
 
     override suspend fun submitClaim(req: SubmitClaimReq) {
         withContext(Dispatchers.IO) {
+            ensureLoggedIn()
             api.submitClaim(xHousehold = household, submitClaimReq = req)
         }
     }
 
     override suspend fun requestRedemption(req: RequestRedemptionReq) {
         withContext(Dispatchers.IO) {
+            ensureLoggedIn()
             api.requestRedemption(xHousehold = household, requestRedemptionReq = req)
         }
     }
 
     override suspend fun resolvedIds(): ResolvedIds = withContext(Dispatchers.IO) {
+        ensureLoggedIn()
         val state = api.getState(xHousehold = household)
         ResolvedIds(
             claims = state.myClaims.map { it.claimId }.toSet(),

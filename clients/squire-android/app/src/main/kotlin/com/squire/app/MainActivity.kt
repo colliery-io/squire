@@ -7,10 +7,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.squire.app.data.RoomOutbox
+import com.squire.app.data.RoomStateCache
 import com.squire.app.data.SquireApiAdapter
+import com.squire.app.data.db.SquireDb
 import com.squire.app.ui.PlayerHomeScreen
-import com.squire.core.InMemoryOutbox
-import com.squire.core.InMemoryStateCache
 import com.squire.core.PlayerStore
 import com.squire.core.PlayerUiState
 import com.squire.core.SyncEngine
@@ -45,11 +46,14 @@ class MainActivity : ComponentActivity() {
             user = user,
             secret = secret,
         )
-        val outbox = InMemoryOutbox()
         val json = Json { ignoreUnknownKeys = true }
+        // Durable cache + outbox: queued claims and the cached StateView survive app/process
+        // restart (REQ-SY1/SY2). Built once here and shared by the PlayerStore + SyncEngine.
+        val db = SquireDb.build(this)
+        val outbox = RoomOutbox(db.outboxDao(), json)
         val store = PlayerStore(
             fetcher = adapter,
-            cache = InMemoryStateCache(),
+            cache = RoomStateCache(db.cacheDao()),
             outbox = outbox,
             sync = SyncEngine(outbox, adapter, adapter),
             json = json,

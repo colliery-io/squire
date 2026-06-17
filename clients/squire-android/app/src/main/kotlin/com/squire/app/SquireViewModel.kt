@@ -16,8 +16,13 @@ class SquireViewModel(private val store: PlayerStore) : ViewModel() {
 
     val state: StateFlow<PlayerUiState> = store.state
 
+    /**
+     * The Refresh action (and startup) does the spec's "Sync" = flush the durable outbox, then
+     * refetch — so a submission queued in a previous session (survived a restart) is delivered as
+     * soon as the computer is reachable, not just on the next manual submit.
+     */
     fun refresh() {
-        viewModelScope.launch { store.refresh() }
+        viewModelScope.launch { store.syncNow() }
     }
 
     fun submitClaim(questId: Long, on: Int) {
