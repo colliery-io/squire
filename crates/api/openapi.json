@@ -4,7 +4,8 @@
     "title": "Squire Local API",
     "description": "The LAN HTTP wire contract for the Squire household reward system — emitted from the Rust types (ADR SQUIRE-A-0009). IDs are int64 on the wire (a 'fits in i64' invariant).",
     "license": {
-      "name": ""
+      "name": "Proprietary",
+      "identifier": "LicenseRef-Proprietary"
     },
     "version": "0.1.0"
   },

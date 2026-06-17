@@ -45,6 +45,9 @@ impl Modify for SecurityAddon {
         title = "Squire Local API",
         description = "The LAN HTTP wire contract for the Squire household reward system — emitted from the Rust types (ADR SQUIRE-A-0009). IDs are int64 on the wire (a 'fits in i64' invariant).",
         version = "0.1.0",
+        // A non-empty license keeps the emitted spec valid for OpenAPI 3.1 tooling
+        // (openapi-generator rejects the empty license utoipa otherwise infers from Cargo metadata).
+        license(name = "Proprietary", identifier = "LicenseRef-Proprietary"),
     ),
     paths(
         // Control plane (SQUIRE-T-0017)
