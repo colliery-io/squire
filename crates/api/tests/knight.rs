@@ -175,7 +175,7 @@ async fn review_claim_approve_credits_balance_and_clears_pending() {
     squire_a_claims(state.clone(), today, claim_id).await;
 
     // Knight approves the claim.
-    let body = serde_json::json!({ "claim_id": claim_id, "decision": "approve" }).to_string();
+    let body = serde_json::json!({ "claim_id": claim_id, "decision": { "verdict": "approve" } }).to_string();
     let resp = router(state.clone())
         .oneshot(req("POST", "/admin/review-claim", Some(KNIGHT_TOKEN), Some(body.clone())))
         .await
@@ -319,8 +319,8 @@ async fn squire_token_on_admin_and_review_is_403() {
 
     let cases: Vec<(&str, &str, Option<String>)> = vec![
         ("GET", "/household-review", None),
-        ("POST", "/admin/review-claim", Some(serde_json::json!({ "claim_id": 1u128, "decision": "approve" }).to_string())),
-        ("POST", "/admin/review-redemption", Some(serde_json::json!({ "request_id": 1u128, "decision": "approve" }).to_string())),
+        ("POST", "/admin/review-claim", Some(serde_json::json!({ "claim_id": 1u128, "decision": { "verdict": "approve" } }).to_string())),
+        ("POST", "/admin/review-redemption", Some(serde_json::json!({ "request_id": 1u128, "decision": { "verdict": "approve" } }).to_string())),
         ("POST", "/admin/redeem", Some(serde_json::json!({ "command_id": 1u128, "squire": SQUIRE_A_ID, "item_id": ITEM_ID }).to_string())),
         ("POST", "/admin/adjust", Some(serde_json::json!({ "command_id": 1u128, "squire": SQUIRE_A_ID, "amount": 1, "reason": "x" }).to_string())),
         ("POST", "/admin/mark-done", Some(serde_json::json!({ "claim_id": 1u128, "squire": SQUIRE_A_ID, "quest_id": QUEST_ID, "on": today.0 }).to_string())),

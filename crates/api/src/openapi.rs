@@ -117,6 +117,7 @@ impl Modify for SecurityAddon {
         crate::knight::MarkDoneReq,
         crate::knight::Ack,
         crate::knight::DecisionDto,
+        crate::knight::DecisionKind,
     )),
     modifiers(&SecurityAddon),
     tags(

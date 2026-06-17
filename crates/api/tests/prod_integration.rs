@@ -276,7 +276,7 @@ async fn ac1_full_flow_over_http_on_prod() {
             "/admin/review-claim",
             &knight,
             &handle,
-            json!({ "claim_id": claim_id, "decision": "approve" }),
+            json!({ "claim_id": claim_id, "decision": { "verdict": "approve" } }),
         )
         .await;
         assert_eq!(st, StatusCode::OK);
@@ -342,7 +342,7 @@ async fn mvp_seed_two_knights_one_squire_through_real_flow() {
             "/admin/review-claim",
             &knight2,
             &handle,
-            json!({ "claim_id": claim_id, "decision": "approve" }),
+            json!({ "claim_id": claim_id, "decision": { "verdict": "approve" } }),
         )
         .await;
         assert_eq!(st, StatusCode::OK, "the second Knight can approve too");
