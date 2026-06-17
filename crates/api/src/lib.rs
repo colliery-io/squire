@@ -15,12 +15,13 @@
 
 pub mod auth;
 pub mod identity;
+pub mod squire;
 pub mod state;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 
 pub use state::AppState;
@@ -33,6 +34,10 @@ pub use state::AppState;
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(health))
+        // ── Squire-role endpoints (SQUIRE-T-0015) ──────────────────────────────
+        .route("/state", get(squire::get_state))
+        .route("/claims", post(squire::submit_claim))
+        .route("/redemption-requests", post(squire::request_redemption))
         .with_state(state)
 }
 

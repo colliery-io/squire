@@ -5,6 +5,7 @@ use super::*;
 /// GET /state — everything a Squire's phone renders, fully cacheable for offline use.
 /// Scoped to one Squire (`squire`); the Knight's review queue is a separate parent read
 /// (`HouseholdReview`).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct StateView {
     pub squire: UserId,
@@ -17,6 +18,7 @@ pub struct StateView {
     pub my_requests: Vec<RedemptionStatus>,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct QuestCard {
     pub quest_id: QuestId,
@@ -27,9 +29,11 @@ pub struct QuestCard {
     pub on: Date,
     pub status: QuestStatus,
 }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Debug)]
 pub enum QuestStatus { Available, Pending, CompletedToday, TakenByOther } // TakenByOther: a Race quest claimed/won by a sibling
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct StreakView {
     pub name: String,
@@ -39,6 +43,7 @@ pub struct StreakView {
     pub next_milestone: Option<u32>, // next achievement length in this scope
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct RewardCard {
     pub item_id: ItemId,
@@ -49,9 +54,11 @@ pub struct RewardCard {
     pub lock: Option<LockReason>,         // None = currently redeemable
     pub last_redeemed: Option<Timestamp>, // most recent redemption of this item (any Squire); informational
 }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum LockReason { NeedsAchievement { name: String }, OutOfStock }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct ClaimStatus {
     pub claim_id: ClaimId,
@@ -59,6 +66,7 @@ pub struct ClaimStatus {
     pub on: Date,
     pub state: ClaimState,
 }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum ClaimState {
     Pending,
@@ -66,6 +74,7 @@ pub enum ClaimState {
     Rejected { reason: Option<String> },
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct RedemptionStatus {
     pub request_id: RequestId,
@@ -73,6 +82,7 @@ pub struct RedemptionStatus {
     pub cost: Points,
     pub state: RedemptionState,
 }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum RedemptionState {
     Pending,
@@ -82,16 +92,20 @@ pub enum RedemptionState {
 
 /// POST /claims — idempotent on `claim_id` (the phone mints it), so the offline
 /// outbox can retry safely. Returns Pending, or Approved if the quest auto-approves.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct SubmitClaimReq { pub claim_id: ClaimId, pub quest_id: QuestId, pub on: Date }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct SubmitClaimResp { pub claim_id: ClaimId, pub state: ClaimState }
 
 /// POST /redemption-requests — idempotent on `request_id` (phone-minted), same as claims.
 /// Affordability is re-checked at approval time, so a request can be made even if the
 /// balance is borderline; the parent sees whether it still clears when they review.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct RequestRedemptionReq { pub request_id: RequestId, pub item_id: ItemId }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct RequestRedemptionResp { pub request_id: RequestId, pub state: RedemptionState }
 
