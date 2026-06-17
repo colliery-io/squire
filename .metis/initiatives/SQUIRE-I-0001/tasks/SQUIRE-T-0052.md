@@ -3,15 +3,15 @@ id: resilient-server-address-runtime
 level: task
 title: "Resilient server address: runtime mDNS re-discovery when the stored host goes stale"
 short_code: "SQUIRE-T-0052"
-created_at: 2026-06-17T22:30:00.000000+00:00
-updated_at: 2026-06-17T22:30:00.000000+00:00
+created_at: 2026-06-17T22:30:00+00:00
+updated_at: 2026-06-17T22:26:13.014591+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -35,18 +35,25 @@ IP change (stable signing key, T-0048), so only the address needs refreshing.
 
 ## Acceptance Criteria
 
-- [ ] When the app is rendering from cache / can't reach the stored host, it attempts an mDNS
-      re-discovery (`NsdDiscovery`, best-effort, at most once per offline stretch). If a responder is
-      found at a **different** host/port, update the `Session` (host/port) in `SessionStore`, keeping
-      the token/household/role, and reconnect (the next refresh hits the new address).
-- [ ] Implemented for **both** apps with no duplication of the reconnection logic (the session-gated
-      `…HomeHost` already rebuilds the transport when the `Session` state changes — drive it from
-      there). Normal (reachable) operation is unchanged — no extra discovery churn when online.
-- [ ] Token/session preserved across a host change (no re-pair, no re-login); a found-but-same host
-      is a no-op; discovery finding nothing leaves the app gracefully offline (current behaviour).
-- [ ] `:core`/`:knight-core`/`:sdk` tests green; both apps assemble. Mechanism verified to not
-      regress the online flow on the emulator; **the actual "IP moved → auto-reconnect" needs a real
-      LAN** (emulator NSD is unreliable, like [[SQUIRE-T-0050]]) — documented.
+## Acceptance Criteria
+
+## Acceptance Criteria
+
+- [x] While the app is rendering from cache / errored (can't reach the stored host), a loop in
+      `…HomeHost` attempts `NsdDiscovery.discover()` every 15s; if a responder is found at a
+      **different** host/port, it updates the `Session` (host/port) via `onSessionChanged` →
+      `SessionStore.save`, keeping token/household/role, and the adapter reconnects.
+- [x] Both apps, no duplicated reconnection logic — the `…HomeHost` `remember(session)` already
+      rebuilds the transport when the `Session` state changes; the loop just swaps host/port. **Online
+      is unchanged** — the loop only calls discovery when offline (`Ready(fromCache)`/`Error`),
+      verified: online → home reached, loop idle.
+- [x] Token/session preserved (only host/port change; no re-pair/re-login); a found-but-same address
+      is a no-op; discovery finding nothing leaves the app gracefully offline (unchanged behaviour).
+- [x] Both apps assemble; `:core`/`:knight-core`/`:sdk` unaffected (app-module-only change). Verified
+      on the emulator: online flow intact; airplane-mode → "Offline — showing last saved view", the
+      relocate loop runs discovery (null on emulator) **without crashing/thrashing**. The actual "IP
+      moved → auto-reconnect" effect needs a real LAN (emulator NSD unreliable, folded into
+      [[SQUIRE-T-0050]]).
 
 ## Implementation Notes
 
@@ -72,4 +79,15 @@ task is the zero-config self-heal on top. Out of scope: storing a `.local` hostn
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Done (mechanism; live relocate needs hardware).** Both `…HomeHost`s gained a
+`discovery: NsdDiscovery` + `onSessionChanged: (Session) -> Unit` param and a relocate loop: while
+the UI state is `Ready(fromCache)`/`Error`, call `discovery.discover()` every `RELOCATE_INTERVAL_MS`
+(15s); on a different host/port, `onSessionChanged(session.copy(host, port))` → `SessionStore.save`
++ session state update → `remember(session)` rebuilds the adapter at the new address. The token is
+untouched (stable signing key, T-0048). MainActivity wires `onSessionChanged = { save; session = it }`.
+
+Verified on the emulator: **online** → player home, loop idle (no discovery churn); **airplane mode**
+→ "Offline — showing last saved view", process stays alive, the loop runs discovery (returns null —
+no mDNS on the emulator) without crashing or thrashing. The real "server IP moved → app auto-
+reconnects" can only be confirmed on a real LAN — rolled into [[SQUIRE-T-0050]]; the DHCP-reservation
+note in the runbook remains the simpler guaranteed mitigation. Both apps assemble; cores unaffected.

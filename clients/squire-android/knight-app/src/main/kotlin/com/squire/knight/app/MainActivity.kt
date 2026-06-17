@@ -29,6 +29,7 @@ import com.squire.knight.app.data.db.KnightDb
 import com.squire.knight.app.ui.KnightHomeScreen
 import com.squire.knight.core.KnightStore
 import com.squire.knight.core.KnightSyncEngine
+import com.squire.knight.core.KnightUiState
 import com.squire.pairing.NsdDiscovery
 import com.squire.pairing.PairingScreen
 import com.squire.pairing.Session
@@ -46,6 +47,9 @@ import java.util.concurrent.atomic.AtomicLong
 
 /** Foreground auto-refresh cadence (SQUIRE-T-0041). */
 private const val AUTO_REFRESH_MS = 5_000L
+
+/** How often to attempt mDNS re-discovery while the server is unreachable (SQUIRE-T-0052). */
+private const val RELOCATE_INTERVAL_MS = 15_000L
 
 /**
  * Compose host for the Knight (parent) review home.
@@ -83,6 +87,8 @@ class MainActivity : ComponentActivity() {
                         db = db,
                         json = json,
                         ids = ids,
+                        discovery = discovery,
+                        onSessionChanged = { s -> sessionStore.save(s); session = s },
                         onForget = {
                             sessionStore.clear()
                             session = null
@@ -115,6 +121,8 @@ private fun KnightHomeHost(
     db: KnightDb,
     json: Json,
     ids: AtomicLong,
+    discovery: NsdDiscovery,
+    onSessionChanged: (Session) -> Unit,
     onForget: () -> Unit,
 ) {
     val viewModel = remember(session) {
@@ -141,6 +149,23 @@ private fun KnightHomeHost(
                 viewModel.refresh().join()
                 delay(AUTO_REFRESH_MS)
             }
+        }
+    }
+
+    // Self-heal a stale server address (SQUIRE-T-0052): while unreachable, re-discover over mDNS and
+    // update the session host/port (keeping the token) so the adapter reconnects. No-op while online.
+    LaunchedEffect(session) {
+        while (true) {
+            val s = viewModel.state.value
+            val offline = (s is KnightUiState.Ready && s.fromCache) || s is KnightUiState.Error
+            if (offline) {
+                val found = discovery.discover()
+                if (found != null && (found.first != session.host || found.second != session.port)) {
+                    onSessionChanged(session.copy(host = found.first, port = found.second))
+                    break
+                }
+            }
+            delay(RELOCATE_INTERVAL_MS)
         }
     }
 
