@@ -4,14 +4,14 @@ level: task
 title: "Store: Repository conformance, raw log query & perf"
 short_code: "SQUIRE-T-0013"
 created_at: 2026-06-17T04:08:45.773954+00:00
-updated_at: 2026-06-17T04:08:45.773954+00:00
+updated_at: 2026-06-17T04:57:24.890605+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Prove the SQLite-backed Repository is a faithful drop-in for the in-memory one (parity), add the raw per-quest / per-item event-log query, and add a perf check at scale.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

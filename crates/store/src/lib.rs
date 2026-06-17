@@ -145,6 +145,67 @@ impl<C: Clock> Store<C> {
     pub fn export(&self, path: impl AsRef<std::path::Path>) -> Result<(), backup::BackupError> {
         backup::export(&mut self.conn.borrow_mut(), path)
     }
+
+    /// Raw per-item event log (NFR-11): every event touching `item`, in `seq` order, decoded
+    /// to domain [`Event`]s. These are exactly the redemption lifecycle events that carry the
+    /// item — `RedemptionRequested` / `RedemptionRejected` / `ItemRedeemed` — i.e. the trail
+    /// that explains how an item's redemptions (and their balance impact) came to be.
+    ///
+    /// Filtered on the `item_id` column at the database, so it scales to a long log without
+    /// materialising the whole snapshot.
+    pub fn raw_log_for_item(&self, item: ItemId) -> Vec<Event> {
+        let mut conn = self.conn.borrow_mut();
+        let rows: Vec<EventRow> = events::table
+            .filter(events::item_id.eq(id_to_text(item.0)))
+            .select(EventRow::as_select())
+            .order(events::seq.asc())
+            .load(&mut *conn)
+            .expect("raw_log_for_item: query failed (corrupt store)");
+        rows.iter()
+            .map(|r| r.to_event())
+            .collect::<Result<Vec<_>, _>>()
+            .expect("raw_log_for_item: decode failed (corrupt store)")
+    }
+
+    /// Raw per-quest event log (NFR-11): every event touching `quest`, in `seq` order, decoded
+    /// to domain [`Event`]s — the trail that explains how a Squire's streak / completion history
+    /// for that quest was reached.
+    ///
+    /// Two steps: (1) the `CompletionClaimed` events carry `quest_id` directly; (2) the
+    /// approve/reject events (`CompletionApproved` / `CompletionRejected`) carry only a
+    /// `claim_id`, so we first resolve the set of claim ids for this quest, then pull the
+    /// events whose `claim_id` is in that set. The union is returned in `seq` order.
+    pub fn raw_log_for_quest(&self, quest: QuestId) -> Vec<Event> {
+        let mut conn = self.conn.borrow_mut();
+
+        // (1) claim ids for this quest (from its CompletionClaimed events).
+        let claim_ids: Vec<String> = events::table
+            .filter(events::quest_id.eq(id_to_text(quest.0)))
+            .filter(events::claim_id.is_not_null())
+            .select(events::claim_id)
+            .load::<Option<String>>(&mut *conn)
+            .expect("raw_log_for_quest: claim-id query failed (corrupt store)")
+            .into_iter()
+            .flatten()
+            .collect();
+
+        // (2) all events that either name the quest directly OR resolve to one of its claims,
+        //     ordered by seq. A single query with the two predicates OR'd keeps it one pass.
+        let rows: Vec<EventRow> = events::table
+            .filter(
+                events::quest_id
+                    .eq(id_to_text(quest.0))
+                    .or(events::claim_id.eq_any(claim_ids)),
+            )
+            .select(EventRow::as_select())
+            .order(events::seq.asc())
+            .load(&mut *conn)
+            .expect("raw_log_for_quest: query failed (corrupt store)");
+        rows.iter()
+            .map(|r| r.to_event())
+            .collect::<Result<Vec<_>, _>>()
+            .expect("raw_log_for_quest: decode failed (corrupt store)")
+    }
 }
 
 impl<C: Clock> Repository for Store<C> {

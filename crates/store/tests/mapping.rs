@@ -384,9 +384,14 @@ fn each_backend(test: impl Fn(&mut AnyConnection)) {
         let path = dir.path().join("mapping-test.sqlite");
         let url = path.to_str().expect("utf-8 path");
         let mut conn = AnyConnection::Sqlite(SqliteConnection::establish(url).expect("sqlite"));
-        // Run the embedded migrations on the SQLite arm.
+        // Run the embedded migrations on the SQLite arm. (A `match` rather than `let-else`
+        // so it's exhaustive whether or not the `postgres` Pg variant is compiled in.)
         {
-            let AnyConnection::Sqlite(ref mut c) = conn else { unreachable!() };
+            let c = match conn {
+                AnyConnection::Sqlite(ref mut c) => c,
+                #[cfg(feature = "postgres")]
+                AnyConnection::Pg(_) => unreachable!("sqlite-only helper"),
+            };
             store::run_migrations(c).expect("sqlite migrations");
         }
         test(&mut conn);
