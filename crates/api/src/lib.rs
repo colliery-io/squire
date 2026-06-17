@@ -2,9 +2,10 @@
 //!
 //! This crate is Squire's **only network seam and trust boundary**: every request crosses an
 //! authenticated edge ([`auth`]) and is reduced to a verified [`identity::Principal`] before
-//! any handler logic runs. The Squire/Knight/control-plane endpoints land in later tasks
-//! (T-0015/16/17); this scaffold provides the framework, app state, identity port, and the
-//! auth/tenant layer, plus a single real route — `GET /health`.
+//! any handler logic runs. The Squire ([`squire`], T-0015), Knight ([`knight`], T-0016), and
+//! control-plane ([`control`], T-0017) endpoints are all wired here, atop the framework, app
+//! state, identity port, and auth/tenant layer; `GET /health` is the unauthenticated liveness
+//! probe.
 //!
 //! ## HTTP framework: axum (decision recorded for SQUIRE-S-0003)
 //!
@@ -14,6 +15,7 @@
 //! `tower::ServiceExt::oneshot`, so the whole request path is exercised in-process.
 
 pub mod auth;
+pub mod control;
 pub mod identity;
 pub mod knight;
 pub mod squire;
@@ -35,6 +37,12 @@ pub use state::AppState;
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(health))
+        // ── Control-plane endpoints (SQUIRE-T-0017) ────────────────────────────
+        // /register and /login are unauthenticated (bootstrap / token exchange);
+        // /members is Knight-only (the extractor 403s a Squire token).
+        .route("/register", post(control::register))
+        .route("/login", post(control::login))
+        .route("/members", post(control::add_member))
         // ── Squire-role endpoints (SQUIRE-T-0015) ──────────────────────────────
         .route("/state", get(squire::get_state))
         .route("/claims", post(squire::submit_claim))

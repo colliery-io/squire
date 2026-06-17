@@ -10,9 +10,11 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use domain_core::contract::{
-    AddMemberReq, AddMemberResp, AuthToken, HouseholdHandle, LoginReq, LoginResp,
-    RegisterHouseholdReq, RegisterHouseholdResp, Role, UserId,
+    AddMemberReq, AddMemberResp, AuthToken, Change, HouseholdHandle, LoginReq, LoginResp,
+    RegisterHouseholdReq, RegisterHouseholdResp, Repository, Role, User, UserId,
 };
+
+use crate::state::SharedStore;
 
 /// A verified caller: the `(household, user, role)` triple every authorized request carries.
 /// Produced by [`Identity::verify`] and threaded into handlers by the auth extractor.
@@ -72,18 +74,41 @@ pub trait Identity: Send + Sync {
 
 /// Minimal in-memory [`Identity`] for the LAN-local single-tenant MVP and for tests.
 ///
-/// `verify` looks a [`Principal`] up by token in a seeded map; the control-plane methods are
-/// stubs until T-0017 wires `store::Provisioner` and real credential handling. Tests mint
-/// tokens with [`DevIdentity::seed`] so T-0015/16 can exercise protected routes.
-#[derive(Default)]
+/// `verify` looks a [`Principal`] up by token in a seeded map. The control-plane methods
+/// (`register` / `login` / `add_member`) manage the household's members by writing the
+/// `users` table of the shared tenant [`store`](SharedStore) (via [`Change::PutUser`] through
+/// the store's single writer) and keeping their credentials + live tokens in memory.
+///
+/// **Dev posture (NOT production).** Secrets are kept *plaintext* in [`secrets`](Self::secrets)
+/// and tokens are kept in [`tokens`](Self::tokens); ids/tokens come from a simple monotonic
+/// [`counter`](Self::counter) (deterministic, no `Date::now`/rand). The production identity —
+/// argon2/scrypt secret hashing, persisted credentials, a household-handle → tenant registry,
+/// and multi-tenant provisioning via `store::Provisioner` — is owned by **SQUIRE-S-0007**.
+/// (MVP single-tenant: there is exactly one store; `register` seeds the first Knight into it.)
 pub struct DevIdentity {
+    /// The shared tenant store — the same [`SharedStore`] held by [`crate::AppState`], so
+    /// member rows seeded here are visible to the request handlers.
+    store: SharedStore,
+    /// Live `token -> Principal` map consulted by `verify`, keyed by the raw token string
+    /// (`AuthToken` is not `Hash`/`Eq`). Dev only: in memory, never persisted.
     tokens: Mutex<HashMap<String, Principal>>,
+    /// Per-member secrets keyed by `(household, user)` (dev: plaintext, never hashed/persisted).
+    secrets: Mutex<HashMap<(HouseholdHandle, UserId), String>>,
+    /// Monotonic source for fresh `UserId`s and token strings. Deterministic for dev/tests.
+    counter: Mutex<u128>,
 }
 
 impl DevIdentity {
-    /// An empty dev identity (no tokens recognized yet).
-    pub fn new() -> Self {
-        Self::default()
+    /// A dev identity over the given shared store (no tokens recognized until seeded or minted).
+    pub fn new(store: SharedStore) -> Self {
+        Self {
+            store,
+            tokens: Mutex::new(HashMap::new()),
+            secrets: Mutex::new(HashMap::new()),
+            // Seed the counter above the ids the T-0015/16 tests seed directly (1..=3), so a
+            // minted member never collides with a hand-seeded one.
+            counter: Mutex::new(1_000),
+        }
     }
 
     /// Seed a `token -> Principal` mapping so `verify` will accept that bearer token. Test
@@ -93,6 +118,31 @@ impl DevIdentity {
             .lock()
             .expect("DevIdentity token map poisoned")
             .insert(token.0, principal);
+    }
+
+    /// Next value of the monotonic counter (used for both user ids and token uniqueness).
+    fn next(&self) -> u128 {
+        let mut c = self.counter.lock().expect("DevIdentity counter poisoned");
+        *c += 1;
+        *c
+    }
+
+    /// Apply changes to the shared store under its single writer, stamping `by`.
+    fn apply(&self, by: Option<UserId>, changes: &[Change]) {
+        self.store
+            .lock()
+            .expect("store mutex poisoned")
+            .apply(by, changes)
+            .expect("apply: single-writer store write failed");
+    }
+
+    /// Look a user's [`Role`] up from the current store snapshot, if the user exists & is active.
+    fn role_of(&self, user: UserId) -> Option<Role> {
+        let snap = self.store.lock().expect("store mutex poisoned").snapshot();
+        snap.users
+            .iter()
+            .find(|u| u.id == user && u.active)
+            .map(|u| u.role)
     }
 }
 
@@ -112,30 +162,111 @@ impl Identity for DevIdentity {
         Ok(principal.clone())
     }
 
-    fn register(&self, _req: RegisterHouseholdReq) -> Result<RegisterHouseholdResp, AuthError> {
-        // TODO(T-0017): provision a tenant via `store::Provisioner`, hash the admin secret,
-        // seed the first Knight, mint and return a token. Dev stub for now.
-        Err(AuthError::Forbidden)
+    fn register(&self, req: RegisterHouseholdReq) -> Result<RegisterHouseholdResp, AuthError> {
+        // Derive a handle from the household name + the counter (sanitized to a stable, opaque
+        // slug). MVP single-tenant: there is one store, and registration seeds its first Knight.
+        let n = self.next();
+        let slug: String = req
+            .household_name
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+            .collect();
+        let handle = HouseholdHandle(format!("{slug}-{n}"));
+
+        // Mint the first member: a Knight (the admin).
+        let admin = UserId(self.next());
+        self.apply(
+            Some(admin),
+            &[Change::PutUser(User {
+                id: admin,
+                role: Role::Knight,
+                display_name: req.admin_name,
+                active: true,
+            })],
+        );
+
+        // Record the admin's secret (dev: plaintext) and mint a live token.
+        self.secrets
+            .lock()
+            .expect("DevIdentity secrets poisoned")
+            .insert((handle.clone(), admin), req.admin_secret);
+        let token = AuthToken(format!("dev-tok-{}", self.next()));
+        self.seed(
+            token.clone(),
+            Principal { household: handle.clone(), user: admin, role: Role::Knight },
+        );
+
+        Ok(RegisterHouseholdResp { household: handle, admin, token })
     }
 
-    fn login(&self, _req: LoginReq) -> Result<LoginResp, AuthError> {
-        // TODO(T-0017): verify the member secret against the stored hash and mint a token.
-        Err(AuthError::BadToken)
+    fn login(&self, req: LoginReq) -> Result<LoginResp, AuthError> {
+        // Verify the member secret (dev: plaintext compare). A missing or mismatched secret is
+        // an authentication failure, not a 403.
+        {
+            let secrets = self.secrets.lock().expect("DevIdentity secrets poisoned");
+            match secrets.get(&(req.household.clone(), req.user)) {
+                Some(s) if *s == req.secret => {}
+                _ => return Err(AuthError::BadToken),
+            }
+        }
+
+        // Resolve the member's current role from the store, then mint a fresh token.
+        let role = self.role_of(req.user).ok_or(AuthError::BadToken)?;
+        let token = AuthToken(format!("dev-tok-{}", self.next()));
+        self.seed(
+            token.clone(),
+            Principal { household: req.household, user: req.user, role },
+        );
+        Ok(LoginResp { token, role })
     }
 
     fn add_member(
         &self,
-        _caller: &Principal,
-        _req: AddMemberReq,
+        caller: &Principal,
+        req: AddMemberReq,
     ) -> Result<AddMemberResp, AuthError> {
-        // TODO(T-0017): Knight-only; create the member row + initial secret hash.
-        Err(AuthError::Forbidden)
+        // Knight-only (defense-in-depth: the `RequireKnight` extractor already gates the route).
+        if caller.role != Role::Knight {
+            return Err(AuthError::Forbidden);
+        }
+
+        // Mint a new member of the requested role and seed its row + initial secret.
+        let new_id = UserId(self.next());
+        self.apply(
+            Some(caller.user),
+            &[Change::PutUser(User {
+                id: new_id,
+                role: req.role,
+                display_name: req.display_name,
+                active: true,
+            })],
+        );
+        self.secrets
+            .lock()
+            .expect("DevIdentity secrets poisoned")
+            .insert((caller.household.clone(), new_id), req.initial_secret);
+
+        Ok(AddMemberResp { user: new_id })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use store::tenant::{Backend, Provisioner};
+    use store::SystemClock;
+
     use super::*;
+
+    /// A `DevIdentity` over a fresh temp-dir SQLite tenant store. Returns the identity and the
+    /// `TempDir` (kept alive for the duration of the test).
+    fn dev_identity() -> (DevIdentity, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let provisioner = Provisioner::new(Backend::Sqlite { dir: dir.path().to_path_buf() });
+        let store = provisioner.open("house1", SystemClock).expect("open tenant store");
+        (DevIdentity::new(Arc::new(Mutex::new(store))), dir)
+    }
 
     fn principal(handle: &str) -> Principal {
         Principal {
@@ -147,7 +278,7 @@ mod tests {
 
     #[test]
     fn verify_accepts_seeded_token() {
-        let id = DevIdentity::new();
+        let (id, _dir) = dev_identity();
         id.seed(AuthToken("t".into()), principal("house1"));
         let p = id
             .verify(&HouseholdHandle("house1".into()), &AuthToken("t".into()))
@@ -157,7 +288,7 @@ mod tests {
 
     #[test]
     fn verify_rejects_unknown_token() {
-        let id = DevIdentity::new();
+        let (id, _dir) = dev_identity();
         assert_eq!(
             id.verify(&HouseholdHandle("house1".into()), &AuthToken("nope".into())),
             Err(AuthError::BadToken)
@@ -166,11 +297,73 @@ mod tests {
 
     #[test]
     fn verify_rejects_cross_tenant_token() {
-        let id = DevIdentity::new();
+        let (id, _dir) = dev_identity();
         id.seed(AuthToken("t".into()), principal("house1"));
         assert_eq!(
             id.verify(&HouseholdHandle("house2".into()), &AuthToken("t".into())),
             Err(AuthError::WrongTenant)
+        );
+    }
+
+    #[test]
+    fn register_then_login_round_trips() {
+        let (id, _dir) = dev_identity();
+        let resp = id
+            .register(RegisterHouseholdReq {
+                household_name: "The Round Table".into(),
+                admin_name: "Arthur".into(),
+                admin_secret: "excalibur".into(),
+            })
+            .expect("register");
+        // The minted admin token verifies as a Knight against the returned handle.
+        let p = id.verify(&resp.household, &resp.token).expect("admin token verifies");
+        assert_eq!(p.user, resp.admin);
+        assert_eq!(p.role, Role::Knight);
+
+        // Login with the admin's secret yields a fresh Knight token.
+        let login = id
+            .login(LoginReq {
+                household: resp.household.clone(),
+                user: resp.admin,
+                secret: "excalibur".into(),
+            })
+            .expect("login");
+        assert_eq!(login.role, Role::Knight);
+        assert!(id.verify(&resp.household, &login.token).is_ok());
+    }
+
+    #[test]
+    fn login_with_wrong_secret_is_rejected() {
+        let (id, _dir) = dev_identity();
+        let resp = id
+            .register(RegisterHouseholdReq {
+                household_name: "House".into(),
+                admin_name: "Admin".into(),
+                admin_secret: "right".into(),
+            })
+            .expect("register");
+        assert_eq!(
+            id.login(LoginReq { household: resp.household, user: resp.admin, secret: "wrong".into() })
+                .err(),
+            Some(AuthError::BadToken)
+        );
+    }
+
+    #[test]
+    fn add_member_requires_knight() {
+        let (id, _dir) = dev_identity();
+        let squire_caller = Principal {
+            household: HouseholdHandle("house1".into()),
+            user: UserId(2),
+            role: Role::Squire,
+        };
+        assert_eq!(
+            id.add_member(
+                &squire_caller,
+                AddMemberReq { role: Role::Squire, display_name: "X".into(), initial_secret: "s".into() }
+            )
+            .err(),
+            Some(AuthError::Forbidden)
         );
     }
 }

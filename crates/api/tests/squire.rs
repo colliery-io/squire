@@ -89,7 +89,9 @@ fn test_state() -> (Arc<AppState>, tempfile::TempDir, Date) {
         )
         .expect("seed");
 
-    let identity = DevIdentity::new();
+    // Share one store between the identity port and the request handlers.
+    let store = Arc::new(std::sync::Mutex::new(store));
+    let identity = DevIdentity::new(store.clone());
     identity.seed(
         AuthToken(KNIGHT_TOKEN.into()),
         Principal { household: HouseholdHandle(HANDLE.into()), user: UserId(KNIGHT_ID), role: Role::Knight },

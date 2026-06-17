@@ -141,25 +141,33 @@ pub struct PendingRequest { pub request_id: RequestId, pub squire: UserId, pub i
 
 /// Opaque handle a paired device presents to route to its household (and, hosted, to
 /// select the schema — ADR SQUIRE-A-0002). Established at registration/pairing.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, PartialEq, Eq, Hash, Debug)] pub struct HouseholdHandle(pub String);
 /// A tenant-scoped bearer token proving (household, user, role). Presented on every call.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)] pub struct AuthToken(pub String);
 
 /// POST /register — create a Household (tenant) + seed its first Knight (admin); provisions
 /// an isolated schema. Returns the handle and the admin's token.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct RegisterHouseholdReq { pub household_name: String, pub admin_name: String, pub admin_secret: String }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct RegisterHouseholdResp { pub household: HouseholdHandle, pub admin: UserId, pub token: AuthToken }
 
 /// Knight-only — add a member (Knight or Squire). No assumed counts or family shape.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct AddMemberReq { pub role: Role, pub display_name: String, pub initial_secret: String }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct AddMemberResp { pub user: UserId }
 
 /// POST /login (or device pair) — exchange a member secret for a tenant-scoped token.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct LoginReq { pub household: HouseholdHandle, pub user: UserId, pub secret: String }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct LoginResp { pub token: AuthToken, pub role: Role }

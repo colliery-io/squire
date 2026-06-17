@@ -34,7 +34,8 @@ fn test_state() -> (Arc<AppState>, tempfile::TempDir) {
         .open(HANDLE, SystemClock)
         .expect("open tenant store");
 
-    let identity = DevIdentity::new();
+    let store = Arc::new(std::sync::Mutex::new(store));
+    let identity = DevIdentity::new(store.clone());
     identity.seed(
         AuthToken(TOKEN.into()),
         Principal {
