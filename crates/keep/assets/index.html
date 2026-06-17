@@ -82,6 +82,26 @@
       <p id="achievement-error" class="error" hidden></p>
       <ul id="achievement-list"></ul>
     </section>
+
+    <!-- Member administration (SQUIRE-T-0028). Add Knights/Squires; the minted token provisions a
+         phone. De/reactivate is archive-not-delete. -->
+    <section id="members-panel" hidden>
+      <h2 id="members">Members</h2>
+      <form id="member-form">
+        <label>Name <input name="display_name" required /></label>
+        <label>Role
+          <select name="role">
+            <option value="Squire">Squire</option>
+            <option value="Knight">Knight</option>
+          </select>
+        </label>
+        <label>Initial secret <input name="initial_secret" type="password" required /></label>
+        <button type="submit">Add member</button>
+      </form>
+      <p id="member-token" class="sub" hidden></p>
+      <p id="member-error" class="error" hidden></p>
+      <ul id="member-list"></ul>
+    </section>
   </main>
 
   <script src="/static/keep.js"></script>
