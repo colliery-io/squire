@@ -75,7 +75,7 @@ This spec owns the parent **workflows and UX** that invoke the rules; the rules 
 - **Context**: The Keep needs a parent-facing UI, but the form factor is an open implementation choice (PRD §10): CLI, TUI, or a local web page served by the same process. This must be decided before the Keep is built out.
 - **Constraints**: Must talk to the engine **directly** (in-process `Engine::handle` + `Repository::apply`) and never through the network API (FR-ADM4, AR-8). Runs on the computer in Rust. Shares the single-writer `Repository` (AR-1) — no second writer. Keyboard-driven; fast authoring is a primary goal.
 - **Required Capabilities**: Authoring forms for all three definition types; a batched, in-place-actionable review queue; direct redeem and reason-required adjustment; a read-only event-log inspector. If a local web page is chosen, it must be served by the same process and still invoke the engine in-process (not loop back through the network API).
-- **ADR**: TBD
+- **ADR**: [[SQUIRE-A-0008]] — **decided: embedded local web app, served in-process by the Keep binary (embedded assets), loopback-only bind, engine-direct command path (no network-API loopback).**
 
 ## Constraints **[CONDITIONAL: Has Constraints]**
 
