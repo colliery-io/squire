@@ -4,14 +4,14 @@ level: task
 title: "Domain Core: claim & review (subject, Race, snapshot, actor, idempotency)"
 short_code: "SQUIRE-T-0003"
 created_at: 2026-06-17T03:01:56.031141+00:00
-updated_at: 2026-06-17T03:01:56.031141+00:00
+updated_at: 2026-06-17T03:30:52.888950+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Implement claim submission + review end-to-end: per-Squire subject validation, assignment gating, auto-approve, snapshot-at-approval, single-review, actor stamping, claim idempotency, and the `Race` occurrence-resolution rule. This is the most complex task in the initiative.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

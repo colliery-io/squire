@@ -100,7 +100,8 @@ fn child_surface_guard_rejects_admin_commands() {
 fn child_surface_guard_admits_child_commands() {
     let eng = DomainEngine;
     let snap = empty_snapshot();
-    // Stub handler returns Ok(vec![]) in T-0001 — the assertion is that the guard admits it.
+    // The guard's job is to *admit* child commands (it may then fail downstream validation —
+    // here UserNotFound on an empty snapshot — but it must NOT reject with BadCommandForActor).
     let r = eng.handle_child(
         &snap,
         Command::SubmitClaim {
@@ -111,7 +112,7 @@ fn child_surface_guard_admits_child_commands() {
         },
         &clock(),
     );
-    assert!(r.is_ok());
+    assert!(!matches!(r, Err(DomainError::BadCommandForActor)));
 }
 
 #[test]
