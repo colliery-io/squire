@@ -1,1 +1,5 @@
 target/
+# Toolchain jars fetched on demand (openapi-generator-cli).
+tools/
+# Generated client SDKs — regenerated from crates/api/openapi.json via clients/generate-sdk.sh.
+clients/squire-sdk/
