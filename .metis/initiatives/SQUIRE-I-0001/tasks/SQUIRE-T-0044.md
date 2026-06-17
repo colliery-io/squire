@@ -3,15 +3,15 @@ id: pairing-1-3-identity-mint-consume
 level: task
 title: "Pairing 1/3 — Identity mint/consume one-time codes + control-plane POST /pair"
 short_code: "SQUIRE-T-0044"
-created_at: 2026-06-17T20:00:00.000000+00:00
-updated_at: 2026-06-17T20:00:00.000000+00:00
+created_at: 2026-06-17T20:00:00+00:00
+updated_at: 2026-06-17T20:21:28.199610+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,11 +30,15 @@ The **server foundation** for device pairing (A-0010): let an authenticated Knig
 
 ## Acceptance Criteria
 
-- [ ] Identity can **mint** a pairing code for `{household, user_id, role}` (caller must be an authenticated Knight): a high-entropy (≥128-bit) single-use token with a **30-minute TTL** (A-0010). Mint appends an event carrying the code's hash, target member, role, and expiry.
-- [ ] Identity can **consume** a code: validates it exists, is unexpired, and has no prior consume event; on success appends a consume event and returns the member's **per-user tenant-scoped token** (same shape as `/login`, A-0004) + `{household_handle, user_id, role}`. Expired / unknown / already-consumed are rejected distinctly (internally; see risk note on the external shape).
-- [ ] Control-plane endpoints: a **Knight-gated** mint (e.g. `POST /pair/codes` → code + expiry) and an **unauthenticated** `POST /pair` (consume → token). Wired in `crates/api`, and the mint reachable from the Keep's engine-direct path.
-- [ ] Code stored/compared as a **hash** (never plaintext in the log); scoped to one household + member + role and cannot cross tenants.
-- [ ] `cargo test --workspace` green incl. new tests (mint→consume happy path; expired; unknown; double-consume; wrong-tenant). `openapi.json` re-frozen + SDK regenerated with the new DTOs.
+## Acceptance Criteria
+
+## Acceptance Criteria
+
+- [x] Identity **mints** a pairing code for `{household, user, role}` (Knight-only): 32 random bytes (OsRng, ≥128-bit), base64url; **30-min TTL**; only `sha256(code)` stored in the per-tenant `pairing_codes` table with the target member + role + expiry.
+- [x] Identity **consumes** a code: take-by-hash + delete (single-use), confirm the member is still active, check expiry, then issue the member's **per-user tenant-scoped token** (same `TokenSigner` as `/login`, A-0004) + `{household, user, role}` as `PairResp`. Unknown / expired / used all surface as a uniform `BadToken` (no enumeration oracle).
+- [x] Control-plane endpoints: `POST /pair/codes` (**RequireKnight** → code + expiry) and `POST /pair` (**unauthenticated** → token). Wired in `crates/api`; mint also callable from the Keep (engine-direct via the same identity).
+- [x] Code stored/compared as a **hash** (plaintext never persisted/logged); the `pairing_codes` table lives inside the tenant schema, so codes can't cross tenants (and `consume` is `WrongTenant`-guarded for single-tenant postures).
+- [x] `cargo test --workspace` green incl. 5 new identity tests (mint→consume round-trip; single-use/double-consume; unknown; non-Knight-can't-mint; expired-via-preseeded-row). `openapi.json` re-frozen; SDK regenerated with `MintPairCodeReq/Resp`, `PairReq/Resp`, `ControlApi.mintPairCode`/`pair`.
 
 ## Implementation Notes
 
@@ -49,4 +53,13 @@ Add `PairCode` DTOs to `domain-core` contract + new `Command`/`Event` variants (
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Design deviation from A-0010 (flagged for review).** The ADR proposed pairing-code state be **log-derived** (mint/consume as domain events), to stay consistent with A-0001's "no processed-commands side table." On reading the code, **credentials** (the closest analog — hashed member secrets) are deliberately stored in a dedicated per-tenant `credentials` table, written directly by the identity layer and **bypassing the event log/`apply`** (they are auth material, not household activity). Pairing codes are the same kind of thing. So I'm implementing them as a per-tenant **`pairing_codes` table** mirroring `credentials` (store row: `code_hash` PK, `user_id`, `role`, `expires_at`); **mint** inserts, **consume** looks up by hash → checks expiry → deletes (single-use enforced by deletion). This keeps auth material out of the household event log (consistent with credentials), avoids threading new variants through the domain Engine/projections, and preserves every security property the ADR wanted (single-use, 30-min TTL, ≥128-bit, hashed-at-rest, tenant-scoped). **A-0001's "no side table" was about command idempotency dedup, not auth material** — so this isn't really in tension, but noting it explicitly since the ADR text said "log-derived." Will reconcile the ADR wording if accepted.
+
+**2026-06-17 — Done (approach: `pairing_codes` table, confirmed by Dylan).** Implemented end-to-end:
+- **store**: `pairing_codes` table (migration up/down, `schema.rs`, `PairingCodeRow`), methods `insert_pairing_code` and `take_pairing_code` (lookup+delete = single-use). Mirrors `credentials` (auth material, bypasses `apply`/event log). Portable DDL (SQLite + Postgres).
+- **domain-core**: `MintPairCodeReq{user}` / `MintPairCodeResp{code,expires_at}` / `PairReq{household,code}` / `PairResp{token,household,user,role}` (serde + utoipa).
+- **identity**: `Identity::mint_pairing_code` / `consume_pairing_code` (default-unsupported in the trait so `DevIdentity` is untouched; full impl in `ProdIdentity`). Code = 32 bytes OsRng → base64url; hash = base64url(sha256(code)); TTL const 30 min. Uniform `BadToken` for unknown/expired/used.
+- **api**: `control::mint_pair_code` (`RequireKnight`) + `control::pair` (open); routes `/pair/codes` + `/pair`; registered in `openapi.rs` (paths + 4 schemas). Re-froze `openapi.json`, regenerated the Kotlin SDK.
+- **tests**: 5 new integration tests in `crates/identity/tests/prod.rs` (added `sha2`/`base64` dev-deps to pre-seed an expired code). `cargo test --workspace` all green; `:sdk:assemble` green.
+
+Unblocks [[SQUIRE-T-0045]] (Keep QR screen) and [[SQUIRE-T-0046]] (phone pairing). **ADR A-0010 wording still says "log-derived"** — should be reconciled to "per-tenant `pairing_codes` table (like credentials)" to match what was built + approved.

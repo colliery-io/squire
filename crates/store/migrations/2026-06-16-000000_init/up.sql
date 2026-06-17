@@ -152,6 +152,22 @@ CREATE TABLE credentials (
     secret_hash TEXT NOT NULL               -- Argon2id PHC string
 );
 
+-- ─── PAIRING CODES (per-tenant, ephemeral device-pairing tokens, ADR SQUIRE-A-0010) ──
+--
+-- A Knight mints a one-time code (via the Keep) to pair a phone to a member; the phone
+-- exchanges it at POST /pair for that member's tenant-scoped token. Like `credentials`,
+-- this is auth material written/read directly by the Identity layer (NOT through
+-- Repository::apply, so no audit columns and not in the event log). Only the HASH of the
+-- code is stored (sha256 hex) — the plaintext code lives only in the QR. Single-use is
+-- enforced by deleting the row on consume; `expires_at` bounds the 30-min TTL. Portable
+-- subset (TEXT + BIGINT), so it migrates on both SQLite and Postgres.
+CREATE TABLE pairing_codes (
+    code_hash   TEXT   NOT NULL PRIMARY KEY,  -- sha256(code) hex; plaintext never stored
+    user_id     TEXT   NOT NULL,              -- target member (UserId decimal string)
+    role        TEXT   NOT NULL,              -- 'Knight' | 'Squire'
+    expires_at  BIGINT NOT NULL               -- unix millis; consume rejects when now >= this
+);
+
 -- Order index (primary read path is the whole ordered log).
 CREATE INDEX idx_events_seq ON events (seq);
 -- Per-quest / per-item raw queries.

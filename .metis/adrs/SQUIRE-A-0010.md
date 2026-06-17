@@ -45,7 +45,7 @@ A **QR-based, Keep-mediated pairing** flow with **mDNS/NSD discovery** and **Key
 3. **Exchange (phone → control plane).** The app POSTs the pairing code to a new `POST /pair` endpoint. Identity validates it (exists, unexpired, unused), marks it consumed, and returns the member's **per-user tenant-scoped token** (same kind A-0004/`/login` issues) plus the resolved `{household_handle, user_id, role}`.
 4. **Store (on the phone).** The app persists `{host, port, household_handle, token, role}` in **Android Keystore-backed `EncryptedSharedPreferences`** (Jetpack Security). Subsequent launches read this; the demo `MainActivity` constants are deleted. A "forget device" action clears it.
 
-The pairing code is consumed server-side from the **append-only log** (mint emits an event; consume checks no prior consume event for that code) — consistent with the project's "dedup/state derived from the log" stance (A-0001/AR-3), no new mutable side table.
+The pairing code lives in a **per-tenant `pairing_codes` table**, written/read directly by the Identity layer — exactly like `credentials` (hashed member secrets), which already establish that **auth material is stored outside the household event log** (not via `Repository::apply`). Only `sha256(code)` is stored; **single-use is enforced by deleting the row on consume**. *(Revised during T-0044: the original draft said "log-derived, no side table" by analogy to A-0001, but A-0001's rule is about command idempotency dedup, not auth credentials. The credentials precedent — auth material as a dedicated table — is the right fit; this keeps the domain Engine/projections untouched. Confirmed by Dylan, 2026-06-17.)*
 
 ## Alternatives Analysis
 

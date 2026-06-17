@@ -114,6 +114,15 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    pairing_codes (code_hash) {
+        code_hash -> Text,
+        user_id -> Text,
+        role -> Text,
+        expires_at -> BigInt,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     users,
     quests,

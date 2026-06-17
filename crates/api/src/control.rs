@@ -20,7 +20,8 @@ use axum::http::StatusCode;
 use axum::Json;
 
 use domain_core::contract::{
-    AddMemberReq, AddMemberResp, LoginReq, LoginResp, RegisterHouseholdReq, RegisterHouseholdResp,
+    AddMemberReq, AddMemberResp, LoginReq, LoginResp, MintPairCodeReq, MintPairCodeResp, PairReq,
+    PairResp, RegisterHouseholdReq, RegisterHouseholdResp,
 };
 
 use identity::AuthError;
@@ -101,6 +102,60 @@ pub async fn add_member(
     state
         .identity
         .add_member(&principal, req)
+        .map(Json)
+        .map_err(status_for)
+}
+
+/// `POST /pair/codes` ([`RequireKnight`]) — mint a one-time device-pairing code for a member
+/// (ADR SQUIRE-A-0010). The Keep renders the returned code as a QR; a Squire token is 403'd at the
+/// extractor.
+#[utoipa::path(
+    post,
+    path = "/pair/codes",
+    tag = "control",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    request_body = MintPairCodeReq,
+    responses(
+        (status = 200, description = "The minted pairing code and its expiry", body = MintPairCodeResp),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight, or unknown/inactive target member"),
+    ),
+)]
+pub async fn mint_pair_code(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(principal): RequireKnight,
+    Json(req): Json<MintPairCodeReq>,
+) -> Result<Json<MintPairCodeResp>, StatusCode> {
+    state
+        .identity
+        .mint_pairing_code(&principal, req.user)
+        .map(Json)
+        .map_err(status_for)
+}
+
+/// `POST /pair` (**unauthenticated**) — a phone exchanges a one-time pairing code for the member's
+/// tenant-scoped token (ADR SQUIRE-A-0010). An unknown / expired / already-used code is a uniform
+/// 401 (no enumeration oracle). `household` routes to the tenant (carried from the QR).
+#[utoipa::path(
+    post,
+    path = "/pair",
+    tag = "control",
+    request_body = PairReq,
+    responses(
+        (status = 200, description = "The paired member's token and identity", body = PairResp),
+        (status = 401, description = "Unknown, expired, or already-used pairing code"),
+    ),
+)]
+pub async fn pair(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<PairReq>,
+) -> Result<Json<PairResp>, StatusCode> {
+    state
+        .identity
+        .consume_pairing_code(&req.household, &req.code)
         .map(Json)
         .map_err(status_for)
 }

@@ -29,3 +29,6 @@ postgres = ["store/postgres"]
 [dev-dependencies]
 # Isolated temp-dir SQLite tenant per unit test.
 tempfile = "3"
+# Recompute a pairing-code hash in tests (to pre-seed an expired code) — same scheme as prod.rs.
+sha2 = "0.10"
+base64 = "0.22"

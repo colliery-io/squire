@@ -494,6 +494,93 @@
         ]
       }
     },
+    "/pair": {
+      "post": {
+        "tags": [
+          "control"
+        ],
+        "summary": "`POST /pair` (**unauthenticated**) — a phone exchanges a one-time pairing code for the member's\ntenant-scoped token (ADR SQUIRE-A-0010). An unknown / expired / already-used code is a uniform\n401 (no enumeration oracle). `household` routes to the tenant (carried from the QR).",
+        "operationId": "pair",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The paired member's token and identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unknown, expired, or already-used pairing code"
+          }
+        }
+      }
+    },
+    "/pair/codes": {
+      "post": {
+        "tags": [
+          "control"
+        ],
+        "summary": "`POST /pair/codes` ([`RequireKnight`]) — mint a one-time device-pairing code for a member\n(ADR SQUIRE-A-0010). The Keep renders the returned code as a QR; a Squire token is 403'd at the\nextractor.",
+        "operationId": "mint_pair_code",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MintPairCodeReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The minted pairing code and its expiry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MintPairCodeResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight, or unknown/inactive target member"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/redemption-requests": {
       "post": {
         "tags": [
@@ -969,6 +1056,74 @@
             "$ref": "#/components/schemas/QuestId"
           },
           "squire": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
+      "MintPairCodeReq": {
+        "type": "object",
+        "description": "POST /pair/codes (Knight-only) — mint a one-time device-pairing code for member `user`\n(ADR SQUIRE-A-0010). The plaintext `code` is returned once for the Keep to render as a QR.",
+        "required": [
+          "user"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
+      "MintPairCodeResp": {
+        "type": "object",
+        "description": "The minted pairing code and its expiry (unix millis). Single-use; ≥128-bit; 30-min TTL.",
+        "required": [
+          "code",
+          "expires_at"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        }
+      },
+      "PairReq": {
+        "type": "object",
+        "description": "POST /pair (unauthenticated) — a phone exchanges a one-time pairing code for the member's\ntenant-scoped token (ADR SQUIRE-A-0010). `household` routes to the tenant (from the QR).",
+        "required": [
+          "household",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "household": {
+            "$ref": "#/components/schemas/HouseholdHandle"
+          }
+        }
+      },
+      "PairResp": {
+        "type": "object",
+        "description": "The paired member's tenant-scoped token + identity (same token shape as `/login`, A-0004).",
+        "required": [
+          "token",
+          "household",
+          "user",
+          "role"
+        ],
+        "properties": {
+          "household": {
+            "$ref": "#/components/schemas/HouseholdHandle"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "token": {
+            "$ref": "#/components/schemas/AuthToken"
+          },
+          "user": {
             "$ref": "#/components/schemas/UserId"
           }
         }

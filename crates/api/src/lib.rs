@@ -44,6 +44,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/register", post(control::register))
         .route("/login", post(control::login))
         .route("/members", post(control::add_member))
+        // Device pairing (ADR SQUIRE-A-0010): /pair/codes mints (Knight-only); /pair consumes
+        // a code for a per-user token (unauthenticated — the code IS the credential).
+        .route("/pair/codes", post(control::mint_pair_code))
+        .route("/pair", post(control::pair))
         // ── Squire-role endpoints (SQUIRE-T-0015) ──────────────────────────────
         .route("/state", get(squire::get_state))
         .route("/claims", post(squire::submit_claim))

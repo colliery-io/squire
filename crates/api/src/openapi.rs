@@ -54,6 +54,8 @@ impl Modify for SecurityAddon {
         crate::control::register,
         crate::control::login,
         crate::control::add_member,
+        crate::control::mint_pair_code,
+        crate::control::pair,
         // Squire-role surface (SQUIRE-T-0015)
         crate::squire::get_state,
         crate::squire::submit_claim,
@@ -97,6 +99,10 @@ impl Modify for SecurityAddon {
         domain_core::contract::LoginResp,
         domain_core::contract::AddMemberReq,
         domain_core::contract::AddMemberResp,
+        domain_core::contract::MintPairCodeReq,
+        domain_core::contract::MintPairCodeResp,
+        domain_core::contract::PairReq,
+        domain_core::contract::PairResp,
         domain_core::contract::HouseholdHandle,
         domain_core::contract::AuthToken,
         // ── id / enum primitives ──
