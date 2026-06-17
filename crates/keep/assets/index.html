@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Squire — the Keep</title>
+  <link rel="stylesheet" href="/static/keep.css" />
+</head>
+<body>
+  <header>
+    <h1>⚔️ The Keep</h1>
+    <p class="sub">Squire household admin · local only</p>
+  </header>
+
+  <main>
+    <!-- Operator login. The Keep is operated by a Knight; the acting Knight is stamped as the
+         author/actor of every committed change (audit). This is a same-machine admin surface. -->
+    <section id="login">
+      <h2>Sign in</h2>
+      <form id="login-form" method="post" action="/login">
+        <label>Knight id <input name="user" inputmode="numeric" required /></label>
+        <label>Secret <input name="secret" type="password" required /></label>
+        <button type="submit">Sign in</button>
+      </form>
+      <p id="login-error" class="error" hidden></p>
+    </section>
+
+    <!-- Authenticated shell. Later Keep tasks (T-0026..T-0030) mount authoring, the review queue,
+         member admin, and the log inspector here. -->
+    <section id="shell" hidden>
+      <p>Signed in as <strong id="who"></strong>.</p>
+      <nav>
+        <a href="#review">Review</a> ·
+        <a href="#quests">Quests</a> ·
+        <a href="#items">Items</a> ·
+        <a href="#members">Members</a> ·
+        <a href="#log">Log</a>
+      </nav>
+    </section>
+  </main>
+
+  <script src="/static/keep.js"></script>
+</body>
+</html>
