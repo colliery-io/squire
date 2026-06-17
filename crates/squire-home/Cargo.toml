@@ -1,0 +1,15 @@
+[package]
+name = "squire-home"
+version = "0.1.0"
+edition = "2021"
+description = "Squire home server — runs the Keep (loopback admin) AND the LAN api over ONE shared store, so the parent's Keep and the child's phone share a household. Demo/dev entrypoint."
+
+[dependencies]
+domain-core = { path = "../domain-core", features = ["serde"] }
+store = { path = "../store" }
+identity = { path = "../identity" }
+# Depends on BOTH surfaces (keep ↔ api stay independent of each other; this is the one place
+# that composes them). No cycle: api/keep do not depend on this crate.
+api = { path = "../api" }
+keep = { path = "../keep" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

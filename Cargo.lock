@@ -1202,6 +1202,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "squire-home"
+version = "0.1.0"
+dependencies = [
+ "api",
+ "domain-core",
+ "identity",
+ "keep",
+ "store",
+ "tokio",
+]
+
+[[package]]
 name = "store"
 version = "0.1.0"
 dependencies = [
