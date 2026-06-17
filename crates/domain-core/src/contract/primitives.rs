@@ -39,6 +39,7 @@ pub struct Timestamp(pub i64); // unix millis
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Role { Knight, Squire }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Weekday { Mon, Tue, Wed, Thu, Fri, Sat, Sun }
 

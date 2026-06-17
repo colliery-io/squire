@@ -4,14 +4,14 @@ level: task
 title: "Keep: quest authoring (define/archive, assignment, completion mode, forward-only reward)"
 short_code: "SQUIRE-T-0026"
 created_at: 2026-06-17T11:09:56.310648+00:00
-updated_at: 2026-06-17T11:09:56.310648+00:00
+updated_at: 2026-06-17T11:24:21.526613+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 The Keep's **quest authoring** surface: create/edit/archive quests with all fields — including `assignment` (AllSquires or an explicit Squire subset) and `completion` mode (EachAssignee vs Race) — submitted **engine-direct** as `DefineQuest` / `ArchiveQuest`. Reward edits are forward-only; archive never deletes; every commit is audited by the acting Knight.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
