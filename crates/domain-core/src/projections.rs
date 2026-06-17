@@ -7,6 +7,7 @@
 //! - T-0005: [`Projections::balance`], [`Projections::can_redeem`]
 //! - T-0006: [`Projections::current_streak`], [`Projections::is_unlocked`]
 
+use crate::common::*;
 use crate::contract::*;
 
 /// Zero-sized projections implementer.
@@ -17,8 +18,18 @@ impl Projections for Proj {
         0 // TODO(T-0005): per-Squire sum over the log.
     }
 
-    fn quests_due(_snap: &Snapshot, _squire: UserId, _on: Date) -> Vec<QuestId> {
-        Vec::new() // TODO(T-0004): cadence + assignment + Race-open − already satisfied.
+    fn quests_due(snap: &Snapshot, squire: UserId, on: Date) -> Vec<QuestId> {
+        // A quest is due for `squire` on `on` when it is scheduled that day AND a fresh
+        // `SubmitClaim` would currently be accepted (active + assignee + not already
+        // satisfied; Race only while the occurrence is open). `submit_rejection` is the same
+        // predicate the claim path uses, so the due list and the claim gate never disagree.
+        snap.quests
+            .iter()
+            .filter(|q| {
+                cadence_matches(q, on) && submit_rejection(snap, squire, q, on).is_none()
+            })
+            .map(|q| q.id)
+            .collect()
     }
 
     fn current_streak(
@@ -42,5 +53,37 @@ impl Projections for Proj {
         _on: Date,
     ) -> Result<(), Blocked> {
         Ok(()) // TODO(T-0005): active + gate + balance + Once-out-of-stock.
+    }
+}
+
+/// The status of one scheduled quest occurrence from `squire`'s point of view, for the
+/// `StateView.quests_today` card (the API assembles the cards; the core derives the status).
+/// Assumes the quest is scheduled on `on` and `squire` is an assignee — i.e. it would appear
+/// in that Squire's "today" list (whether or not it is still claimable).
+pub fn quest_status(snap: &Snapshot, squire: UserId, quest: &Quest, on: Date) -> QuestStatus {
+    match quest.completion {
+        Completion::Race => {
+            if occurrence_closed(snap, quest.id, on) {
+                // Won — by this Squire (CompletedToday) or a sibling (TakenByOther).
+                if squire_satisfied(snap, squire, quest.id, on) {
+                    QuestStatus::CompletedToday
+                } else {
+                    QuestStatus::TakenByOther
+                }
+            } else if squire_pending(snap, squire, quest.id, on) {
+                QuestStatus::Pending
+            } else {
+                QuestStatus::Available
+            }
+        }
+        Completion::EachAssignee => {
+            if squire_satisfied(snap, squire, quest.id, on) {
+                QuestStatus::CompletedToday
+            } else if squire_pending(snap, squire, quest.id, on) {
+                QuestStatus::Pending
+            } else {
+                QuestStatus::Available
+            }
+        }
     }
 }

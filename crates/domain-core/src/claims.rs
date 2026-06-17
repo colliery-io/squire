@@ -41,32 +41,10 @@ fn submit(
     }
     require_active_squire(snap, squire)?;
     let quest = find_quest(snap, quest_id).ok_or(DomainError::QuestNotFound)?;
-    if !quest.active {
-        return Err(DomainError::Inactive);
-    }
-    if !is_assignee(snap, quest, squire) {
-        return Err(DomainError::NotAssigned);
-    }
-
-    match quest.completion {
-        Completion::Race => {
-            // First *approved* completion wins; once closed, the race is over for everyone.
-            if occurrence_closed(snap, quest_id, on) {
-                return Err(DomainError::OccurrenceTaken);
-            }
-            // One live claim per Squire in the race (others may still hold their own).
-            if squire_has_live_claim(snap, squire, quest_id, on) {
-                return Err(DomainError::AlreadyClaimedToday);
-            }
-        }
-        Completion::EachAssignee => {
-            // One live claim per (Squire, quest, day) unless the quest repeats within the day.
-            if !quest.repeatable_within_day
-                && squire_has_live_claim(snap, squire, quest_id, on)
-            {
-                return Err(DomainError::AlreadyClaimedToday);
-            }
-        }
+    // Active + assignee + dup/Race gating, shared verbatim with `quests_due` (T-0004) so the
+    // two can never disagree about what is claimable.
+    if let Some(reason) = submit_rejection(snap, squire, quest, on) {
+        return Err(reason);
     }
 
     let at = clock.now();
