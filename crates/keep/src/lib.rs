@@ -34,8 +34,8 @@ use axum::{Form, Json, Router};
 use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
-    AuthToken, Change, Command, DomainError, Engine, HouseholdHandle, LoginReq, Repository, Role,
-    Snapshot, UserId,
+    AuthToken, Change, Command, DomainError, Engine, HouseholdHandle, LoginReq, RegisterHouseholdReq,
+    Repository, Role, Snapshot, UserId,
 };
 use domain_core::DomainEngine;
 use store::tenant::{Backend, ProvisionError, Provisioner};
@@ -258,6 +258,36 @@ async fn login(
     Ok(response)
 }
 
+/// `POST /register` — **first-run bootstrap**: create the household's first Knight (the admin) when
+/// none exists yet, then log the operator in (sets the `keep_session` cookie). Delegates to the
+/// [`identity`] port, which refuses (`Forbidden` → 403) once a Knight already exists, so this is
+/// safe to leave exposed on the loopback admin surface. A fresh Keep has no members and no way to
+/// sign in otherwise; this is how the operator creates the first one.
+async fn register(
+    State(state): State<Arc<KeepState>>,
+    Form(form): Form<RegisterForm>,
+) -> Result<Response, StatusCode> {
+    let resp = state
+        .identity
+        .register(RegisterHouseholdReq {
+            household_name: state.household.0.clone(),
+            admin_name: form.admin_name,
+            admin_secret: form.admin_secret,
+        })
+        .map_err(|e| match e {
+            identity::AuthError::Forbidden => StatusCode::CONFLICT, // already bootstrapped
+            _ => StatusCode::BAD_REQUEST,
+        })?;
+
+    let body = Json(Whoami { user: resp.admin.0, role: Role::Knight, display_name: String::new() });
+    let mut response = body.into_response();
+    let cookie = format!("{SESSION_COOKIE}={}; HttpOnly; SameSite=Strict; Path=/", resp.token.0);
+    response
+        .headers_mut()
+        .insert(SET_COOKIE, cookie.parse().expect("session cookie is valid header value"));
+    Ok(response)
+}
+
 /// `GET /api/whoami` — echoes the verified acting Knight (proves the operator session works and is
 /// the principal handlers will stamp). Refused (401/403) without a valid Knight session.
 async fn whoami(State(state): State<Arc<KeepState>>, Operator(principal): Operator) -> Json<Whoami> {
@@ -316,6 +346,13 @@ struct LoginForm {
     secret: String,
 }
 
+/// `POST /register` form body — the first-run admin Knight's name + secret.
+#[derive(Debug, Deserialize)]
+struct RegisterForm {
+    admin_name: String,
+    admin_secret: String,
+}
+
 /// The acting Knight echoed by `/login` and `/api/whoami`.
 #[derive(Debug, Serialize)]
 struct Whoami {
@@ -333,6 +370,7 @@ pub fn router(state: Arc<KeepState>) -> Router {
         .route("/health", get(health))
         .route("/", get(index))
         .route("/static/{*path}", get(static_asset))
+        .route("/register", post(register))
         .route("/login", post(login))
         .route("/api/whoami", get(whoami))
         // ── Authoring: quests (SQUIRE-T-0026) ──────────────────────────────────

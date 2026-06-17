@@ -175,6 +175,34 @@
     }
   }
 
+  // ── First-run registration ───────────────────────────────────────────────────
+  const registerForm = document.getElementById("register-form");
+  const registerErr = document.getElementById("register-error");
+  if (registerForm) {
+    registerForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      registerErr.hidden = true;
+      const res = await fetch("/register", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(new FormData(registerForm)),
+      });
+      if (!res.ok) {
+        registerErr.textContent = res.status === 409 ? "Already set up — just sign in." : "Could not create admin.";
+        registerErr.hidden = false;
+        return;
+      }
+      const who = await res.json();
+      document.getElementById("login").hidden = true;
+      document.getElementById("who").textContent = `${who.display_name || "Admin"} (#${who.user})`;
+      document.getElementById("shell").hidden = false;
+      for (const id of ["review-panel", "quests-panel", "items-panel", "achievements-panel", "members-panel", "log-panel"]) {
+        document.getElementById(id).hidden = false;
+      }
+      loadReview(); loadQuests(); loadCatalog("items", "item-list"); loadCatalog("achievements", "achievement-list"); loadMembers();
+    });
+  }
+
   // ── Quests (T-0026) ──────────────────────────────────────────────────────────
   // The session cookie is HttpOnly; same-origin fetch sends it automatically, so the Operator
   // extractor authenticates these calls without the page handling the token.
