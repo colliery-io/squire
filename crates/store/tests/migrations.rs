@@ -9,12 +9,19 @@ use diesel::sql_types::BigInt;
 use diesel::sqlite::SqliteConnection;
 use diesel::{Connection, QueryableByName, RunQueryDsl};
 
-use store::{run_migrations, SqliteStore};
+use store::{run_migrations, AnyConnection, SqliteStore};
 
 #[derive(QueryableByName)]
 struct Count {
     #[diesel(sql_type = BigInt)]
     n: i64,
+}
+
+fn count_any(conn: &mut AnyConnection, table: &str) -> i64 {
+    let row: Count = diesel::sql_query(format!("SELECT COUNT(*) AS n FROM {table}"))
+        .get_result(conn)
+        .unwrap_or_else(|e| panic!("count {table}: {e}"));
+    row.n
 }
 
 fn temp_db_url() -> (tempfile::TempDir, String) {
@@ -61,7 +68,7 @@ fn sqlite_store_open_runs_migrations() {
     let (_dir, url) = temp_db_url();
     let mut store = SqliteStore::open(&url).expect("open store");
 
-    assert_eq!(count(store.connection(), "events"), 0);
+    assert_eq!(count_any(&mut store.connection(), "events"), 0);
 }
 
 #[test]
