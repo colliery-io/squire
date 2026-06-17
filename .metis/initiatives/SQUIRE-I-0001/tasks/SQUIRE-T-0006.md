@@ -4,14 +4,14 @@ level: task
 title: "Domain Core: streaks & achievements (current_streak, is_unlocked, unlock emission)"
 short_code: "SQUIRE-T-0006"
 created_at: 2026-06-17T03:02:02.897657+00:00
-updated_at: 2026-06-17T03:48:31.005082+00:00
+updated_at: 2026-06-17T03:54:21.078437+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,12 +32,14 @@ Implement `current_streak`, `is_unlocked`, achievement criterion evaluation with
 
 ## Acceptance Criteria
 
-- [ ] `current_streak(snap, squire, scope, basis, asof)`: `ScheduledOccurrences` counts consecutive completed scheduled occurrences for a quest scope (a non-scheduled-day gap does NOT break it) — a M/W/F quest done 3 scheduled days reads 3 despite weekends (AC-4); `CalendarDays` counts consecutive calendar days with ≥1 in-scope completion; a repeatable quest counts once/day; per-Squire.
-- [ ] On a qualifying approval (evaluated within `handle`), the engine emits `AchievementUnlocked{squire}` **exactly once** for that Squire when a `Criterion` (`Streak`/`TotalCompletions`/`PointsEarned`) is first satisfied; the unlock is sticky (survives a later streak break); awards `bonus_points` to that Squire and unlocks any item gated on it for that Squire.
-- [ ] `is_unlocked(snap, squire, id)` true iff that Squire has the `AchievementUnlocked` event.
-- [ ] `PointsEarned` criterion evaluates that Squire's earned total.
-- [ ] `StreakView` `current`/`best`/`alive`/`next_milestone` derived correctly (alive=false once an occurrence has lapsed; next_milestone = next achievement length in scope).
-- [ ] Unit tests per criterion type and streak basis.
+## Acceptance Criteria
+
+- [x] `current_streak`: `ScheduledOccurrences`+Quest counts consecutive completed scheduled occurrences (non-scheduled gaps don't break; pending-today forgiven) — M/W/F × 3 reads 3 despite weekends (AC-4); else `CalendarDays` counts consecutive days with ≥1 in-scope completion (repeatable = once/day); per-Squire.
+- [x] A qualifying approval emits `AchievementUnlocked{squire}` **exactly once** when a `Streak`/`TotalCompletions`/`PointsEarned` criterion is first met (fixpoint over cascading bonuses); sticky; awards `bonus_points` to that Squire; flips a gated item's `can_redeem` from `AchievementLocked`→Ok.
+- [x] `is_unlocked(snap, squire, id)` true iff that Squire has the unlock event (per-Squire).
+- [x] `PointsEarned` evaluates the Squire's lifetime earned total (approvals + bonuses), not net balance.
+- [x] `streak_view` derives `current`/`best`/`alive`/`next_milestone`.
+- [x] `tests/achievements.rs` (15 tests) per criterion type + both streak bases.
 
 ## Implementation Notes
 
@@ -52,4 +54,6 @@ T-0001; consumes approvals from T-0003 (unlock emission runs on approval) and ba
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-16 — Completed.** Implemented `current_streak` (`scheduled_streak` walks the quest's scheduled days back from `asof`, weekends skipped not broken, pending-today forgiven; `calendar_streak` walks calendar days with ≥1 in-scope completion) + `streak_view` (current/best/alive/next_milestone, `scopes_eq` since `Scope` has no `PartialEq`) in `src/projections.rs`. New `src/achievements.rs`: `unlocks_after` runs a fixpoint over a projected post-approval `Snapshot`, emitting `AchievementUnlocked` once per newly-met, not-yet-unlocked active achievement (cascades on bonus → `PointsEarned`); `criterion_met` dispatches Streak/TotalCompletions/PointsEarned. Added `src/common.rs` helpers `quest_in_scope`, `squire_completed_in_scope_on`, `total_completions` (distinct `(quest,day)`), `points_earned` (lifetime), `latest_scheduled_on_or_before`. Wired into `claims::approval_events` (now takes the claim's `on` + a `pending` slice so the auto-approve path threads its just-minted `CompletionClaimed` for the unlock join). `is_unlocked` (from T-0005) is the sticky lookup; gated `can_redeem` flips on unlock.
+
+Tests `tests/achievements.rs` (15): AC-4 M/W/F streak, missed-day reset, pending-today, calendar streak + repeatable-once/day, per-Squire isolation, once-only sticky emission via the real approve flow, bonus→balance, PointsEarned earned-total, cascade, gated-item flip, auto-approve unlock, streak_view fields. Full suite **64 passed, 0 warnings**. Committed.

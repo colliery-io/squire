@@ -4,14 +4,14 @@ level: task
 title: "Domain Core: invariant property-test suite & projection perf check"
 short_code: "SQUIRE-T-0007"
 created_at: 2026-06-17T03:02:04.123324+00:00
-updated_at: 2026-06-17T03:02:04.123324+00:00
+updated_at: 2026-06-17T03:54:32.918460+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Consolidate the engine-wide property tests (NFR-9) and a projection performance check (NFR-8) exercising the whole core against the in-memory Repository.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -34,10 +34,13 @@ impl Projections for Proj {
         // `SubmitClaim` would currently be accepted (active + assignee + not already
         // satisfied; Race only while the occurrence is open). `submit_rejection` is the same
         // predicate the claim path uses, so the due list and the claim gate never disagree.
+        // Build the claim index once (NFR-1.1.2): `submit_rejection_with` reuses it instead of
+        // re-scanning the log per quest. Behaviour matches `submit_rejection` exactly.
+        let idx = ClaimIndex::build(snap);
         snap.quests
             .iter()
             .filter(|q| {
-                cadence_matches(q, on) && submit_rejection(snap, squire, q, on).is_none()
+                cadence_matches(q, on) && submit_rejection_with(snap, &idx, squire, q, on).is_none()
             })
             .map(|q| q.id)
             .collect()
@@ -50,11 +53,14 @@ impl Projections for Proj {
         basis: StreakBasis,
         asof: Date,
     ) -> u32 {
+        // One claim index per call (NFR-1.1.2): the streak walks step day-by-day and would
+        // otherwise re-scan the log at each step (O(n²)). The `_with` walks use this index.
+        let idx = ClaimIndex::build(snap);
         match (basis, scope) {
             (StreakBasis::ScheduledOccurrences, Scope::Quest(qid)) => {
-                scheduled_streak(snap, squire, *qid, asof)
+                scheduled_streak(snap, &idx, squire, *qid, asof)
             }
-            _ => calendar_streak(snap, squire, scope, asof),
+            _ => calendar_streak(snap, &idx, squire, scope, asof),
         }
     }
 
@@ -96,25 +102,27 @@ impl Projections for Proj {
 /// Assumes the quest is scheduled on `on` and `squire` is an assignee — i.e. it would appear
 /// in that Squire's "today" list (whether or not it is still claimable).
 pub fn quest_status(snap: &Snapshot, squire: UserId, quest: &Quest, on: Date) -> QuestStatus {
+    // One index per call keeps the StateView assembly (a card per quest) off the O(n²) path.
+    let idx = ClaimIndex::build(snap);
     match quest.completion {
         Completion::Race => {
-            if occurrence_closed(snap, quest.id, on) {
+            if occurrence_closed_with(snap, &idx, quest.id, on) {
                 // Won — by this Squire (CompletedToday) or a sibling (TakenByOther).
-                if squire_satisfied(snap, squire, quest.id, on) {
+                if squire_satisfied_with(snap, &idx, squire, quest.id, on) {
                     QuestStatus::CompletedToday
                 } else {
                     QuestStatus::TakenByOther
                 }
-            } else if squire_pending(snap, squire, quest.id, on) {
+            } else if squire_pending_with(snap, &idx, squire, quest.id, on) {
                 QuestStatus::Pending
             } else {
                 QuestStatus::Available
             }
         }
         Completion::EachAssignee => {
-            if squire_satisfied(snap, squire, quest.id, on) {
+            if squire_satisfied_with(snap, &idx, squire, quest.id, on) {
                 QuestStatus::CompletedToday
-            } else if squire_pending(snap, squire, quest.id, on) {
+            } else if squire_pending_with(snap, &idx, squire, quest.id, on) {
                 QuestStatus::Pending
             } else {
                 QuestStatus::Available
@@ -154,7 +162,7 @@ pub fn reward_view(
 /// Consecutive *scheduled* occurrences of `qid` that `squire` has completed, counting back
 /// from `asof`. A non-scheduled gap (e.g. a weekend for a Mon/Wed/Fri quest) is skipped, not
 /// a break. A pending occurrence *today* (`asof` itself) doesn't break an otherwise-live run.
-fn scheduled_streak(snap: &Snapshot, squire: UserId, qid: QuestId, asof: Date) -> u32 {
+fn scheduled_streak(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, qid: QuestId, asof: Date) -> u32 {
     let quest = match find_quest(snap, qid) {
         Some(q) => q,
         None => return 0,
@@ -167,7 +175,7 @@ fn scheduled_streak(snap: &Snapshot, squire: UserId, qid: QuestId, asof: Date) -
             Some(d) => d,
             None => break,
         };
-        let done = squire_satisfied(snap, squire, qid, sd);
+        let done = squire_satisfied_with(snap, idx, squire, qid, sd);
         // A not-yet-done scheduled occurrence *today* is forgiven once: step past it.
         if first && sd == asof && !done {
             first = false;
@@ -187,13 +195,13 @@ fn scheduled_streak(snap: &Snapshot, squire: UserId, qid: QuestId, asof: Date) -
 
 /// Consecutive calendar days (ending at `asof`) with ≥1 in-scope completion. A repeatable
 /// quest contributes once/day. A missing `asof` doesn't break a run that ends the day before.
-fn calendar_streak(snap: &Snapshot, squire: UserId, scope: &Scope, asof: Date) -> u32 {
+fn calendar_streak(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, scope: &Scope, asof: Date) -> u32 {
     let earliest = snap
         .events
         .iter()
         .filter_map(|e| match e {
             Event::CompletionApproved { claim_id, squire: s, .. } if *s == squire => {
-                claim_meta(snap, *claim_id)
+                idx.meta(*claim_id)
                     .filter(|(_, q, _)| quest_in_scope(snap, *q, scope))
                     .map(|(_, _, d)| d.0)
             }
@@ -208,7 +216,7 @@ fn calendar_streak(snap: &Snapshot, squire: UserId, scope: &Scope, asof: Date) -
     let mut streak = 0u32;
     let mut first = true;
     while cursor.0 >= earliest {
-        let has = squire_completed_in_scope_on(snap, squire, scope, cursor);
+        let has = squire_completed_in_scope_on_with(snap, idx, squire, scope, cursor);
         if first && !has {
             first = false;
             cursor = Date(cursor.0 - 1);
@@ -250,10 +258,11 @@ pub fn streak_view(
     // High-water mark: the streak ending at each day the Squire completed something in scope.
     let mut best = current;
     let mut days: std::collections::BTreeSet<i32> = std::collections::BTreeSet::new();
+    let idx = ClaimIndex::build(snap);
     for e in &snap.events {
         if let Event::CompletionApproved { claim_id, squire: s, .. } = e {
             if *s == squire {
-                if let Some((_, q, d)) = claim_meta(snap, *claim_id) {
+                if let Some((_, q, d)) = idx.meta(*claim_id) {
                     if quest_in_scope(snap, q, scope) {
                         days.insert(d.0);
                     }
