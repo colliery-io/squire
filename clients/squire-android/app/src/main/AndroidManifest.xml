@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- The Squire talks to the Local API over the home LAN (plain HTTP; NFR-6). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
-        android:label="Squire">
+        android:label="Squire"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true">
