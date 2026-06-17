@@ -13,8 +13,9 @@ use std::net::SocketAddr;
 
 use api::AppState;
 use domain_core::contract::{
-    AddMemberReq, Assignment, Availability, Cadence, Change, Completion, HouseholdHandle, ItemId,
-    Quest, QuestId, RedeemableItem, RegisterHouseholdReq, Repository, Role, Schedule, UserId,
+    Achievement, AchievementId, AddMemberReq, Assignment, Availability, Cadence, Change, Completion,
+    Criterion, HouseholdHandle, ItemId, Quest, QuestId, RedeemableItem, RegisterHouseholdReq,
+    Repository, Role, Schedule, Scope, StreakBasis, UserId,
 };
 use identity::{Principal, TokenSigner};
 use store::tenant::Backend;
@@ -112,6 +113,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         active: true,
         icon: None,
     };
+    // A STREAK achievement: 3 scheduled days in a row of "Tidy your room" (quest 101) → +50 bonus
+    // points on unlock. Achievements aren't "points for a total" — they can be streaks that award
+    // currency AND gate rewards (operator feedback / SQUIRE-T-0036).
+    let streak_achievement = Achievement {
+        id: AchievementId(300),
+        name: "Room Master".into(),
+        description: Some("Tidy your room 3 scheduled days in a row.".into()),
+        criterion: Criterion::Streak {
+            scope: Scope::Quest(QuestId(101)),
+            length: 3,
+            basis: StreakBasis::ScheduledOccurrences,
+        },
+        bonus_points: 50,
+        active: true,
+    };
+    // A GATED reward: locked (NeedsAchievement) until the "Room Master" streak is earned.
+    let gated_reward = RedeemableItem {
+        id: ItemId(201),
+        name: "Movie night".into(),
+        description: Some("Unlocked by the Room Master streak.".into()),
+        cost: 15,
+        gate: Some(AchievementId(300)),
+        availability: Availability::Repeatable,
+        active: true,
+        icon: None,
+    };
     state
         .store
         .lock()
@@ -121,10 +148,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             &[
                 Change::PutQuest(auto_quest),
                 Change::PutQuest(review_quest),
+                Change::PutAchievement(streak_achievement),
                 Change::PutItem(reward),
+                Change::PutItem(gated_reward),
             ],
         )
-        .expect("seed quests + reward");
+        .expect("seed quests + achievement + rewards");
 
     // ── Banner ──────────────────────────────────────────────────────────────────────────────────
     println!("════════════════════════════════════════════════════════════════════");
@@ -134,6 +163,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("  Household:  demo");
     println!("  Squire login: (household=demo, user=2, secret=demo)");
     println!("  Knight login: (household=demo, user=1, secret=demo)");
+    println!("  Seeded: 2 quests, 'Ice cream' (3pts), 'Movie night' (gated on the");
+    println!("          'Room Master' streak: 3 days of 'Tidy your room' → +50pts).");
     println!("════════════════════════════════════════════════════════════════════");
 
     // ── Serve ───────────────────────────────────────────────────────────────────────────────────
