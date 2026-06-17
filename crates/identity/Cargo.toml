@@ -1,0 +1,13 @@
+[package]
+name = "identity"
+version = "0.1.0"
+edition = "2021"
+description = "Squire — the Identity port (auth / membership seam) extracted from `api`, per task SQUIRE-T-0019"
+
+[dependencies]
+domain-core = { path = "../domain-core", features = ["serde"] }
+store = { path = "../store" }
+
+[dev-dependencies]
+# Isolated temp-dir SQLite tenant per unit test.
+tempfile = "3"

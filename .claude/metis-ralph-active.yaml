@@ -3,13 +3,13 @@
 project_path: "/Users/dstorey/Desktop/squire/.metis"
 mode: tasks
 tasks:
-  - "SQUIRE-T-0014"
-  - "SQUIRE-T-0015"
-  - "SQUIRE-T-0016"
-  - "SQUIRE-T-0017"
-  - "SQUIRE-T-0018"
+  - "SQUIRE-T-0019"
+  - "SQUIRE-T-0020"
+  - "SQUIRE-T-0021"
+  - "SQUIRE-T-0022"
+  - "SQUIRE-T-0023"
 current_task_index: 0
 iteration: 1
 max_iterations: 0
 completion_promise: "ALL TASKS COMPLETE"
-started_at: "2026-06-17T05:17:35Z"
+started_at: "2026-06-17T09:56:09Z"

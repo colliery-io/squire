@@ -22,7 +22,8 @@ use axum::http::StatusCode;
 
 use domain_core::contract::{AuthToken, HouseholdHandle, Role};
 
-use crate::identity::{AuthError, Principal};
+use identity::{AuthError, Principal};
+
 use crate::state::AppState;
 
 /// Header carrying the opaque household handle a paired device presents to route to its tenant.
