@@ -4,14 +4,14 @@ level: task
 title: "Store: schema-per-tenant provisioning & connection selection"
 short_code: "SQUIRE-T-0011"
 created_at: 2026-06-17T04:08:43.565492+00:00
-updated_at: 2026-06-17T04:08:43.565492+00:00
+updated_at: 2026-06-17T04:45:26.838320+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Provide tenant-store lifecycle: `provision` (create + migrate) and `deprovision` (drop) a tenant store, and select backend/connection at startup. SQLite uses file-per-tenant; Postgres uses schema-per-tenant via `search_path`. The store operates on a handed connection; the household-handle → connection registry/routing is owned by S-0007 and explicitly out of scope here.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

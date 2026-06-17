@@ -4,14 +4,14 @@ level: task
 title: "Store: snapshot + atomic apply(by) + audit columns"
 short_code: "SQUIRE-T-0010"
 created_at: 2026-06-17T04:08:42.088609+00:00
-updated_at: 2026-06-17T04:34:34.165904+00:00
+updated_at: 2026-06-17T04:45:10.110145+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,12 +32,14 @@ Implement `domain_core::contract::Repository` over Diesel: `snapshot()` loads th
 
 ## Acceptance Criteria
 
-- [ ] `snapshot()` returns the full `Snapshot` (users, quests, items, achievements, events in append order).
-- [ ] `apply(by, changes)` runs in ONE transaction (all-or-nothing): `Append`→insert event (never update/delete); `PutQuest/Item/Achievement` / `PutUser`→upsert by id; `SetXActive` / `SetUserActive`→toggle `active`. Any error rolls back (store unchanged) → `RepoError`.
-- [ ] Audit (A-0007): `Put*` / `SetXActive` / `SetUserActive` stamp `updated_by=by`, `updated_at=Clock::now()` (+ `created_*` on first insert); `Append(Event)` ignores `by`.
-- [ ] No stored availability state (A-0006): items upsert definition + audit columns only; no decrement-on-redeem.
-- [ ] `RepoError::{Conflict, Io}` surfaced; a real injectable `Clock` impl provided.
-- [ ] Tests (SQLite): snapshot round-trip after applies; atomic rollback on a forced mid-batch failure; audit stamping (created vs updated, `None` for seed); append-only (events never mutated).
+## Acceptance Criteria
+
+- [x] `snapshot()` returns the full `Snapshot` (users, quests, items, achievements, events ordered by `seq`), decoded via the T-0009 mapping.
+- [x] `apply(by, changes)` runs in ONE `conn.transaction` (all-or-nothing): `Append`→insert (seq = max+1; never update/delete); `Put*`→upsert by id; `SetXActive`/`SetUserActive`→toggle `active` (+`updated_*`). Any error rolls back → `RepoError`.
+- [x] Audit (A-0007): `Put*`/Set* stamp `updated_by=by`,`updated_at=now`; `created_*` preserved on update (omitted from `.set(...)`); `Append` ignores `by`; `by=None`→NULL.
+- [x] No stored availability state (A-0006): items upsert definition+audit columns only; no decrement-on-redeem.
+- [x] `RepoError::{Conflict, Io}` mapped (unique/serialization/check/FK→Conflict, else Io); real `SystemClock` + injectable `FixedClock`.
+- [x] Tests on **both backends** (`tests/repository.rs`, 5): snapshot round-trip, atomic rollback (store byte-identical), audit stamping (created-vs-updated, None), append-only/seq, Clock Monday-alignment. Same `apply`/`snapshot` over `AnyConnection` run on SQLite + the compose Postgres.
 
 ## Implementation Notes
 
@@ -54,4 +56,10 @@ SQUIRE-T-0008 (schema/backend), SQUIRE-T-0009 (domain ↔ row mapping).
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Completed.** Rewrote `store::lib`: `Store<C: Clock>` over a `RefCell<AnyConnection>` (single-writer, so no concurrent borrow) implements `Repository`. `snapshot()` selects all five tables (events ordered by `seq`), decodes via T-0009. `apply(by, &[Change])` wraps the batch in `conn.transaction`; `seq=max+1` computed once and incremented per append; `Put*` upsert with audit; Set* toggles `active`+`updated_*` (`Conflict` if id missing). Diesel errors → `Conflict` (unique/serialization/check/FK) else `Io`; a `TxnError` bridges `RepoError` through Diesel's transaction `From<diesel::Error>`.
+
+**Upsert preserves `created_*`:** `insert_into(t).values(row).on_conflict(id).do_update().set(<mutable cols + updated_by/updated_at>)` — `created_*` omitted from `.set`, so a new INSERT takes `created_*=(by,now)` from the row while a conflicting row keeps its original. Wrinkle: Diesel's `MultiConnection` reports no on-conflict support, so upserts dispatch via a `run_upsert!` macro to the concrete `SqliteConnection`/`PgConnection` (both support Pg-style upsert in Diesel 2); plain insert/update/select run on `AnyConnection` directly.
+
+**Clock:** `SystemClock::now()`=unix millis; `today()`=`days_since_unix + 3` (epoch realigned to Monday 1969-12-29) so `Date(0)==Monday` matches the engine's `weekday_of` (unix epoch is a Thursday — without the +3, Weekly schedules would drift 3 days). `FixedClock` for deterministic tests. Audit accessors (`quest_audit`/`user_audit`) added for tests (audit cols aren't in the pure `Snapshot`).
+
+Results: SQLite `cargo test -p store` → 24 (11 mapping + 4 migrations + 5 repository); Postgres (`--features postgres` + compose) → repository (5) + postgres (1) green on PG; `cargo test --workspace` → domain-core 70 intact. Committed.
