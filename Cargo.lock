@@ -678,6 +678,8 @@ dependencies = [
  "domain-core",
  "libsqlite3-sys",
  "proptest",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 

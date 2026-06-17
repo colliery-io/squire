@@ -7,6 +7,7 @@
 //! Default build is SQLite-only (bundled SQLite, no system libpq). Postgres is an
 //! opt-in `postgres` cargo feature.
 
+pub mod backup;
 pub mod conn;
 pub mod migrations;
 pub mod rows;
@@ -136,6 +137,13 @@ impl<C: Clock> Store<C> {
     /// audit columns that are intentionally absent from the [`Snapshot`]).
     pub fn connection(&mut self) -> std::cell::RefMut<'_, AnyConnection> {
         self.conn.borrow_mut()
+    }
+
+    /// Export this household store to ONE file at `path` (the full backend-portable dump:
+    /// users + definitions + complete event log, incl. audit columns and `seq`). See
+    /// [`crate::backup::export`].
+    pub fn export(&self, path: impl AsRef<std::path::Path>) -> Result<(), backup::BackupError> {
+        backup::export(&mut self.conn.borrow_mut(), path)
     }
 }
 

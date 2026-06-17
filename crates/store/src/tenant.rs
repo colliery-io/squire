@@ -32,7 +32,8 @@
 
 use std::path::PathBuf;
 
-use diesel::connection::SimpleConnection;
+#[cfg(feature = "postgres")]
+use diesel::connection::SimpleConnection; // batch_execute, only used for PG schema setup
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 
@@ -203,6 +204,23 @@ impl Provisioner {
                 Ok(AnyConnection::Pg(conn))
             }
         }
+    }
+
+    /// Restore a per-tenant backup dump at `path` into the tenant for `handle`.
+    ///
+    /// The tenant must already be provisioned (migrated) and **empty** — `import` is a
+    /// verbatim bulk load that preserves `seq` and audit columns as-is (see
+    /// [`crate::backup::import`]). Returns the opened, restored [`AnyConnection`].
+    pub fn import(
+        &self,
+        handle: &str,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<AnyConnection, ProvisionError> {
+        let handle = sanitize_handle(handle)?;
+        let mut conn = self.open_conn(handle)?;
+        crate::backup::import(&mut conn, path)
+            .map_err(|e| ProvisionError::Backend(e.to_string()))?;
+        Ok(conn)
     }
 
     /// Remove the tenant for `handle`.
