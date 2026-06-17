@@ -4,14 +4,14 @@ level: task
 title: "Keep: crate scaffold, engine-direct command seam, loopback web server & operator login"
 short_code: "SQUIRE-T-0025"
 created_at: 2026-06-17T11:09:54.911758+00:00
-updated_at: 2026-06-17T11:09:54.911758+00:00
+updated_at: 2026-06-17T11:16:17.035430+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Stand up the `keep` binary crate: an embedded, **loopback-only** admin web server whose handlers drive the Domain Core **in-process** (the engine-direct command seam), plus operator (Knight) login for audit. No authoring/review features yet — this is the spine every later Keep task builds on, and the place the A-0008 invariants (loopback-only, no network-API loopback) are established and tested.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

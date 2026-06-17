@@ -1,0 +1,32 @@
+[package]
+name = "keep"
+version = "0.1.0"
+edition = "2021"
+description = "Squire — the Keep: the parent/admin app, an embedded loopback-only web UI that drives the engine in-process (SQUIRE-S-0004 / ADR SQUIRE-A-0008)"
+
+[dependencies]
+# The Keep drives the Domain Core IN-PROCESS and is the single writer; it depends on the engine,
+# the store, and identity — and deliberately NOT on `api` (no network-API loopback; ADR A-0008).
+domain-core = { path = "../domain-core", features = ["serde"] }
+store = { path = "../store" }
+identity = { path = "../identity" }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# The web UI (HTML/CSS/JS) is embedded into the binary — one self-contained artifact, no asset
+# server, no node build step (ADR A-0008).
+rust-embed = "8"
+
+[features]
+default = []
+# Opt-in Postgres path (links libpq via store/identity), mirroring the other crates.
+postgres = ["store/postgres", "identity/postgres"]
+
+[dev-dependencies]
+# `ServiceExt::oneshot` drives the Router without binding a socket.
+tower = { version = "0.5", features = ["util"] }
+# Collect response bodies in tests.
+http-body-util = "0.1"
+# Isolated temp-dir SQLite tenant per test.
+tempfile = "3"
