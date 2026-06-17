@@ -4,14 +4,14 @@ level: task
 title: "Runnable LAN api server binary + Squire app minimal connect (login) for end-to-end demo"
 short_code: "SQUIRE-T-0035"
 created_at: 2026-06-17T13:49:42.673669+00:00
-updated_at: 2026-06-17T13:50:27.780097+00:00
+updated_at: 2026-06-17T14:01:15.821937+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,10 +32,12 @@ Make the system **runnable end-to-end**: a LAN api server binary (the `api` crat
 
 ## Acceptance Criteria
 
-- [ ] An `api` server entrypoint (a `src/bin/serve.rs` or `examples/serve_demo.rs`) wires `AppState::local_prod` and serves on a configurable `0.0.0.0:PORT`. For the demo it **seeds deterministically**: register household `demo` (admin Knight = `UserId(1)`, secret `demo`), add a Squire (`UserId(2)`, secret `demo`), author 2–3 quests (incl. one `auto_approve=true` so the child immediately sees points) + a reward (direct store `apply`), and prints the base URL + the Squire's `(household, user, secret)`.
-- [ ] `cargo run -p api --bin serve` (or the example) boots and answers `GET /state` for the seeded Squire over the wire (verified with a `login` → token → `curl /state`).
-- [ ] **Squire app minimal connect:** the app (`MainActivity`/a small `Connect` step) logs in via the generated `ControlApi.login(household, user, secret)` to obtain a tenant token, then drives `PlayerStore` — so it self-connects with no baked/expiring token. Demo config (`http://10.0.2.2:PORT`, `demo`/`2`/`demo`) is clearly marked as placeholder; the full pairing UI + secure storage remain a later task.
-- [ ] `./gradlew :app:assembleDebug` builds; `cargo test --workspace` stays green; the seed path uses only existing public APIs (no new wire endpoints).
+## Acceptance Criteria
+
+- [x] `crates/api/src/bin/serve_demo.rs` wires `AppState::local_prod` and serves on `0.0.0.0:DEMO_PORT` (default 8080). Seeds deterministically: household `demo` (Knight `UserId(1)`), Squire `UserId(2)` secret `demo`, quest 100 `auto_approve=true` (+5), quest 101 review (+10), reward 200 (cost 3) via direct `store.apply`; prints creds + the `10.0.2.2` emulator hint.
+- [x] `cargo run -p api --bin serve_demo` boots; `login`→token→`GET /state` returns a populated `StateView` over the wire (verified).
+- [x] **Squire app connect:** `SquireApiAdapter.login()` via the generated `ControlApi` stores the token in a mutable holder set as the bearer; `MainActivity` logs in once then refreshes. **Also added INTERNET permission + `usesCleartextTraffic` to the manifest** (LAN HTTP, NFR-6) — without them the app couldn't reach the server.
+- [x] `./gradlew :app:assembleDebug` builds; `cargo test --workspace` green (43 binaries). **Verified LIVE on an arm64 Android-34 emulator: login → populated home → Mark-done → +5 pts → reward becomes redeemable, end-to-end.**
 
 ## Implementation Notes
 
@@ -50,4 +52,10 @@ This is demo/bootstrap convenience + the first connect slice — **not** the ful
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Done (`7cbe593`).** End-to-end runnable + verified live on an emulator.
+
+- `crates/api/src/bin/serve_demo.rs` (the api had no runnable binary): seeds the `demo` household + Squire + quests/reward and serves the LAN api on `0.0.0.0:8080`.
+- Squire app: `SquireApiAdapter.login()` (generated `ControlApi`) → token holder → bearer; `MainActivity` logs in then refreshes. **Manifest: added INTERNET + `usesCleartextTraffic`** (the missing pieces that were causing "computer unreachable").
+- **Eyeball:** installed on an arm64 Android-34 emulator → the player home renders from real `StateView` (quests with Mark-done, rewards with affordability, streaks, claims/requests). Tapping Mark-done on the auto-approve quest credited **+5**, flipped it to "Done today", made *Ice cream* **redeemable**, and showed *"Make your bed — Approved (+5)"* in Recent claims. The whole tap→claim→outbox→sync→auto-approve→refresh loop works.
+
+**Still running for the operator's review:** `serve_demo` on :8080, the Keep on :4920, and the `squire` emulator. Deferred (later tasks): durable Room persistence, real pairing UI + secure token storage, sync trigger.
