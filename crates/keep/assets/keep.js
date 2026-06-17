@@ -29,6 +29,7 @@
     }
     loadReview();
     loadQuests();
+    loadAchScopeQuests();
     loadCatalog("items", "item-list");
     loadCatalog("achievements", "achievement-list");
     loadMembers();
@@ -148,19 +149,63 @@
     });
   }
 
+  // ── Achievement helpers (T-0036) ─────────────────────────────────────────────
+  // The achievements list, kept around so the item list can resolve a gate id → name and the
+  // item-gate dropdown can be (re)populated.
+  let achievementRows = [];
+
+  // Render a Scope (externally-tagged serde JSON) as a short human label.
+  function scopeLabel(scope) {
+    if (scope === "Any") return "Any";
+    if (scope && scope.Quest !== undefined) {
+      const row = (window.__questsById && window.__questsById[scope.Quest]) || null;
+      return row ? `Quest:${row}` : `Quest #${scope.Quest}`;
+    }
+    if (scope && scope.Category !== undefined) return `Category:${scope.Category}`;
+    return "?";
+  }
+
+  // Summarize a Criterion (externally-tagged serde JSON) for the list view.
+  function criterionSummary(c) {
+    if (c && c.Streak) {
+      return `Streak · ${scopeLabel(c.Streak.scope)} · ${c.Streak.length} (${c.Streak.basis})`;
+    }
+    if (c && c.TotalCompletions) {
+      return `TotalCompletions · ${scopeLabel(c.TotalCompletions.scope)} · ${c.TotalCompletions.count}`;
+    }
+    if (c && c.PointsEarned) {
+      return `PointsEarned · ${c.PointsEarned.total}`;
+    }
+    return "?";
+  }
+
+  // Resolve a gate (achievement id) → its name, falling back to the raw id.
+  function gateLabel(gateId) {
+    const row = achievementRows.find((r) => r.achievement.id === gateId);
+    return row ? row.achievement.name : `#${gateId}`;
+  }
+
   // ── Generic catalog list/archive (items, achievements) ───────────────────────
   async function loadCatalog(kind, listId) {
     const res = await fetch(`/api/${kind}`);
     if (!res.ok) return;
     const rows = await res.json();
+    if (kind === "achievements") {
+      achievementRows = rows;
+      populateItemGate();
+    }
     const ul = document.getElementById(listId);
     ul.innerHTML = "";
     for (const row of rows) {
       const obj = row.item || row.achievement;
       const li = document.createElement("li");
-      const label = row.item
-        ? `${obj.name} — ${obj.cost} pts${obj.active ? "" : " (archived)"}${row.out_of_stock ? " · out of stock" : ""}`
-        : `${obj.name}${obj.active ? "" : " (archived)"}`;
+      let label;
+      if (row.item) {
+        const gate = obj.gate != null ? ` · needs: ${gateLabel(obj.gate)}` : "";
+        label = `${obj.name} — ${obj.cost} pts${obj.active ? "" : " (archived)"}${row.out_of_stock ? " · out of stock" : ""}${gate}`;
+      } else {
+        label = `${obj.name} — ${criterionSummary(obj.criterion)} · +${obj.bonus_points}${obj.active ? "" : " (archived)"}`;
+      }
       li.textContent = label + " ";
       if (obj.active) {
         const btn = document.createElement("button");
@@ -173,6 +218,21 @@
       }
       ul.appendChild(li);
     }
+  }
+
+  // Populate the item-form gate <select> (None + each achievement) from the loaded rows.
+  function populateItemGate() {
+    const sel = document.getElementById("item-gate");
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">None</option>';
+    for (const r of achievementRows) {
+      const opt = document.createElement("option");
+      opt.value = String(r.achievement.id);
+      opt.textContent = r.achievement.name;
+      sel.appendChild(opt);
+    }
+    sel.value = prev;
   }
 
   // ── First-run registration ───────────────────────────────────────────────────
@@ -199,7 +259,7 @@
       for (const id of ["review-panel", "quests-panel", "items-panel", "achievements-panel", "members-panel", "log-panel"]) {
         document.getElementById(id).hidden = false;
       }
-      loadReview(); loadQuests(); loadCatalog("items", "item-list"); loadCatalog("achievements", "achievement-list"); loadMembers();
+      loadReview(); loadQuests(); loadAchScopeQuests(); loadCatalog("items", "item-list"); loadCatalog("achievements", "achievement-list"); loadMembers();
     });
   }
 
@@ -278,12 +338,14 @@
       ev.preventDefault();
       itemErr.hidden = true;
       const fd = new FormData(itemForm);
+      const gateRaw = fd.get("gate");
       const item = {
         id: Date.now(),
         name: fd.get("name"),
         description: null,
         cost: Number(fd.get("cost")),
-        gate: null,
+        // gate is an achievement id number, or null for "None".
+        gate: gateRaw ? Number(gateRaw) : null,
         availability: fd.get("availability"), // "Once" | "Repeatable"
         active: true,
         icon: null,
@@ -303,19 +365,77 @@
     });
   }
 
-  // ── Achievement create (T-0027) ──────────────────────────────────────────────
+  // ── Achievement create (T-0027 / enriched T-0036) ────────────────────────────
   const achForm = document.getElementById("achievement-form");
   const achErr = document.getElementById("achievement-error");
+
+  // Show only the fields relevant to the chosen criterion / scope. Driven by the two selects;
+  // re-run on change and once at startup.
+  function syncAchFields() {
+    const criterion = document.getElementById("ach-criterion").value;
+    const isPoints = criterion === "PointsEarned";
+    const isTotal = criterion === "TotalCompletions";
+    const isStreak = criterion === "Streak";
+    document.getElementById("ach-points-fields").hidden = !isPoints;
+    document.getElementById("ach-scope-fields").hidden = isPoints; // scope for Streak + TotalCompletions
+    document.getElementById("ach-total-fields").hidden = !isTotal;
+    document.getElementById("ach-streak-fields").hidden = !isStreak;
+
+    const scope = document.getElementById("ach-scope").value;
+    document.getElementById("ach-scope-quest-label").hidden = scope !== "Quest";
+    document.getElementById("ach-scope-category-label").hidden = scope !== "Category";
+  }
+
+  // Populate the scope→Quest dropdown from GET /api/quests (options = quest title valued by id).
+  async function loadAchScopeQuests() {
+    const res = await fetch("/api/quests");
+    if (!res.ok) return;
+    const rows = await res.json();
+    window.__questsById = {};
+    const sel = document.getElementById("ach-scope-quest");
+    if (sel) sel.innerHTML = "";
+    for (const row of rows) {
+      window.__questsById[row.quest.id] = row.quest.title;
+      if (sel) {
+        const opt = document.createElement("option");
+        opt.value = String(row.quest.id);
+        opt.textContent = row.quest.title;
+        sel.appendChild(opt);
+      }
+    }
+  }
+
+  // Build the externally-tagged Scope JSON from the scope sub-control.
+  function buildScope(fd) {
+    const scope = fd.get("scope");
+    if (scope === "Quest") return { Quest: Number(fd.get("scope_quest")) };
+    if (scope === "Category") return { Category: fd.get("scope_category") || "" };
+    return "Any";
+  }
+
   if (achForm) {
+    document.getElementById("ach-criterion").addEventListener("change", syncAchFields);
+    document.getElementById("ach-scope").addEventListener("change", syncAchFields);
+    syncAchFields();
+
     achForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       achErr.hidden = true;
       const fd = new FormData(achForm);
+      const kind = fd.get("criterion");
+      let criterion;
+      if (kind === "PointsEarned") {
+        criterion = { PointsEarned: { total: Number(fd.get("total")) } };
+      } else if (kind === "TotalCompletions") {
+        criterion = { TotalCompletions: { scope: buildScope(fd), count: Number(fd.get("count")) } };
+      } else {
+        criterion = { Streak: { scope: buildScope(fd), length: Number(fd.get("length")), basis: fd.get("basis") } };
+      }
       const achievement = {
         id: Date.now(),
         name: fd.get("name"),
         description: null,
-        criterion: { PointsEarned: { total: Number(fd.get("total")) } },
+        criterion,
         bonus_points: Number(fd.get("bonus")),
         active: true,
       };
@@ -330,6 +450,7 @@
         return;
       }
       achForm.reset();
+      syncAchFields();
       loadCatalog("achievements", "achievement-list");
     });
   }
