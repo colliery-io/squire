@@ -4,14 +4,14 @@ level: task
 title: "Identity: integration, isolation, dual-backend & MVP seed; wire API to prod identity"
 short_code: "SQUIRE-T-0023"
 created_at: 2026-06-17T09:52:25.200559+00:00
-updated_at: 2026-06-17T10:19:26.088456+00:00
+updated_at: 2026-06-17T10:30:55.529578+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,13 +32,15 @@ Wire the api onto the production `Identity`, prove full tenant isolation and per
 
 ## Acceptance Criteria
 
-- [ ] `AppState` can be built with the production `Identity` (a constructor/example wiring `ProdIdentity` in place of `DevIdentity`); the api integration flow (register→login→claim→approve→state) passes over HTTP on the production identity.
-- [ ] Full tenant isolation: two households registered; each member's token reaches only its own tenant; no cross-tenant read/write; a member of A cannot authenticate into or enumerate B (no global user directory).
-- [ ] No account-bypass: every protected call requires a valid token; there is no shared/anonymous path (NFR-2.2).
-- [ ] MVP seed: seed a household with N Knights + N Squires (e.g. 2 Knights + 1 Squire) through the REAL register/add-member flow (no fixture back-door, REQ-1.10); each member logs in and acts per role.
-- [ ] Audit: "who added member X (and when)" is answerable from the users audit columns (REQ-1.12).
-- [ ] Dual-backend: identity + provisioning + isolation tests run on SQLite AND the compose Postgres (`--features postgres` + `DATABASE_URL`).
-- [ ] `cargo test --workspace` is green and the build is warning-free.
+## Acceptance Criteria
+
+- [x] `AppState` can be built with the production `Identity` (a constructor/example wiring `ProdIdentity` in place of `DevIdentity`); the api integration flow (register→login→claim→approve→state) passes over HTTP on the production identity.
+- [x] Full tenant isolation: two households registered; each member's token reaches only its own tenant; no cross-tenant read/write; a member of A cannot authenticate into or enumerate B (no global user directory).
+- [x] No account-bypass: every protected call requires a valid token; there is no shared/anonymous path (NFR-2.2).
+- [x] MVP seed: seed a household with N Knights + N Squires (e.g. 2 Knights + 1 Squire) through the REAL register/add-member flow (no fixture back-door, REQ-1.10); each member logs in and acts per role.
+- [x] Audit: "who added member X (and when)" is answerable from the users audit columns (REQ-1.12).
+- [x] Dual-backend: identity + provisioning + isolation tests run on SQLite AND the compose Postgres (`--features postgres` + `DATABASE_URL`).
+- [x] `cargo test --workspace` is green and the build is warning-free.
 
 ## Implementation Notes
 
@@ -53,4 +55,12 @@ SQUIRE-T-0019..T-0022; api (T-0018); `store` Provisioner.
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Done.** Wired the api onto the production identity and proved isolation / no-bypass / MVP-seed on both backends.
+
+- **`AppState::local_prod(backend, handle, signer, ttl)`** (`crates/api/src/state.rs`): provisions the tenant (creating the SQLite file / Postgres schema + migrating — required on PG, where `open` alone does not create the schema), opens the handlers' store, and binds a `ProdIdentity` (local single-tenant) over the SAME handle/backend. The handlers' store and the identity's registry are separate connections to the same tenant; sequential single-writer requests never overlap, and the identity only writes `users`/`credentials` (never the event log's app-assigned `seq`).
+- **Hardened `ProdIdentity::verify`**: in Local posture, a presented handle ≠ the bound household is now `WrongTenant`, so an api bound to household B refuses an otherwise-valid token minted for A.
+- **`crates/api/Cargo.toml`**: added `postgres` feature = `["store/postgres", "identity/postgres"]`.
+- **`crates/api/tests/prod_integration.rs`** (new, dual-backend via `each_backend_async`): AC-1 full flow over HTTP on `ProdIdentity`; MVP seed of **2 Knights + 1 Squire** built only through real `register` + `/members` (no fixture), each logging in and acting per role; **audit** assertions (admin Knight = system seed `created_by=None`; added members record Knight #1 via `store::user_audit`); **no-bypass** (missing/garbage/wrong-tenant → 401); **two-household isolation** (two AppStates, shared signing key: A's token reaches nothing on B; A's admin cannot log into B; B's directory holds only its own member — ids are per-tenant so isolation is asserted on member data, not id equality).
+- **`crates/identity/tests/prod.rs`**: added a **hosted** multi-tenant isolation test (two households registered through the real flow; cross-tenant `verify`/`login` rejected; a probe registry confirms a member added to A never appears in B; no global directory).
+
+**Verification.** `cargo test --workspace` green & warning-free (32 test binaries). Postgres path run against docker-compose (`docker compose up -d postgres`; `PQ_LIB_DIR`/`DYLD_FALLBACK_LIBRARY_PATH`/`DATABASE_URL` + `cargo test -p identity -p api --features postgres`) — all green, prod-integration executed (not skipped). Compose torn down. Committed as `73aa10f`.
