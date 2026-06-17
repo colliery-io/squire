@@ -74,7 +74,8 @@
       <ul id="quest-list"></ul>
     </section>
 
-    <!-- Item authoring (SQUIRE-T-0027). Availability is Once or Repeatable only (A-0006). -->
+    <!-- Item authoring (SQUIRE-T-0027 / enriched T-0036). Availability is Once or Repeatable only
+         (A-0006); an optional achievement gate (RedeemableItem.gate) locks the reward until earned. -->
     <section id="items-panel" hidden>
       <h2 id="items">Rewards</h2>
       <form id="item-form">
@@ -86,18 +87,69 @@
             <option value="Once">Once (out of stock after redemption)</option>
           </select>
         </label>
+        <label>Requires achievement (gate)
+          <select name="gate" id="item-gate">
+            <option value="">None</option>
+          </select>
+        </label>
         <button type="submit">Add reward</button>
       </form>
       <p id="item-error" class="error" hidden></p>
       <ul id="item-list"></ul>
     </section>
 
-    <!-- Achievement authoring (SQUIRE-T-0027). Minimal: a points-earned criterion. -->
+    <!-- Achievement authoring (SQUIRE-T-0027 / enriched T-0036). The full Criterion surface:
+         Streak (scope + length + basis), TotalCompletions (scope + count), PointsEarned (total). -->
     <section id="achievements-panel" hidden>
       <h2 id="achievements">Achievements</h2>
       <form id="achievement-form">
         <label>Name <input name="name" required /></label>
-        <label>Points to earn <input name="total" type="number" min="1" value="100" required /></label>
+        <label>Criterion
+          <select name="criterion" id="ach-criterion">
+            <option value="Streak">Streak</option>
+            <option value="TotalCompletions">Total completions</option>
+            <option value="PointsEarned">Points earned</option>
+          </select>
+        </label>
+
+        <!-- PointsEarned: just a total. -->
+        <fieldset id="ach-points-fields" hidden>
+          <label>Points to earn (total) <input name="total" type="number" min="1" value="100" /></label>
+        </fieldset>
+
+        <!-- Scope sub-control, shared by Streak + TotalCompletions. -->
+        <fieldset id="ach-scope-fields" hidden>
+          <label>Scope
+            <select name="scope" id="ach-scope">
+              <option value="Any">Any</option>
+              <option value="Quest">Quest</option>
+              <option value="Category">Category</option>
+            </select>
+          </label>
+          <label id="ach-scope-quest-label" hidden>Quest
+            <select name="scope_quest" id="ach-scope-quest"></select>
+          </label>
+          <label id="ach-scope-category-label" hidden>Category
+            <input name="scope_category" id="ach-scope-category" />
+          </label>
+        </fieldset>
+
+        <!-- TotalCompletions: a count. -->
+        <fieldset id="ach-total-fields" hidden>
+          <label>Count <input name="count" type="number" min="1" value="5" /></label>
+        </fieldset>
+
+        <!-- Streak: a length + basis. -->
+        <fieldset id="ach-streak-fields" hidden>
+          <label>Length <input name="length" type="number" min="1" value="7" /></label>
+          <label>Basis
+            <select name="basis">
+              <option value="ScheduledOccurrences">Scheduled occurrences</option>
+              <option value="CalendarDays">Calendar days</option>
+            </select>
+          </label>
+        </fieldset>
+
         <label>Bonus points <input name="bonus" type="number" min="0" value="10" required /></label>
         <button type="submit">Add achievement</button>
       </form>
