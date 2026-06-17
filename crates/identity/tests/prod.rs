@@ -285,3 +285,110 @@ fn hosted_two_households_are_fully_isolated() {
     assert!(b_users.iter().all(|u| u.id != added.user), "B never sees A's Squire");
     assert_eq!(b_users.len(), 1, "B still has only its own admin");
 }
+
+// ─── Device pairing (ADR SQUIRE-A-0010 / SQUIRE-T-0044) ──────────────────────────────────────────
+
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine as _;
+use sha2::{Digest, Sha256};
+use store::SystemClock as StoreClock;
+
+/// Recompute the stored hash of a code the same way `prod.rs` does (so a test can pre-seed a row).
+fn code_hash(code: &str) -> String {
+    URL_SAFE_NO_PAD.encode(Sha256::digest(code.as_bytes()))
+}
+
+/// Register an admin Knight and add one Squire; return (identity, handle, inspector, dir, caller, squire).
+fn household_with_squire(
+) -> (ProdIdentity, HouseholdHandle, Provisioner, tempfile::TempDir, Principal, UserId) {
+    let (id, handle, inspector, dir) = local_identity(60_000);
+    let admin = id
+        .register(RegisterHouseholdReq {
+            household_name: "House".into(),
+            admin_name: "Admin".into(),
+            admin_secret: "admin-secret".into(),
+        })
+        .expect("register");
+    let caller = id.verify(&admin.household, &admin.token).expect("admin principal");
+    let squire = id
+        .add_member(
+            &caller,
+            AddMemberReq { role: Role::Squire, display_name: "Kid".into(), initial_secret: "s".into() },
+        )
+        .expect("add squire")
+        .user;
+    (id, handle, inspector, dir, caller, squire)
+}
+
+#[test]
+fn mint_then_consume_round_trips_to_a_member_token() {
+    let (id, handle, _inspector, _dir, caller, squire) = household_with_squire();
+
+    let minted = id
+        .mint_pairing_code(&caller, squire)
+        .expect("knight mints a pairing code for the squire");
+
+    // Consume the code → the squire's tenant-scoped token + identity.
+    let paired = id.consume_pairing_code(&handle, &minted.code).expect("consume");
+    assert_eq!(paired.user, squire);
+    assert_eq!(paired.role, Role::Squire);
+    assert_eq!(paired.household, handle);
+
+    // The returned token verifies to exactly that Squire Principal.
+    let principal = id.verify(&handle, &paired.token).expect("paired token verifies");
+    assert_eq!(principal, Principal { household: handle, user: squire, role: Role::Squire });
+}
+
+#[test]
+fn pairing_code_is_single_use() {
+    let (id, handle, _inspector, _dir, caller, squire) = household_with_squire();
+    let minted = id.mint_pairing_code(&caller, squire).expect("mint");
+
+    assert!(id.consume_pairing_code(&handle, &minted.code).is_ok(), "first consume works");
+    // Second consume of the same code is rejected (the row was deleted on the first).
+    assert_eq!(
+        id.consume_pairing_code(&handle, &minted.code).unwrap_err(),
+        AuthError::BadToken,
+        "a used code can't be replayed"
+    );
+}
+
+#[test]
+fn unknown_pairing_code_is_rejected() {
+    let (id, handle, _inspector, _dir, _caller, _squire) = household_with_squire();
+    assert_eq!(
+        id.consume_pairing_code(&handle, "not-a-real-code").unwrap_err(),
+        AuthError::BadToken,
+    );
+}
+
+#[test]
+fn non_knight_cannot_mint() {
+    let (id, handle, _inspector, _dir, caller, squire) = household_with_squire();
+    // Forge a Squire principal and try to mint — rejected before any store write.
+    let squire_principal = Principal { household: handle, user: squire, role: Role::Squire };
+    assert_eq!(
+        id.mint_pairing_code(&squire_principal, caller.user).map(|_| ()),
+        Err(AuthError::Forbidden),
+    );
+}
+
+#[test]
+fn expired_pairing_code_is_rejected() {
+    let (id, handle, inspector, _dir, _caller, squire) = household_with_squire();
+    // Pre-seed an already-expired code directly in the tenant store (expires_at = 1ms past epoch).
+    let code = "expired-demo-code";
+    inspector
+        .open(&handle.0, StoreClock)
+        .expect("open tenant")
+        .insert_pairing_code(&code_hash(code), squire, Role::Squire, 1)
+        .expect("seed expired code");
+
+    assert_eq!(
+        id.consume_pairing_code(&handle, code).unwrap_err(),
+        AuthError::BadToken,
+        "an expired code is rejected (and consumed)"
+    );
+    // And it's been deleted — a second attempt is still rejected (single-use even when expired).
+    assert_eq!(id.consume_pairing_code(&handle, code).unwrap_err(), AuthError::BadToken);
+}

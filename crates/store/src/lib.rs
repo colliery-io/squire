@@ -54,11 +54,11 @@ use diesel_migrations::MigrationHarness;
 
 use domain_core::contract::{
     Achievement, AchievementId, Change, Clock, Date, Event, ItemId, Quest, QuestId,
-    RedeemableItem, RepoError, Repository, Snapshot, Timestamp, User, UserId,
+    RedeemableItem, RepoError, Repository, Role, Snapshot, Timestamp, User, UserId,
 };
 
 use crate::rows::id_to_text;
-use crate::schema::{achievements, credentials, events, items, quests, users};
+use crate::schema::{achievements, credentials, events, items, pairing_codes, quests, users};
 
 // ─── error mapping ───────────────────────────────────────────────────────────
 
@@ -278,6 +278,61 @@ impl<C: Clock> Store<C> {
             .optional()
             .expect("credential: query failed (corrupt store)")
     }
+
+    /// Insert a one-time pairing code into THIS tenant's `pairing_codes` table (ADR SQUIRE-A-0010).
+    ///
+    /// Like [`set_credential`](Self::set_credential), this is auth material written directly by the
+    /// identity layer (NOT a domain [`Change`] — bypasses `apply`, no audit, not in the event log).
+    /// `code_hash` is `sha256(code)` hex; the plaintext code is never stored. `expires_at` is unix
+    /// millis. The code is consumed (and deleted) via [`take_pairing_code`](Self::take_pairing_code).
+    pub fn insert_pairing_code(
+        &self,
+        code_hash: &str,
+        user: UserId,
+        role: Role,
+        expires_at: i64,
+    ) -> Result<(), RepoError> {
+        let mut conn = self.conn.borrow_mut();
+        let row = PairingCodeRow {
+            code_hash: code_hash.to_string(),
+            user_id: id_to_text(user.0),
+            role: match role {
+                Role::Knight => "Knight",
+                Role::Squire => "Squire",
+            }
+            .to_string(),
+            expires_at,
+        };
+        diesel::insert_into(pairing_codes::table)
+            .values(&row)
+            .execute(&mut *conn)
+            .map_err(map_err)?;
+        Ok(())
+    }
+
+    /// Look up a pairing code by its `sha256(code)` hash and **delete it** (single-use), returning
+    /// `(target_user, role, expires_at)` if present. Returns `None` for an unknown code. The caller
+    /// (identity) enforces the expiry against the clock; the row is removed on access either way, so
+    /// a presented code is always spent. Atomic with respect to other writers because the caller
+    /// holds the single-writer store lock for the whole consume.
+    pub fn take_pairing_code(&self, code_hash: &str) -> Option<(UserId, Role, i64)> {
+        let mut conn = self.conn.borrow_mut();
+        let row: PairingCodeRow = pairing_codes::table
+            .filter(pairing_codes::code_hash.eq(code_hash))
+            .first::<PairingCodeRow>(&mut *conn)
+            .optional()
+            .expect("take_pairing_code: query failed (corrupt store)")?;
+        diesel::delete(pairing_codes::table.filter(pairing_codes::code_hash.eq(code_hash)))
+            .execute(&mut *conn)
+            .expect("take_pairing_code: delete failed (corrupt store)");
+        let user = UserId(row.user_id.parse::<u128>().ok()?);
+        let role = match row.role.as_str() {
+            "Knight" => Role::Knight,
+            "Squire" => Role::Squire,
+            _ => return None,
+        };
+        Some((user, role, row.expires_at))
+    }
 }
 
 /// A `credentials` row: a member's hashed secret keyed by `UserId` (no audit columns — this
@@ -288,6 +343,19 @@ impl<C: Clock> Store<C> {
 struct CredentialRow {
     user_id: String,
     secret_hash: String,
+}
+
+/// A `pairing_codes` row: a one-time device-pairing code (hashed) keyed by `code_hash`, with its
+/// target member, role, and expiry. Auth material written directly by the identity layer (ADR
+/// SQUIRE-A-0010); no audit columns, not in the event log.
+#[derive(Debug, Clone, Insertable, Queryable, Selectable)]
+#[diesel(table_name = pairing_codes)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+struct PairingCodeRow {
+    code_hash: String,
+    user_id: String,
+    role: String,
+    expires_at: i64,
 }
 
 impl<C: Clock> Repository for Store<C> {

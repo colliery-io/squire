@@ -37,11 +37,33 @@
 
 use std::sync::Mutex;
 
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine as _;
+use password_hash::rand_core::{OsRng, RngCore};
+use sha2::{Digest, Sha256};
+
 use domain_core::contract::{
     AddMemberReq, AddMemberResp, AuthToken, Change, Clock, HouseholdHandle, LoginReq, LoginResp,
-    RegisterHouseholdReq, RegisterHouseholdResp, Repository, Role, User, UserId,
+    MintPairCodeResp, PairResp, RegisterHouseholdReq, RegisterHouseholdResp, Repository, Role,
+    Timestamp, User, UserId,
 };
 use store::{Store, SystemClock};
+
+/// Device-pairing code lifetime: 30 minutes (ADR SQUIRE-A-0010), in unix millis.
+const PAIR_CODE_TTL_MS: i64 = 30 * 60 * 1000;
+
+/// A fresh ≥128-bit single-use pairing code (32 random bytes, base64url-encoded). The plaintext is
+/// returned to the Keep once (for the QR); only its [`hash_code`] is persisted.
+fn generate_code() -> String {
+    let mut bytes = [0u8; 32];
+    OsRng.fill_bytes(&mut bytes);
+    URL_SAFE_NO_PAD.encode(bytes)
+}
+
+/// `sha256(code)` (base64url) — what we store/compare, so the plaintext code never hits the DB.
+fn hash_code(code: &str) -> String {
+    URL_SAFE_NO_PAD.encode(Sha256::digest(code.as_bytes()))
+}
 
 use crate::creds::{hash_secret, verify_secret};
 use crate::tenant::{TenantError, TenantRegistry};
@@ -345,5 +367,74 @@ impl Identity for ProdIdentity {
         })?;
 
         Ok(AddMemberResp { user: new_id })
+    }
+
+    fn mint_pairing_code(
+        &self,
+        caller: &Principal,
+        target: UserId,
+    ) -> Result<MintPairCodeResp, AuthError> {
+        // Knight-only (defense in depth: the API route also gates on RequireKnight).
+        if caller.role != Role::Knight {
+            return Err(AuthError::Forbidden);
+        }
+        let now = self.now_ms();
+        let expires_at = now + PAIR_CODE_TTL_MS;
+        let code = generate_code();
+        let code_hash = hash_code(&code);
+
+        // Resolve the target member (must exist + be active) and store the code hash under one lock
+        // (Shared), so the check-then-write is atomic against other writers.
+        self.with_tenant_store(&caller.household, |store| {
+            let role = store
+                .snapshot()
+                .users
+                .iter()
+                .find(|u| u.id == target && u.active)
+                .map(|u| u.role)
+                .ok_or(AuthError::Forbidden)?; // unknown / inactive target
+            store
+                .insert_pairing_code(&code_hash, target, role, expires_at)
+                .map_err(|_| AuthError::BadToken)?;
+            Ok(())
+        })?;
+
+        Ok(MintPairCodeResp { code, expires_at: Timestamp(expires_at) })
+    }
+
+    fn consume_pairing_code(
+        &self,
+        household: &HouseholdHandle,
+        code: &str,
+    ) -> Result<PairResp, AuthError> {
+        let now = self.now_ms();
+        let code_hash = hash_code(code);
+
+        // Take (lookup + delete = single-use) and confirm the member is still active, under one
+        // lock. An unknown code, an inactive member, and (below) an expired code ALL surface as the
+        // same `BadToken` so `/pair` is not an enumeration oracle.
+        let (user, role, expires_at) = self.with_tenant_store(household, |store| {
+            let taken = store.take_pairing_code(&code_hash).ok_or(AuthError::BadToken)?;
+            let (user, role, _exp) = taken;
+            let active = store
+                .snapshot()
+                .users
+                .iter()
+                .any(|u| u.id == user && u.active && u.role == role);
+            if !active {
+                return Err(AuthError::BadToken);
+            }
+            Ok(taken)
+        })?;
+
+        // Expiry is checked after the take, so an expired code is still consumed (deleted) and can't
+        // be retried.
+        if now >= expires_at {
+            return Err(AuthError::BadToken);
+        }
+
+        let principal = Principal { household: household.clone(), user, role };
+        let token = self.signer.issue(&principal, now, self.token_ttl_ms);
+        Ok(PairResp { token, household: household.clone(), user, role })
     }
 }

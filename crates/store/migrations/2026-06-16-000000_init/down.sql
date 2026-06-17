@@ -2,6 +2,7 @@ DROP INDEX IF EXISTS idx_events_squire;
 DROP INDEX IF EXISTS idx_events_item;
 DROP INDEX IF EXISTS idx_events_quest;
 DROP INDEX IF EXISTS idx_events_seq;
+DROP TABLE IF EXISTS pairing_codes;
 DROP TABLE IF EXISTS credentials;
 DROP TABLE IF EXISTS events;
 DROP TABLE IF EXISTS achievements;

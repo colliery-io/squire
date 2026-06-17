@@ -23,7 +23,8 @@ use std::sync::{Arc, Mutex};
 
 use domain_core::contract::{
     AddMemberReq, AddMemberResp, AuthToken, Change, HouseholdHandle, LoginReq, LoginResp,
-    RegisterHouseholdReq, RegisterHouseholdResp, Repository, Role, User, UserId,
+    MintPairCodeResp, PairResp, RegisterHouseholdReq, RegisterHouseholdResp, Repository, Role, User,
+    UserId,
 };
 use store::{Store, SystemClock};
 
@@ -87,6 +88,26 @@ pub trait Identity: Send + Sync {
         caller: &Principal,
         req: AddMemberReq,
     ) -> Result<AddMemberResp, AuthError>;
+
+    /// Knight-only: mint a one-time device-pairing code for member `target` (ADR SQUIRE-A-0010).
+    /// Returns the plaintext code (shown once, in the Keep's QR) + its expiry. Default: unsupported.
+    fn mint_pairing_code(
+        &self,
+        _caller: &Principal,
+        _target: UserId,
+    ) -> Result<MintPairCodeResp, AuthError> {
+        Err(AuthError::Forbidden)
+    }
+
+    /// Unauthenticated: exchange a one-time pairing `code` for the target member's tenant-scoped
+    /// token + identity (ADR SQUIRE-A-0010). `household` routes to the tenant. Default: unsupported.
+    fn consume_pairing_code(
+        &self,
+        _household: &HouseholdHandle,
+        _code: &str,
+    ) -> Result<PairResp, AuthError> {
+        Err(AuthError::BadToken)
+    }
 }
 
 /// Minimal in-memory [`Identity`] for the LAN-local single-tenant MVP and for tests.

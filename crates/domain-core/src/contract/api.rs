@@ -289,3 +289,27 @@ pub struct LoginReq { pub household: HouseholdHandle, pub user: UserId, pub secr
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct LoginResp { pub token: AuthToken, pub role: Role }
+
+/// POST /pair/codes (Knight-only) — mint a one-time device-pairing code for member `user`
+/// (ADR SQUIRE-A-0010). The plaintext `code` is returned once for the Keep to render as a QR.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct MintPairCodeReq { pub user: UserId }
+/// The minted pairing code and its expiry (unix millis). Single-use; ≥128-bit; 30-min TTL.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct MintPairCodeResp { pub code: String, pub expires_at: Timestamp }
+
+/// POST /pair (unauthenticated) — a phone exchanges a one-time pairing code for the member's
+/// tenant-scoped token (ADR SQUIRE-A-0010). `household` routes to the tenant (from the QR).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct PairReq { pub household: HouseholdHandle, pub code: String }
+/// The paired member's tenant-scoped token + identity (same token shape as `/login`, A-0004).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct PairResp { pub token: AuthToken, pub household: HouseholdHandle, pub user: UserId, pub role: Role }
