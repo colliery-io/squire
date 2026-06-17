@@ -781,34 +781,31 @@
         "format": "int32"
       },
       "DecisionDto": {
-        "oneOf": [
-          {
-            "type": "string",
-            "enum": [
-              "approve"
-            ]
-          },
-          {
-            "type": "object",
-            "required": [
-              "reject"
-            ],
-            "properties": {
-              "reject": {
-                "type": "object",
-                "properties": {
-                  "reason": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  }
-                }
-              }
-            }
-          }
+        "type": "object",
+        "description": "A review decision as it arrives on the wire. **Flat struct** (not an externally-tagged enum):\n`{\"verdict\":\"approve\"}` or `{\"verdict\":\"reject\",\"reason\":\"…\"}`. The tagged-enum form made\nopenapi-generator emit an undecodable Kotlin class (it couldn't represent the bare `Approve`),\nso — exactly like the T-0033 state enums — we discriminate on a `verdict` field plus an optional\npayload. Maps onto the domain [`Decision`].",
+        "required": [
+          "verdict"
         ],
-        "description": "A review decision as it arrives on the wire: `approve`, or `reject` with an optional reason.\nMaps onto the domain [`Decision`]. Tagged so the JSON is `{\"approve\":{}}` / `{\"reject\":{...}}`."
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional note for a [`DecisionKind::Reject`]; omitted on the wire when absent."
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/DecisionKind"
+          }
+        }
+      },
+      "DecisionKind": {
+        "type": "string",
+        "description": "The two review verdicts, as a flat string discriminant on the wire.",
+        "enum": [
+          "approve",
+          "reject"
+        ]
       },
       "HouseholdHandle": {
         "type": "string",

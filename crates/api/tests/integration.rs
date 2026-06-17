@@ -279,7 +279,7 @@ async fn ac1_full_flow_over_http() {
         "/admin/review-claim",
         &knight,
         &handle,
-        json!({ "claim_id": claim_id, "decision": "approve" }),
+        json!({ "claim_id": claim_id, "decision": { "verdict": "approve" } }),
     )
     .await;
     assert_eq!(st, StatusCode::OK);
@@ -313,8 +313,8 @@ async fn squire_token_is_403_on_every_privileged_route() {
 
     // Each privileged POST with a *Squire* token → 403.
     let posts: Vec<(&str, Value)> = vec![
-        ("/admin/review-claim", json!({ "claim_id": 1u128, "decision": "approve" })),
-        ("/admin/review-redemption", json!({ "request_id": 1u128, "decision": "approve" })),
+        ("/admin/review-claim", json!({ "claim_id": 1u128, "decision": { "verdict": "approve" } })),
+        ("/admin/review-redemption", json!({ "request_id": 1u128, "decision": { "verdict": "approve" } })),
         ("/admin/redeem", json!({ "command_id": 1u128, "squire": squire_id, "item_id": ITEM_ID })),
         ("/admin/adjust", json!({ "command_id": 1u128, "squire": squire_id, "amount": 1, "reason": "x" })),
         ("/admin/mark-done", json!({ "claim_id": 1u128, "squire": squire_id, "quest_id": DAILY_QUEST_ID, "on": today.0 })),
@@ -541,7 +541,7 @@ async fn redemption_approval_fails_when_balance_drained_before_review() {
         "/admin/review-redemption",
         &knight,
         &handle,
-        json!({ "request_id": request_id, "decision": "approve" }),
+        json!({ "request_id": request_id, "decision": { "verdict": "approve" } }),
     )
     .await;
     assert_eq!(

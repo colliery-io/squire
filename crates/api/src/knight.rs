@@ -37,20 +37,44 @@ use crate::state::AppState;
 
 // ─── wire request DTOs (the body never carries `actor` — it's token-derived) ─────────────
 
-/// A review decision as it arrives on the wire: `approve`, or `reject` with an optional reason.
-/// Maps onto the domain [`Decision`]. Tagged so the JSON is `{"approve":{}}` / `{"reject":{...}}`.
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+/// The two review verdicts, as a flat string discriminant on the wire.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum DecisionDto {
+pub enum DecisionKind {
     Approve,
-    Reject { reason: Option<String> },
+    Reject,
+}
+
+/// A review decision as it arrives on the wire. **Flat struct** (not an externally-tagged enum):
+/// `{"verdict":"approve"}` or `{"verdict":"reject","reason":"…"}`. The tagged-enum form made
+/// openapi-generator emit an undecodable Kotlin class (it couldn't represent the bare `Approve`),
+/// so — exactly like the T-0033 state enums — we discriminate on a `verdict` field plus an optional
+/// payload. Maps onto the domain [`Decision`].
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct DecisionDto {
+    pub verdict: DecisionKind,
+    /// Optional note for a [`DecisionKind::Reject`]; omitted on the wire when absent.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reason: Option<String>,
+}
+
+impl DecisionDto {
+    /// `{"verdict":"approve"}` — accept the claim/request.
+    pub fn approve() -> Self {
+        Self { verdict: DecisionKind::Approve, reason: None }
+    }
+
+    /// `{"verdict":"reject"}` (optionally with a `reason`) — decline it.
+    pub fn reject(reason: Option<String>) -> Self {
+        Self { verdict: DecisionKind::Reject, reason }
+    }
 }
 
 impl From<DecisionDto> for Decision {
     fn from(d: DecisionDto) -> Self {
-        match d {
-            DecisionDto::Approve => Decision::Approve,
-            DecisionDto::Reject { reason } => Decision::Reject { reason },
+        match d.verdict {
+            DecisionKind::Approve => Decision::Approve,
+            DecisionKind::Reject => Decision::Reject { reason: d.reason },
         }
     }
 }
