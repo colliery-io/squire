@@ -11,3 +11,6 @@ clients/squire-android/**/build/
 clients/squire-android/local.properties
 clients/squire-android/.idea/
 clients/squire-android/.kotlin/
+# Release signing material — never commit the keystore or its credentials.
+clients/squire-android/keystore/
+clients/squire-android/keystore.properties
