@@ -36,8 +36,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.HouseholdReview
+import com.squire.sdk.model.ItemOption
 import com.squire.sdk.model.PendingClaim
 import com.squire.sdk.model.PendingRequest
+import com.squire.sdk.model.QuestOption
 import com.squire.sdk.model.SquireSummary
 
 /**
@@ -55,6 +57,8 @@ fun KnightHomeScreen(
     onApproveRequest: (requestId: Long) -> Unit,
     onRejectRequest: (requestId: Long) -> Unit,
     onAddFunds: (squire: Long, amount: Long, reason: String) -> Unit,
+    onRedeem: (squire: Long, itemId: Long) -> Unit,
+    onMarkDone: (squire: Long, questId: Long, on: Int) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -85,6 +89,8 @@ fun KnightHomeScreen(
                 onApproveRequest = onApproveRequest,
                 onRejectRequest = onRejectRequest,
                 onAddFunds = onAddFunds,
+                onRedeem = onRedeem,
+                onMarkDone = onMarkDone,
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
         }
@@ -100,12 +106,16 @@ private fun ReadyContent(
     onApproveRequest: (Long) -> Unit,
     onRejectRequest: (Long) -> Unit,
     onAddFunds: (Long, Long, String) -> Unit,
+    onRedeem: (Long, Long) -> Unit,
+    onMarkDone: (Long, Long, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // The Squire a pending claim/request belongs to is labelled by display name from the summaries.
     val names = review.squires.associate { it.squire to it.displayName }
 
     var fundsFor by remember { mutableStateOf<SquireSummary?>(null) }
+    var redeemFor by remember { mutableStateOf<SquireSummary?>(null) }
+    var markDoneFor by remember { mutableStateOf<SquireSummary?>(null) }
 
     LazyColumn(
         modifier = modifier,
@@ -119,7 +129,12 @@ private fun ReadyContent(
             item { Text("No Squires yet.") }
         } else {
             items(review.squires, key = { it.squire }) { s ->
-                SquireRow(s, onAddFunds = { fundsFor = s })
+                SquireRow(
+                    s = s,
+                    onAddFunds = { fundsFor = s },
+                    onRedeem = { redeemFor = s },
+                    onMarkDone = { markDoneFor = s },
+                )
             }
         }
 
@@ -162,21 +177,86 @@ private fun ReadyContent(
             },
         )
     }
+
+    redeemFor?.let { target ->
+        PickDialog(
+            title = "Redeem for ${target.displayName}",
+            empty = "No items to redeem.",
+            options = review.items.map { it.itemId to "${it.name} · ${it.cost} pts" },
+            onPick = { itemId ->
+                onRedeem(target.squire, itemId)
+                redeemFor = null
+            },
+            onDismiss = { redeemFor = null },
+        )
+    }
+
+    markDoneFor?.let { target ->
+        PickDialog(
+            title = "Mark done for ${target.displayName}",
+            empty = "No quests to mark.",
+            options = review.quests.map { it.questId to it.title },
+            onPick = { questId ->
+                onMarkDone(target.squire, questId, review.today)
+                markDoneFor = null
+            },
+            onDismiss = { markDoneFor = null },
+        )
+    }
 }
 
 @Composable
-private fun SquireRow(s: SquireSummary, onAddFunds: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(s.displayName, fontWeight = FontWeight.Medium)
-            Text("${s.balance} pts", style = MaterialTheme.typography.bodySmall)
+private fun SquireRow(
+    s: SquireSummary,
+    onAddFunds: () -> Unit,
+    onRedeem: () -> Unit,
+    onMarkDone: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(s.displayName, fontWeight = FontWeight.Medium)
+        Text("${s.balance} pts", style = MaterialTheme.typography.bodySmall)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(top = 4.dp),
+        ) {
+            OutlinedButton(onClick = onMarkDone) { Text("Mark done") }
+            OutlinedButton(onClick = onRedeem) { Text("Redeem") }
+            OutlinedButton(onClick = onAddFunds) { Text("Add funds") }
         }
-        OutlinedButton(onClick = onAddFunds) { Text("Add funds") }
     }
+}
+
+/**
+ * A simple single-pick dialog: each option is a tappable row that fires [onPick] with its id and
+ * dismisses. Used for the Knight's direct-redeem (items) and mark-done (quests) pickers.
+ */
+@Composable
+private fun PickDialog(
+    title: String,
+    empty: String,
+    options: List<Pair<Long, String>>,
+    onPick: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            if (options.isEmpty()) {
+                Text(empty)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    options.forEach { (id, label) ->
+                        TextButton(onClick = { onPick(id) }, modifier = Modifier.fillMaxWidth()) {
+                            Text(label, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -280,10 +360,14 @@ private fun KnightHomePreview() {
         squires = listOf(SquireSummary(balance = 25, displayName = "Gawain", squire = 2)),
         pendingClaims = listOf(PendingClaim(claimId = 9L, on = 20624, questTitle = "Tidy your room", squire = 2)),
         pendingRequests = listOf(PendingRequest(cost = 15, itemName = "Movie night", requestId = 5L, squire = 2)),
+        items = listOf(ItemOption(itemId = 200, name = "Ice cream", cost = 3)),
+        quests = listOf(QuestOption(questId = 100, title = "Make your bed")),
+        today = 20624,
     )
     KnightHomeScreen(
         state = KnightUiState.Ready(sample, fromCache = false),
         onRefresh = {}, onApproveClaim = {}, onRejectClaim = {},
         onApproveRequest = {}, onRejectRequest = {}, onAddFunds = { _, _, _ -> },
+        onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
     )
 }

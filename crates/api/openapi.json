@@ -818,11 +818,21 @@
           "generated_at",
           "squires",
           "pending_claims",
-          "pending_requests"
+          "pending_requests",
+          "items",
+          "quests",
+          "today"
         ],
         "properties": {
           "generated_at": {
             "$ref": "#/components/schemas/Timestamp"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemOption"
+            },
+            "description": "Active redeemable items the Knight can direct-redeem on a Squire's behalf (REQ-K5)."
           },
           "pending_claims": {
             "type": "array",
@@ -836,17 +846,48 @@
               "$ref": "#/components/schemas/PendingRequest"
             }
           },
+          "quests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestOption"
+            },
+            "description": "Active quests the Knight can mark done for a Squire (REQ-K3), paired with [`today`]."
+          },
           "squires": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SquireSummary"
             }
+          },
+          "today": {
+            "$ref": "#/components/schemas/Date",
+            "description": "The server's \"today\" (date number) — the `on` a mark-done claim is filed against."
           }
         }
       },
       "ItemId": {
         "type": "integer",
         "format": "int64"
+      },
+      "ItemOption": {
+        "type": "object",
+        "description": "A redeemable item the Knight can pick for a direct redeem (REQ-K5). Affordability/availability\nare re-checked by the Keep at commit, so this is just the catalog, not a per-Squire eligibility.",
+        "required": [
+          "item_id",
+          "name",
+          "cost"
+        ],
+        "properties": {
+          "cost": {
+            "$ref": "#/components/schemas/u32"
+          },
+          "item_id": {
+            "$ref": "#/components/schemas/ItemId"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
       },
       "LockReason": {
         "type": "object",
@@ -1024,6 +1065,22 @@
       "QuestId": {
         "type": "integer",
         "format": "int64"
+      },
+      "QuestOption": {
+        "type": "object",
+        "description": "An active quest the Knight can pick for a mark-done (REQ-K3).",
+        "required": [
+          "quest_id",
+          "title"
+        ],
+        "properties": {
+          "quest_id": {
+            "$ref": "#/components/schemas/QuestId"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
       },
       "QuestStatus": {
         "type": "string",

@@ -88,6 +88,8 @@ impl Modify for SecurityAddon {
         domain_core::contract::SquireSummary,
         domain_core::contract::PendingClaim,
         domain_core::contract::PendingRequest,
+        domain_core::contract::ItemOption,
+        domain_core::contract::QuestOption,
         // ── Identity / control-plane DTOs ──
         domain_core::contract::RegisterHouseholdReq,
         domain_core::contract::RegisterHouseholdResp,

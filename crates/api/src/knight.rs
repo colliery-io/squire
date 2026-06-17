@@ -25,9 +25,9 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
-    ClaimId, Clock, Command, CommandId, Date, Decision, Event, HouseholdReview, ItemId,
-    PendingClaim, PendingRequest, Projections, QuestId, Repository, RequestId, Role, Snapshot,
-    SquireSummary, UserId,
+    ClaimId, Clock, Command, CommandId, Date, Decision, Event, HouseholdReview, ItemId, ItemOption,
+    PendingClaim, PendingRequest, Projections, QuestId, QuestOption, Repository, RequestId, Role,
+    Snapshot, SquireSummary, UserId,
 };
 use domain_core::Proj;
 
@@ -353,17 +353,43 @@ pub async fn household_review(
         store.snapshot()
     };
     let now = state.clock.now();
-    Json(assemble_review(&snap, now))
+    let today = state.clock.today();
+    Json(assemble_review(&snap, now, today))
 }
 
-/// Build the [`HouseholdReview`] from one snapshot — pure over `snap`; `now` from the clock.
-fn assemble_review(snap: &Snapshot, now: domain_core::contract::Timestamp) -> HouseholdReview {
+/// Build the [`HouseholdReview`] from one snapshot — pure over `snap`; `now`/`today` from the clock.
+fn assemble_review(
+    snap: &Snapshot,
+    now: domain_core::contract::Timestamp,
+    today: Date,
+) -> HouseholdReview {
     HouseholdReview {
         generated_at: now,
         squires: squire_summaries(snap),
         pending_claims: pending_claims(snap),
         pending_requests: pending_requests(snap),
+        items: item_options(snap),
+        quests: quest_options(snap),
+        today,
     }
+}
+
+/// The active redeemable-item catalog the Knight can direct-redeem from (REQ-K5).
+fn item_options(snap: &Snapshot) -> Vec<ItemOption> {
+    snap.items
+        .iter()
+        .filter(|i| i.active)
+        .map(|i| ItemOption { item_id: i.id, name: i.name.clone(), cost: i.cost })
+        .collect()
+}
+
+/// The active quests the Knight can mark done for a Squire (REQ-K3).
+fn quest_options(snap: &Snapshot) -> Vec<QuestOption> {
+    snap.quests
+        .iter()
+        .filter(|q| q.active)
+        .map(|q| QuestOption { quest_id: q.id, title: q.title.clone() })
+        .collect()
 }
 
 /// One [`SquireSummary`] per active Squire, balance clamped `>= 0`.

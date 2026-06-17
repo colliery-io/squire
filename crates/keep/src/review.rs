@@ -16,8 +16,9 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
-    ClaimId, Clock, Command, CommandId, Decision, Event, HouseholdReview, ItemId, PendingClaim,
-    PendingRequest, Projections, RequestId, Role, Snapshot, SquireSummary, Timestamp, UserId,
+    ClaimId, Clock, Command, CommandId, Date, Decision, Event, HouseholdReview, ItemId, ItemOption,
+    PendingClaim, PendingRequest, Projections, QuestOption, RequestId, Role, Snapshot,
+    SquireSummary, Timestamp, UserId,
 };
 use domain_core::Proj;
 
@@ -91,7 +92,8 @@ fn ack() -> Json<Ack> {
 pub async fn get_review(State(state): State<Arc<KeepState>>, _op: Operator) -> Json<HouseholdReview> {
     let snap = state.snapshot();
     let now = state.clock.now();
-    Json(assemble_review(&snap, now))
+    let today = state.clock.today();
+    Json(assemble_review(&snap, now, today))
 }
 
 // ─── action handlers (Knight-only, engine-direct) ────────────────────────────────────────────
@@ -149,13 +151,26 @@ pub async fn adjust(
 
 // ─── HouseholdReview assembly (pure over one snapshot) ───────────────────────────────────────
 
-/// Build the [`HouseholdReview`] from one snapshot (cross-Squire); `now` from the clock.
-fn assemble_review(snap: &Snapshot, now: Timestamp) -> HouseholdReview {
+/// Build the [`HouseholdReview`] from one snapshot (cross-Squire); `now`/`today` from the clock.
+fn assemble_review(snap: &Snapshot, now: Timestamp, today: Date) -> HouseholdReview {
     HouseholdReview {
         generated_at: now,
         squires: squire_summaries(snap),
         pending_claims: pending_claims(snap),
         pending_requests: pending_requests(snap),
+        items: snap
+            .items
+            .iter()
+            .filter(|i| i.active)
+            .map(|i| ItemOption { item_id: i.id, name: i.name.clone(), cost: i.cost })
+            .collect(),
+        quests: snap
+            .quests
+            .iter()
+            .filter(|q| q.active)
+            .map(|q| QuestOption { quest_id: q.id, title: q.title.clone() })
+            .collect(),
+        today,
     }
 }
 
