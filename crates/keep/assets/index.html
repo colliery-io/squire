@@ -23,6 +23,16 @@
         <button type="submit">Sign in</button>
       </form>
       <p id="login-error" class="error" hidden></p>
+
+      <details id="firstrun">
+        <summary>First run? Create the admin Knight</summary>
+        <form id="register-form" method="post" action="/register">
+          <label>Admin name <input name="admin_name" required /></label>
+          <label>Secret <input name="admin_secret" type="password" required /></label>
+          <button type="submit">Create admin &amp; sign in</button>
+        </form>
+        <p id="register-error" class="error" hidden></p>
+      </details>
     </section>
 
     <!-- Authenticated shell. Later Keep tasks (T-0026..T-0030) mount authoring, the review queue,
