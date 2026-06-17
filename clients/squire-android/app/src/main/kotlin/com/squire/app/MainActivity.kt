@@ -47,6 +47,9 @@ import java.util.concurrent.atomic.AtomicLong
 /** Foreground auto-refresh cadence (SQUIRE-T-0041). */
 private const val AUTO_REFRESH_MS = 5_000L
 
+/** How often to attempt mDNS re-discovery while the server is unreachable (SQUIRE-T-0052). */
+private const val RELOCATE_INTERVAL_MS = 15_000L
+
 /**
  * Compose host for the Squire player home.
  *
@@ -84,6 +87,8 @@ class MainActivity : ComponentActivity() {
                         db = db,
                         json = json,
                         ids = ids,
+                        discovery = discovery,
+                        onSessionChanged = { s -> sessionStore.save(s); session = s },
                         onForget = {
                             sessionStore.clear()
                             session = null
@@ -116,6 +121,8 @@ private fun PlayerHomeHost(
     db: SquireDb,
     json: Json,
     ids: AtomicLong,
+    discovery: NsdDiscovery,
+    onSessionChanged: (Session) -> Unit,
     onForget: () -> Unit,
 ) {
     val viewModel = remember(session) {
@@ -143,6 +150,25 @@ private fun PlayerHomeHost(
                 viewModel.refresh().join()
                 delay(AUTO_REFRESH_MS)
             }
+        }
+    }
+
+    // Self-heal a stale server address (SQUIRE-T-0052): while we can't reach the stored host (the
+    // view is from cache, or errored), best-effort re-discover the server over mDNS; if it now lives
+    // at a different host/port, update the session (keeping the token) so the adapter reconnects to
+    // the new address — no re-pairing. No-op while online; the actual relocate needs a real LAN.
+    LaunchedEffect(session) {
+        while (true) {
+            val s = viewModel.state.value
+            val offline = (s is PlayerUiState.Ready && s.fromCache) || s is PlayerUiState.Error
+            if (offline) {
+                val found = discovery.discover()
+                if (found != null && (found.first != session.host || found.second != session.port)) {
+                    onSessionChanged(session.copy(host = found.first, port = found.second))
+                    break // session changes → this effect re-keys against the new address
+                }
+            }
+            delay(RELOCATE_INTERVAL_MS)
         }
     }
 
