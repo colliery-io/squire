@@ -51,6 +51,7 @@ fun PlayerHomeScreen(
     onRefresh: () -> Unit,
     onMarkDone: (questId: Long) -> Unit,
     onRedeem: (itemId: Long) -> Unit,
+    onForget: () -> Unit = {},
 ) {
     val balance = (state as? PlayerUiState.Ready)?.view?.balance
     Scaffold(
@@ -64,6 +65,7 @@ fun PlayerHomeScreen(
                 },
                 actions = {
                     TextButton(onClick = onRefresh) { Text("Refresh") }
+                    TextButton(onClick = onForget) { Text("Forget") }
                 },
             )
         },

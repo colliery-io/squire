@@ -59,12 +59,16 @@ fun KnightHomeScreen(
     onAddFunds: (squire: Long, amount: Long, reason: String) -> Unit,
     onRedeem: (squire: Long, itemId: Long) -> Unit,
     onMarkDone: (squire: Long, questId: Long, on: Int) -> Unit,
+    onForget: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Knight — review", fontWeight = FontWeight.Bold) },
-                actions = { TextButton(onClick = onRefresh) { Text("Refresh") } },
+                actions = {
+                    TextButton(onClick = onRefresh) { Text("Refresh") }
+                    TextButton(onClick = onForget) { Text("Forget") }
+                },
             )
         },
     ) { padding ->

@@ -4,12 +4,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.squire.knight.BuildConfig
 import com.squire.knight.app.data.KnightApiAdapter
 import com.squire.knight.app.data.RoomPrivilegedOutbox
 import com.squire.knight.app.data.RoomReviewCache
@@ -17,7 +22,15 @@ import com.squire.knight.app.data.db.KnightDb
 import com.squire.knight.app.ui.KnightHomeScreen
 import com.squire.knight.core.KnightStore
 import com.squire.knight.core.KnightSyncEngine
+import com.squire.pairing.NsdDiscovery
+import com.squire.pairing.PairingScreen
+import com.squire.pairing.Session
+import com.squire.pairing.SessionStore
+import com.squire.sdk.api.ControlApi
+import com.squire.sdk.model.LoginReq
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicLong
 
@@ -27,33 +40,75 @@ private const val AUTO_REFRESH_MS = 5_000L
 /**
  * Compose host for the Knight (parent) review home.
  *
- * Wiring only: it assembles a [KnightStore] over the durable Room impls and a [KnightApiAdapter]
- * built from a placeholder demo config. All behaviour lives in `:knight-core`. Durable cache/outbox
- * survive restart (REQ-K7); pairing + secure token storage are deferred (NFR-5).
+ * **Session-gated** (ADR SQUIRE-A-0010 / SQUIRE-T-0046): first run shows the pairing screen; once a
+ * [Session] is stored (Keystore-encrypted) it builds the transport from that session's host +
+ * Knight-role token and shows the review home. "Forget" clears the session. A debug-only demo
+ * bypass logs in as the Knight (user 1) so the emulator flow stays one-tap; release always pairs.
  */
 class MainActivity : ComponentActivity() {
 
     private val ids = AtomicLong(System.currentTimeMillis())
 
-    // DEMO/placeholder transport config — matches the `squire-home` seed. `10.0.2.2` is the host
-    // loopback from the emulator. The Knight authenticates as a **Knight-role** user (user 1); a
-    // Squire token would 403 every privileged action.
-    private val baseUrl = "http://10.0.2.2:8080"
-    private val household = "demo"
-    private val user = 1L
-    private val secret = "demo"
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val adapter = KnightApiAdapter(
-            baseUrl = baseUrl,
-            household = household,
-            user = user,
-            secret = secret,
-        )
-        val json = Json { ignoreUnknownKeys = true }
+        val sessionStore = SessionStore(this)
+        val discovery = NsdDiscovery(this)
         val db = KnightDb.build(this)
+        val json = Json { ignoreUnknownKeys = true }
+
+        setContent {
+            MaterialTheme {
+                var session by remember { mutableStateOf(sessionStore.load()) }
+                val current = session
+                if (current == null) {
+                    PairingScreen(
+                        discovery = discovery,
+                        demoLogin = if (BuildConfig.DEBUG) ({ demoLogin() }) else null,
+                        onPaired = { s -> sessionStore.save(s); session = s },
+                    )
+                } else {
+                    KnightHomeHost(
+                        session = current,
+                        db = db,
+                        json = json,
+                        ids = ids,
+                        onForget = {
+                            sessionStore.clear()
+                            session = null
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    /** Debug-only bypass: log in with the demo Knight creds against `squire-home` → a [Session]. */
+    private suspend fun demoLogin(): Session = withContext(Dispatchers.IO) {
+        val control = ControlApi(basePath = "http://10.0.2.2:8080")
+        val resp = control.login(LoginReq(household = "demo", secret = "demo", user = 1L))
+        Session(
+            host = "10.0.2.2",
+            port = 8080,
+            household = "demo",
+            token = resp.token,
+            user = 1L,
+            role = resp.role.value,
+        )
+    }
+}
+
+/** Builds the offline-first [KnightStore] from a paired [Session] and hosts the review home. */
+@Composable
+private fun KnightHomeHost(
+    session: Session,
+    db: KnightDb,
+    json: Json,
+    ids: AtomicLong,
+    onForget: () -> Unit,
+) {
+    val viewModel = remember(session) {
+        val adapter = KnightApiAdapter(session.baseUrl, session.household, session.token)
         val outbox = RoomPrivilegedOutbox(db.outboxDao(), json)
         val store = KnightStore(
             fetcher = adapter,
@@ -63,46 +118,31 @@ class MainActivity : ComponentActivity() {
             json = json,
             ids = { ids.getAndIncrement() },
         )
-        val viewModel = KnightViewModel(store)
+        KnightViewModel(store)
+    }
 
-        setContent {
-            MaterialTheme {
-                val state by viewModel.state.collectAsStateWithLifecycle()
-                val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-                // DEMO connect: log in once to obtain a Knight token, then auto-refresh. If login
-                // fails (server down / offline) the store's offline path renders cache gracefully,
-                // and the adapter's lazy login retries on the next poll/action.
-                LaunchedEffect(Unit) {
-                    try {
-                        adapter.login()
-                    } catch (_: Throwable) {
-                        // Offline / login failure — fall through to the poll loop (offline path).
-                    }
-                    // Foreground auto-refresh (SQUIRE-T-0041): while the review screen is visible,
-                    // sync on a cadence so a child's new claim/request appears and queued approvals
-                    // flush without a manual Refresh. Cancels when backgrounded; `syncNow()` never
-                    // throws, so polling while the Keep is asleep is a harmless no-op.
-                    lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                        while (true) {
-                            viewModel.refresh().join()
-                            delay(AUTO_REFRESH_MS)
-                        }
-                    }
-                }
-
-                KnightHomeScreen(
-                    state = state,
-                    onRefresh = { viewModel.refresh() },
-                    onApproveClaim = { viewModel.approveClaim(it) },
-                    onRejectClaim = { viewModel.rejectClaim(it, null) },
-                    onApproveRequest = { viewModel.approveRequest(it) },
-                    onRejectRequest = { viewModel.rejectRequest(it, null) },
-                    onAddFunds = { squire, amount, reason -> viewModel.adjust(squire, amount, reason) },
-                    onRedeem = { squire, itemId -> viewModel.redeem(squire, itemId) },
-                    onMarkDone = { squire, questId, on -> viewModel.markDone(squire, questId, on) },
-                )
+    LaunchedEffect(session) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                viewModel.refresh().join()
+                delay(AUTO_REFRESH_MS)
             }
         }
     }
+
+    KnightHomeScreen(
+        state = state,
+        onRefresh = { viewModel.refresh() },
+        onApproveClaim = { viewModel.approveClaim(it) },
+        onRejectClaim = { viewModel.rejectClaim(it, null) },
+        onApproveRequest = { viewModel.approveRequest(it) },
+        onRejectRequest = { viewModel.rejectRequest(it, null) },
+        onAddFunds = { squire, amount, reason -> viewModel.adjust(squire, amount, reason) },
+        onRedeem = { squire, itemId -> viewModel.redeem(squire, itemId) },
+        onMarkDone = { squire, questId, on -> viewModel.markDone(squire, questId, on) },
+        onForget = onForget,
+    )
 }

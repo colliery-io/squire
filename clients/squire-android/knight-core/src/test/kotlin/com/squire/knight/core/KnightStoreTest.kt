@@ -16,6 +16,9 @@ private fun review(balance: Int) = HouseholdReview(
     pendingClaims = emptyList(),
     pendingRequests = emptyList(),
     squires = listOf(SquireSummary(balance = balance, displayName = "Gawain", squire = 2)),
+    items = emptyList(),
+    quests = emptyList(),
+    today = 20624,
 )
 
 /** Yields [review] until [online] flips false, then throws like an unreachable Keep. */

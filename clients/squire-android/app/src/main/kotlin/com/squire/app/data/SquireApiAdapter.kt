@@ -4,9 +4,7 @@ import com.squire.core.ResolvedIds
 import com.squire.core.StateFetcher
 import com.squire.core.StatePort
 import com.squire.core.SubmissionApi
-import com.squire.sdk.api.ControlApi
 import com.squire.sdk.api.SquireApi
-import com.squire.sdk.model.LoginReq
 import com.squire.sdk.model.RequestRedemptionReq
 import com.squire.sdk.model.StateView
 import com.squire.sdk.model.SubmitClaimReq
@@ -14,7 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Transport adapter binding `:core`'s ports to the generated okhttp [SquireApi].
@@ -24,88 +21,47 @@ import java.util.concurrent.atomic.AtomicReference
  *  - [SubmissionApi] — `POST /claims`, `POST /redemption-requests`
  *  - [StatePort]     — reconciliation ids derived from the refreshed `my_claims`/`my_requests`.
  *
- * The generated [SquireApi] threads `X-Household` per call; the bearer token is added by an
- * okhttp [Interceptor] that reads a **mutable** token holder ([tokenHolder]). The token starts
- * empty; [login] exchanges `(household, user, secret)` for a tenant-scoped token via the
- * control-plane [ControlApi] and stores it in the holder, so every subsequent [SquireApi] call
- * carries `Authorization: Bearer <token>`. Building the holder up-front (rather than baking the
- * token into the client) lets the same client be used before and after login. The blocking okhttp
- * calls are moved off the caller's thread onto [Dispatchers.IO].
- *
- * Pairing / secure token storage is a later task — for now [baseUrl], [household], [user], and
- * [secret] are injected from a placeholder demo config (see `MainActivity`).
+ * Auth comes from a **paired session** (ADR SQUIRE-A-0010): [baseUrl], [household], and the
+ * per-user [token] are obtained once via device pairing (`POST /pair`) and stored encrypted, then
+ * injected here. An okhttp [Interceptor] attaches `Authorization: Bearer <token>` to every call —
+ * no in-app login, no baked credentials. (A token that has expired surfaces as 401s; the host app
+ * can "forget device" to re-pair.) The blocking okhttp calls run on [Dispatchers.IO].
  */
 class SquireApiAdapter(
     private val baseUrl: String,
     private val household: String,
-    private val user: Long,
-    private val secret: String,
+    private val token: String,
 ) : StateFetcher, SubmissionApi, StatePort {
-
-    /** Mutable bearer token, set after [login]. Empty until then. */
-    private val tokenHolder = AtomicReference("")
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(
             Interceptor { chain ->
-                val token = tokenHolder.get()
-                val builder = chain.request().newBuilder()
-                if (token.isNotEmpty()) {
-                    builder.header("Authorization", "Bearer $token")
-                }
-                chain.proceed(builder.build())
+                chain.proceed(
+                    chain.request().newBuilder().header("Authorization", "Bearer $token").build(),
+                )
             },
         )
         .build()
 
     private val api = SquireApi(basePath = baseUrl, client = client)
-    private val control = ControlApi(basePath = baseUrl, client = client)
-
-    /**
-     * Exchange the demo `(household, user, secret)` for a tenant-scoped token via `POST /login`,
-     * store it in [tokenHolder] (so subsequent [SquireApi] calls are authenticated), and return it.
-     */
-    suspend fun login(): String = withContext(Dispatchers.IO) {
-        val resp = control.login(LoginReq(household = household, secret = secret, user = user))
-        tokenHolder.set(resp.token)
-        resp.token
-    }
-
-    /**
-     * Make sure we hold a bearer token before an authenticated call. The app may have *started
-     * offline* — then `MainActivity`'s startup [login] failed and [tokenHolder] is still empty, so a
-     * later flush/refetch (once the computer is reachable again) would otherwise POST with no
-     * `Authorization` header and be rejected. This logs in lazily on the first authenticated call
-     * that finds an empty token. If login itself fails (still offline), the exception propagates and
-     * the caller degrades to the offline path / leaves the submission on the durable outbox.
-     */
-    private suspend fun ensureLoggedIn() {
-        if (tokenHolder.get().isEmpty()) {
-            login()
-        }
-    }
 
     override suspend fun fetchState(): StateView = withContext(Dispatchers.IO) {
-        ensureLoggedIn()
         api.getState(xHousehold = household)
     }
 
     override suspend fun submitClaim(req: SubmitClaimReq) {
         withContext(Dispatchers.IO) {
-            ensureLoggedIn()
             api.submitClaim(xHousehold = household, submitClaimReq = req)
         }
     }
 
     override suspend fun requestRedemption(req: RequestRedemptionReq) {
         withContext(Dispatchers.IO) {
-            ensureLoggedIn()
             api.requestRedemption(xHousehold = household, requestRedemptionReq = req)
         }
     }
 
     override suspend fun resolvedIds(): ResolvedIds = withContext(Dispatchers.IO) {
-        ensureLoggedIn()
         val state = api.getState(xHousehold = household)
         ResolvedIds(
             claims = state.myClaims.map { it.claimId }.toSet(),
