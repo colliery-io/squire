@@ -8,6 +8,18 @@ description = "Squire — the Identity port (auth / membership seam) extracted f
 domain-core = { path = "../domain-core", features = ["serde"] }
 store = { path = "../store" }
 
+# Credential hashing: Argon2id with a random per-credential salt; PHC string storage.
+argon2 = "0.5"
+# `getrandom` pulls in `rand_core/getrandom`, which gates the `OsRng` used for salt generation.
+password-hash = { version = "0.5", features = ["getrandom"] }
+
+# Token: compact HMAC-SHA256-signed bearer token (base64url(claims_json).base64url(mac)).
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
 [dev-dependencies]
 # Isolated temp-dir SQLite tenant per unit test.
 tempfile = "3"

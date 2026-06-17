@@ -10,6 +10,11 @@
 //! on `api` (SQUIRE-T-0019): the dependency direction is `api → identity → {store, domain-core}`,
 //! so a production identity can be built without a cycle back through the HTTP layer.
 
+pub mod creds;
+pub mod token;
+
+pub use token::TokenSigner;
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 

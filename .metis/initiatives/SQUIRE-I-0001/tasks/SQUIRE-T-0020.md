@@ -4,14 +4,14 @@ level: task
 title: "Identity: credential hashing + token issuance/verification"
 short_code: "SQUIRE-T-0020"
 created_at: 2026-06-17T09:52:21.321789+00:00
-updated_at: 2026-06-17T09:52:21.321789+00:00
+updated_at: 2026-06-17T10:00:35.133624+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 In `crates/identity`, implement credential hashing and token issuance/verification. This task RESOLVES the spec's "credential hashing scheme" and "token format & crypto" decision areas and records the chosen options in the task log.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
