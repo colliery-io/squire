@@ -4,14 +4,14 @@ level: task
 title: "API: Squire endpoints + per-Squire StateView assembly"
 short_code: "SQUIRE-T-0015"
 created_at: 2026-06-17T05:13:25.400963+00:00
-updated_at: 2026-06-17T05:23:30.206261+00:00
+updated_at: 2026-06-17T05:30:49.285649+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,11 +32,14 @@ Implement the three Squire-role endpoints and assemble the per-Squire `StateView
 
 ## Acceptance Criteria
 
-- [ ] `GET /state` (Squire token): returns the authenticated Squire's `StateView` (carries `squire`) built from a Snapshot scoped to that Squire — `quests_today` (`QuestCard` + `quest_status`, including `TakenByOther`), `balance`, `streaks` (`streak_view`), `rewards` (`reward_view`: affordable/lock/`last_redeemed`, `LockReason` NeedsAchievement|OutOfStock), `my_claims` (`ClaimStatus`), `my_requests` (`RedemptionStatus`); never another Squire's state.
-- [ ] `POST /claims`: parse `SubmitClaimReq` (omits squire), fill `squire` from the token, run `Engine::handle(SubmitClaim)` → apply → `SubmitClaimResp{claim_id, state}` (Pending, or Approved{points} on auto-approve).
-- [ ] `POST /redemption-requests`: parse `RequestRedemptionReq`, fill squire, run `RequestRedemption` → apply → `RequestRedemptionResp{request_id, Pending}`; no affordability check at request time.
-- [ ] Idempotency: re-POST of the same `claim_id`/`request_id` produces no duplicate event and re-returns the current state.
-- [ ] Squire-role only; covered by `oneshot` tests.
+## Acceptance Criteria
+
+- [x] `GET /state` (RequireSquire): the authenticated Squire's `StateView` (carries `squire`) from one scoped snapshot — `quests_today` (`QuestCard`+`quest_status`), `balance`, `streaks` (`streak_view`), `rewards` (`reward_view`: affordable/lock/`last_redeemed`), `my_claims`, `my_requests`; never another Squire's state (`squire` from token, never a query param).
+- [x] `POST /claims`: `SubmitClaimReq` (omits squire) → fill `squire` from token → `SubmitClaim` via shared `handle_command` (snapshot→engine→apply, `by=None`) → `SubmitClaimResp{claim_id, state}` (Pending / Approved{points} on auto-approve).
+- [x] `POST /redemption-requests`: `RequestRedemptionReq` → `RequestRedemption` → `RequestRedemptionResp{request_id, Pending}`; no affordability check.
+- [x] Idempotency: replayed `claim_id`/`request_id` → engine emits no changes; handler re-reads + returns current state (no error, no duplicate event).
+- [x] RequireSquire (Knight token → 403, no token → 401); `tests/squire.rs` (5) via `oneshot` over a real seeded SQLite tenant.
+- [x] **Serde:** added an optional `serde` feature to `domain-core` (`dep:serde`, off by default → core stays pure; `cargo test -p domain-core` still 70 without serde) with cfg-gated derives on the API DTOs + ids/enums; `api` enables it.
 
 ## Implementation Notes
 
@@ -51,4 +54,8 @@ SQUIRE-T-0014 (crate scaffold, auth/tenant middleware, app state).
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Completed.** `crates/api/src/squire.rs`: `get_state` (assembles the per-Squire `StateView` purely over one snapshot — quests_today via `quest_status`, rewards via `reward_view`, streaks via `streak_view`, balance via `Proj::balance` clamped ≥0, my_claims/my_requests read from the scoped log), `submit_claim`, `request_redemption`, plus a reusable `handle_command(state, by, cmd)` (lock store → snapshot → `engine.handle` → `apply`) that T-0016 reuses, and `DomainError`→4xx mapping. `squire` is always taken from the verified `Principal`; submissions apply with `by=None`. Wired `GET /state`, `POST /claims`, `POST /redemption-requests` in `lib.rs`.
+
+**Serde:** `domain-core` gained an optional `serde` feature (`serde` optional dep + `serde = ["dep:serde"]`; `#[cfg_attr(feature="serde", derive(Serialize,Deserialize))]` on the API DTOs and the ids/`Role`/`Category`/`Date`/`Timestamp` they contain). `dep:` syntax means no implicit feature — default `cargo build/test -p domain-core` pulls in zero serde and compiles the derives away (still 70 tests). The `api` crate opts in via `features=["serde"]`.
+
+Results: `cargo test -p api` → lib 3 + health 7 + squire 5 green; `cargo test -p domain-core` (default) → 70, no serde; `cargo test --workspace` → green; warning-free. Committed.

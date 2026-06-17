@@ -25,6 +25,7 @@ pub struct Timestamp(pub i64); // unix millis
 /// once and reuses it on every retry; the engine dedupes by finding an emitted event
 /// that already carries it, so retry-safety stays *derived from the append-only log*
 /// — the same mechanism as `claim_id` / `request_id`. See ADR SQUIRE-A-0001.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct CommandId(pub u128);
 
 /// Identifies a household member. A household has one-or-more Knights (adult/parent) and

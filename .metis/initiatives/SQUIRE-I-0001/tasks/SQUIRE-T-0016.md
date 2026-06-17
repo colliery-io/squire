@@ -4,14 +4,14 @@ level: task
 title: "API: Knight quick-action surface + HouseholdReview"
 short_code: "SQUIRE-T-0016"
 created_at: 2026-06-17T05:13:26.850593+00:00
-updated_at: 2026-06-17T05:13:26.850593+00:00
+updated_at: 2026-06-17T05:31:02.255076+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Implement the Knight-role privileged quick-action surface plus the cross-Squire `HouseholdReview` read. The Knight token authorizes review and adjustment actions; the actor is always taken from the verified token, never from the client. The Keep remains the only writer.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
