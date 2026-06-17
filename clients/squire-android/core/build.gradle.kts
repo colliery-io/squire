@@ -3,8 +3,9 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":sdk"))
-    implementation(libs.kotlinx.coroutines.core)
+    api(project(":sdk"))
+    api(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)

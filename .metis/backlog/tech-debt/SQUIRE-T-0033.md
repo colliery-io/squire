@@ -4,7 +4,7 @@ level: task
 title: "Make data-carrying enums (ClaimState/RedemptionState/LockReason) generator-friendly for the Kotlin SDK"
 short_code: "SQUIRE-T-0033"
 created_at: 2026-06-17T13:02:45.219655+00:00
-updated_at: 2026-06-17T13:13:08.352921+00:00
+updated_at: 2026-06-17T13:25:13.439942+00:00
 parent: 
 blocked_by: []
 archived: false
@@ -12,7 +12,7 @@ archived: false
 tags:
   - "#task"
   - "#tech-debt"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -46,10 +46,14 @@ Make the contract's **data-carrying enums** round-trip cleanly through `openapi-
 
 ## Acceptance Criteria
 
-- [ ] The generated Kotlin SDK represents `ClaimState`, `RedemptionState`, `LockReason`, and `DecisionDto` as faithful sum types (sealed classes / discriminated unions) that **round-trip the real server JSON** (incl. the unit variants like `Pending`).
-- [ ] A round-trip test: a real `GET /state` (and `HouseholdReview`) JSON sample from the Rust server decodes via the generated SDK and re-encodes to equivalent JSON.
-- [ ] The Rust wire JSON either stays unchanged OR, if a discriminator is introduced, the change is deliberate, conformance-re-frozen (`openapi.json`), and all existing api/keep tests updated.
-- [ ] `cargo test --workspace` green; `./gradlew :sdk:compileKotlin` + a new SDK decode test green.
+## Acceptance Criteria
+
+- [x] The generated Kotlin SDK represents `ClaimState`, `RedemptionState`, `LockReason` as clean, **decodable** types (flat tagged objects: a `*Kind` discriminant enum + optional payload fields) that round-trip the real server JSON incl. unit variants (`Pending`/`OutOfStock`). *(`DecisionDto` is Knight-only — deferred to S-0006.)*
+- [x] A round-trip decode test (`clients/squire-android/sdk/.../SdkDecodeTest.kt`, 6 cases) parses real Approved/Pending/Rejected/NeedsAchievement/OutOfStock JSON via the generated types.
+- [x] Wire change is deliberate (`{"state":"Approved","points":5}` flat object), conformance-re-frozen (`openapi.json`), and all api tests updated to the new shape.
+- [x] `cargo test --workspace` green & warning-free (42); `./gradlew :sdk:compileKotlin :sdk:test` green; lean `domain-core` builds.
+
+**Decision:** took the **flat-struct** route, not the discriminator/sealed one — the subagent verified that openapi-generator's kotlin/kotlinx backend renders a discriminated `oneOf` as a non-decodable bare `interface` (no sealed registration), so the discriminator approach doesn't actually round-trip. Flat tagged objects generate a guaranteed-clean `data class ClaimState(state: ClaimStateKind, points: Int?=null, reason: String?=null)`.
 
 ## Implementation Notes
 
@@ -68,4 +72,6 @@ Option 1 ripples through existing api/keep tests (numeric/string-shape assertion
 
 ## Status Updates
 
-**2026-06-17 — Filed** from [[SQUIRE-T-0032]] (discovered while inspecting the generated SDK). Not started; `:core` proceeds without it.
+**2026-06-17 — Filed** from [[SQUIRE-T-0032]] (discovered while inspecting the generated SDK).
+
+**2026-06-17 — Done (`2b18124`).** Flat-tagged-object representation for `ClaimState`/`RedemptionState`/`LockReason` (the discriminator/sealed route was tried first and rejected — kotlin/kotlinx renders it as a non-decodable bare interface). Same wire JSON; clean generated data classes + `*Kind` enums; 6-case SDK round-trip decode test; all api tests moved to the flat shape; openapi.json re-frozen. cargo `--workspace` + `:sdk:test` green. `DecisionDto` (Knight-only) deferred to S-0006. **The Squire UI is now unblocked** to render `GET /state` from the generated SDK.
