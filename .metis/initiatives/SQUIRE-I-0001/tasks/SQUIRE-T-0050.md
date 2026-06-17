@@ -3,15 +3,15 @@ id: real-device-lan-validation-pass
 level: task
 title: "Real-device LAN validation pass (camera QR scan, mDNS discovery, reachability)"
 short_code: "SQUIRE-T-0050"
-created_at: 2026-06-17T21:20:00.000000+00:00
-updated_at: 2026-06-17T21:20:00.000000+00:00
+created_at: 2026-06-17T21:20:00+00:00
+updated_at: 2026-06-17T22:03:32.278572+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Everything so far is verified on the **emulator**, which can't exercise the three things that only work on real hardware/LAN: the **camera QR scan**, **mDNS/NSD discovery**, and **phone↔computer reachability over Wi-Fi**. Do a hands-on pass on real Android phones against a real `squire-serve` to confirm the pairing + chore loop actually work off-emulator, and capture/fix whatever breaks. This is the "does it really work in a house" gate.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -48,4 +50,20 @@ Home routers often block/limit mDNS or enable AP/client isolation — discovery 
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Agent prep done; hardware test awaits the user.** Did the two things that make a
+real-device pass smooth, so when the user sits down with phones it "just works":
+
+1. **Real LAN-IP detection** (`squire_home::local_lan_ip` — UDP-connect-to-8.8.8.8 trick, no packets
+   sent). `squire-serve` now auto-sets `SQUIRE_PAIR_HOST` to the detected IP (honouring an explicit
+   override) and prints it in the banner. **Verified**: the Keep's minted QR now carries the real
+   LAN IP — `squire://pair?host=10.0.0.232&port=...&household=home&code=...` (was emulator-only
+   `10.0.2.2`). mDNS (libmdns) already announces the real interface IPs. `cargo test --workspace`
+   green (48 groups).
+2. **Runbook** at `clients/RUNBOOK.md` — build release APKs, run `squire-serve`, find the LAN IP
+   (printed), add members + pair in the Keep, run the loop, plus the T-0050 on-device checklist and
+   troubleshooting (router mDNS filtering, firewall, single-use codes, signing-key stability).
+
+**The four ACs below remain unchecked — they require the user's physical phones** (camera QR scan,
+mDNS discover, Wi-Fi reachability, on-device offline-first); the agent cannot self-drive those. This
+task stays active pending that pass; the user checks the boxes (or files bugs) after running the
+runbook on real hardware.

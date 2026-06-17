@@ -10,7 +10,7 @@
 //! Both compose the same coherent topology (ADR A-0008): one shared single-writer store + identity,
 //! the loopback **Keep** and the LAN **api** over it, plus a best-effort mDNS advert (T-0047).
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -86,6 +86,22 @@ pub async fn serve(
 /// Parse a `u16` from env `key`, falling back to `default`.
 pub fn env_u16(key: &str, default: u16) -> u16 {
     std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
+}
+
+/// Best-effort detection of this machine's **LAN IPv4** — the address a phone on the same Wi-Fi
+/// should reach the api at (SQUIRE-T-0050). "Connects" a UDP socket toward a public address so the
+/// OS picks the outbound interface, then reads its local IP; **no packets are sent**. Returns `None`
+/// (e.g. no network) so the caller can fall back. Skips loopback / non-IPv4.
+pub fn local_lan_ip() -> Option<IpAddr> {
+    let sock = UdpSocket::bind("0.0.0.0:0").ok()?;
+    // The destination is never contacted; this only selects a route/interface.
+    sock.connect("8.8.8.8:80").ok()?;
+    let ip = sock.local_addr().ok()?.ip();
+    if ip.is_loopback() || !ip.is_ipv4() {
+        None
+    } else {
+        Some(ip)
+    }
 }
 
 /// The server's HMAC signing key, **stable across restarts** so previously issued/paired tokens keep

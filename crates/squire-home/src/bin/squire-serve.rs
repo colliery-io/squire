@@ -17,7 +17,9 @@ use std::path::PathBuf;
 
 use domain_core::contract::{HouseholdHandle, RegisterHouseholdReq};
 
-use squire_home::{env_u16, has_admin, open_household, serve, signing_key, TOKEN_TTL_MS};
+use squire_home::{
+    env_u16, has_admin, local_lan_ip, open_household, serve, signing_key, TOKEN_TTL_MS,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -59,11 +61,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         println!("  Bootstrapped household '{}' with admin '{admin_name}' (UserId {}).", handle.0, resp.admin.0);
     }
 
+    // Advertise the real LAN IP in the pairing QR (the Keep reads `SQUIRE_PAIR_HOST`), so phones
+    // reach THIS machine — not the emulator-only `10.0.2.2`. Honour an explicit override.
+    let lan_host = std::env::var("SQUIRE_PAIR_HOST").ok().or_else(|| {
+        let detected = local_lan_ip().map(|ip| ip.to_string());
+        if let Some(ip) = &detected {
+            std::env::set_var("SQUIRE_PAIR_HOST", ip);
+        }
+        detected
+    });
+
     println!("════════════════════════════════════════════════════════════════════");
     println!("  Squire server (squire-serve) — persistent, data in {}", data_dir.display());
     println!("  Household:               {}{}", handle.0, if first_run { " (newly bootstrapped)" } else { " (loaded)" });
     println!("  Keep (parent, loopback): http://127.0.0.1:{keep_port}");
-    println!("  LAN api (phones):        http://0.0.0.0:{api_port}");
+    match &lan_host {
+        Some(h) => {
+            println!("  LAN api (phones):        http://{h}:{api_port}   ← phones pair to this (QR + mDNS)");
+        }
+        None => {
+            println!("  LAN api (phones):        http://0.0.0.0:{api_port}");
+            println!("  (could not detect a LAN IP — set SQUIRE_PAIR_HOST=<this computer's IP> for the QR)");
+        }
+    }
     if first_run {
         println!("  Next: open the Keep, sign in as the admin, add members, and pair devices.");
     }
