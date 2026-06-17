@@ -712,51 +712,40 @@
         "format": "int64"
       },
       "ClaimState": {
-        "oneOf": [
-          {
-            "type": "string",
-            "enum": [
-              "Pending"
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "properties": {
+          "points": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/u32",
+                "description": "Present (and required) for [`ClaimStateKind::Approved`]: the points awarded."
+              }
             ]
           },
-          {
-            "type": "object",
-            "required": [
-              "Approved"
+          "reason": {
+            "type": [
+              "string",
+              "null"
             ],
-            "properties": {
-              "Approved": {
-                "type": "object",
-                "required": [
-                  "points"
-                ],
-                "properties": {
-                  "points": {
-                    "$ref": "#/components/schemas/u32"
-                  }
-                }
-              }
-            }
+            "description": "Optional rejection note for [`ClaimStateKind::Rejected`]."
           },
-          {
-            "type": "object",
-            "required": [
-              "Rejected"
-            ],
-            "properties": {
-              "Rejected": {
-                "type": "object",
-                "properties": {
-                  "reason": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  }
-                }
-              }
-            }
+          "state": {
+            "$ref": "#/components/schemas/ClaimStateKind"
           }
+        }
+      },
+      "ClaimStateKind": {
+        "type": "string",
+        "enum": [
+          "Pending",
+          "Approved",
+          "Rejected"
         ]
       },
       "ClaimStatus": {
@@ -863,32 +852,28 @@
         "format": "int64"
       },
       "LockReason": {
-        "oneOf": [
-          {
-            "type": "object",
-            "required": [
-              "NeedsAchievement"
-            ],
-            "properties": {
-              "NeedsAchievement": {
-                "type": "object",
-                "required": [
-                  "name"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/LockReasonKind"
           },
-          {
-            "type": "string",
-            "enum": [
-              "OutOfStock"
-            ]
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Present for [`LockReasonKind::NeedsAchievement`]; the achievement's name."
           }
+        }
+      },
+      "LockReasonKind": {
+        "type": "string",
+        "enum": [
+          "NeedsAchievement",
+          "OutOfStock"
         ]
       },
       "LoginReq": {
@@ -1073,38 +1058,29 @@
         }
       },
       "RedemptionState": {
-        "oneOf": [
-          {
-            "type": "string",
-            "enum": [
-              "Pending"
-            ]
-          },
-          {
-            "type": "string",
-            "enum": [
-              "Approved"
-            ]
-          },
-          {
-            "type": "object",
-            "required": [
-              "Rejected"
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
             ],
-            "properties": {
-              "Rejected": {
-                "type": "object",
-                "properties": {
-                  "reason": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  }
-                }
-              }
-            }
+            "description": "Optional rejection note for [`RedemptionStateKind::Rejected`]."
+          },
+          "state": {
+            "$ref": "#/components/schemas/RedemptionStateKind"
           }
+        }
+      },
+      "RedemptionStateKind": {
+        "type": "string",
+        "enum": [
+          "Pending",
+          "Approved",
+          "Rejected"
         ]
       },
       "RedemptionStatus": {

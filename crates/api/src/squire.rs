@@ -137,7 +137,7 @@ pub async fn request_redemption(
     handle_command(&state, None, cmd).map_err(domain_status)?;
     Ok(Json(RequestRedemptionResp {
         request_id: req.request_id,
-        state: RedemptionState::Pending,
+        state: RedemptionState::pending(),
     }))
 }
 
@@ -395,15 +395,15 @@ fn claim_state(snap: &Snapshot, claim_id: domain_core::contract::ClaimId) -> Cla
     for e in &snap.events {
         match e {
             Event::CompletionApproved { claim_id: c, points, .. } if *c == claim_id => {
-                return ClaimState::Approved { points: *points };
+                return ClaimState::approved(*points);
             }
             Event::CompletionRejected { claim_id: c, reason, .. } if *c == claim_id => {
-                return ClaimState::Rejected { reason: reason.clone() };
+                return ClaimState::rejected(reason.clone());
             }
             _ => {}
         }
     }
-    ClaimState::Pending
+    ClaimState::pending()
 }
 
 /// The Squire's own redemption requests, each labelled with item name / cost and current state.
@@ -431,13 +431,13 @@ fn redemption_state(snap: &Snapshot, request_id: domain_core::contract::RequestI
     for e in &snap.events {
         match e {
             Event::ItemRedeemed { request_id: Some(r), .. } if *r == request_id => {
-                return RedemptionState::Approved;
+                return RedemptionState::approved();
             }
             Event::RedemptionRejected { request_id: r, reason, .. } if *r == request_id => {
-                return RedemptionState::Rejected { reason: reason.clone() };
+                return RedemptionState::rejected(reason.clone());
             }
             _ => {}
         }
     }
-    RedemptionState::Pending
+    RedemptionState::pending()
 }

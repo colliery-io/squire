@@ -93,16 +93,31 @@ fn frozen_openapi_has_key_schemas_and_paths() {
         "frozen openapi.json is missing the bearer_auth security scheme"
     );
 
-    // Externally-tagged data-carrying enum: `ClaimState::Approved { points }` must serialize as
-    // `{ "Approved": { points } }` (serde external tagging), reflected as a oneOf object variant.
-    let claim_state = &schemas["ClaimState"]["oneOf"];
-    let has_approved_object = claim_state
-        .as_array()
-        .expect("ClaimState is a oneOf")
-        .iter()
-        .any(|v| v["properties"].get("Approved").is_some());
-    assert!(
-        has_approved_object,
-        "ClaimState schema does not reflect serde's externally-tagged `Approved` variant"
+    // SQUIRE-T-0033: ClaimState is a flat tagged object (not an externally-tagged `oneOf`) so the
+    // generated Kotlin SDK gets a clean, decodable data class. It has a `state` discriminator that
+    // `$ref`s the `ClaimStateKind` enum, plus the optional `points`/`reason` payload fields. Wire
+    // shape: `{ "state": "Approved", "points": 5 }`.
+    let claim_state = &schemas["ClaimState"];
+    assert_eq!(
+        claim_state["type"], "object",
+        "ClaimState should be a flat tagged object, not a oneOf"
     );
+    assert_eq!(
+        claim_state["properties"]["state"]["$ref"], "#/components/schemas/ClaimStateKind",
+        "ClaimState.state should reference the ClaimStateKind discriminator enum"
+    );
+    assert!(
+        claim_state["properties"].get("points").is_some(),
+        "ClaimState should carry the optional `points` payload field"
+    );
+    // The discriminator enum lists every variant, including the unit ones.
+    let kinds = schemas["ClaimStateKind"]["enum"]
+        .as_array()
+        .expect("ClaimStateKind is a string enum");
+    for variant in ["Pending", "Approved", "Rejected"] {
+        assert!(
+            kinds.iter().any(|v| v == variant),
+            "ClaimStateKind enum is missing the `{variant}` variant"
+        );
+    }
 }

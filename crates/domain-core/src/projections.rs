@@ -147,12 +147,12 @@ pub fn reward_view(
         .and_then(|aid| {
             (!Proj::is_unlocked(snap, squire, aid)).then(|| {
                 let name = find_achievement(snap, aid).map(|a| a.name.clone()).unwrap_or_default();
-                LockReason::NeedsAchievement { name }
+                LockReason::needs_achievement(name)
             })
         })
         .or_else(|| {
             (item.availability == Availability::Once && item_ever_redeemed(snap, item.id))
-                .then_some(LockReason::OutOfStock)
+                .then(LockReason::out_of_stock)
         });
     (affordable, lock, last_redeemed(snap, item.id))
 }

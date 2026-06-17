@@ -268,7 +268,7 @@ async fn ac1_full_flow_over_http_on_prod() {
         )
         .await;
         assert_eq!(st, StatusCode::OK);
-        assert_eq!(claim["state"], "Pending");
+        assert_eq!(claim["state"]["state"], "Pending");
 
         // Knight approves.
         let (st, _) = post_json(
@@ -286,7 +286,9 @@ async fn ac1_full_flow_over_http_on_prod() {
         assert_eq!(st, StatusCode::OK);
         assert_eq!(view["squire"], squire_id as u64);
         assert_eq!(view["balance"], 5);
-        assert_eq!(view["my_claims"][0]["state"]["Approved"]["points"], 5);
+        // Flat tagged object: { "state": "Approved", "points": 5 } (SQUIRE-T-0033).
+        assert_eq!(view["my_claims"][0]["state"]["state"], "Approved");
+        assert_eq!(view["my_claims"][0]["state"]["points"], 5);
     })
     .await;
 }
