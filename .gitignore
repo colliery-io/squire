@@ -3,3 +3,11 @@ target/
 tools/
 # Generated client SDKs — regenerated from crates/api/openapi.json via clients/generate-sdk.sh.
 clients/squire-sdk/
+
+# Squire Android Gradle project (commit the wrapper jar + scripts; ignore build/IDE/local state).
+clients/squire-android/.gradle/
+clients/squire-android/build/
+clients/squire-android/**/build/
+clients/squire-android/local.properties
+clients/squire-android/.idea/
+clients/squire-android/.kotlin/
