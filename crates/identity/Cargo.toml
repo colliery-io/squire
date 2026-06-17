@@ -20,6 +20,12 @@ base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+[features]
+default = []
+# Opt-in: compile the tenant-registry Postgres path by enabling the store's `postgres` backend
+# (which links system libpq). Used by the dual-backend tenant integration tests.
+postgres = ["store/postgres"]
+
 [dev-dependencies]
 # Isolated temp-dir SQLite tenant per unit test.
 tempfile = "3"

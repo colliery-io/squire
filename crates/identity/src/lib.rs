@@ -11,6 +11,7 @@
 //! so a production identity can be built without a cycle back through the HTTP layer.
 
 pub mod creds;
+pub mod tenant;
 pub mod token;
 
 pub use token::TokenSigner;
