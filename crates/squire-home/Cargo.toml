@@ -13,3 +13,6 @@ identity = { path = "../identity" }
 api = { path = "../api" }
 keep = { path = "../keep" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+# Best-effort mDNS/DNS-SD advertisement of `_squire._tcp` so phones discover the api without a
+# typed IP (ADR SQUIRE-A-0010 / NFR-6, SQUIRE-T-0047). Opt-out via SQUIRE_MDNS=off.
+libmdns = "0.9"

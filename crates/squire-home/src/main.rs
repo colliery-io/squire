@@ -130,6 +130,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let app = AppState::new(store.clone(), identity.clone()); // LAN api (phones)
     let keep_state = KeepState::from_parts(store.clone(), identity.clone(), handle.clone()); // loopback admin
 
+    // Best-effort mDNS: advertise the LAN api as `_squire._tcp` so phones can discover host/port
+    // without a typed IP (SQUIRE-T-0047 / NFR-6). Held for the process lifetime; never fatal.
+    let _mdns = start_mdns(api_port, &handle.0);
+
     println!("════════════════════════════════════════════════════════════════════");
     println!("  Squire HOME server — one household, two surfaces, one shared store");
     println!("  Keep (parent, loopback): http://127.0.0.1:{keep_port}   login: Knight 1 / demo");
@@ -148,4 +152,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 fn env_u16(key: &str, default: u16) -> u16 {
     std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
+}
+
+/// Advertise the LAN api over mDNS/DNS-SD as `_squire._tcp` on `api_port` (SQUIRE-T-0047 / NFR-6),
+/// so a pairing phone's NSD browse can prefill the host/port. **Best-effort**: opt out with
+/// `SQUIRE_MDNS=off`, and a responder failure only logs — serving never depends on it. The returned
+/// guard `(Responder, Service)` must be kept alive for the advertisement to persist; the caller
+/// binds it for the process lifetime. `libmdns` enumerates the host's interfaces and announces the
+/// machine's LAN address (not loopback) itself.
+fn start_mdns(api_port: u16, household: &str) -> Option<(libmdns::Responder, libmdns::Service)> {
+    if std::env::var("SQUIRE_MDNS").is_ok_and(|v| v.eq_ignore_ascii_case("off")) {
+        println!("  mDNS:                    disabled (SQUIRE_MDNS=off)");
+        return None;
+    }
+    match libmdns::Responder::new() {
+        Ok(responder) => {
+            let txt = format!("household={household}");
+            let service = responder.register(
+                "_squire._tcp".to_owned(),
+                "Squire".to_owned(),
+                api_port,
+                &[txt.as_str()],
+            );
+            println!("  mDNS:                    advertising _squire._tcp on :{api_port}");
+            Some((responder, service))
+        }
+        Err(e) => {
+            eprintln!("  mDNS:                    disabled (responder failed: {e})");
+            None
+        }
+    }
 }
