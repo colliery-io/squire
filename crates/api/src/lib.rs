@@ -15,6 +15,7 @@
 
 pub mod auth;
 pub mod identity;
+pub mod knight;
 pub mod squire;
 pub mod state;
 
@@ -28,9 +29,9 @@ pub use state::AppState;
 
 /// Build the application [`Router`] with the shared [`AppState`] wired in.
 ///
-/// Only `GET /health` exists today (returns 200 `"ok"`); the protected feature routes are
-/// added by later tasks using the [`auth`] extractors. Returned as a fully-`State`-wrapped
-/// `Router` so callers (and tests) can serve or `oneshot` it directly.
+/// `GET /health` plus the Squire-role (T-0015) and Knight-role (T-0016) feature routes, each
+/// gated by the [`auth`] extractors. Returned as a fully-`State`-wrapped `Router` so callers
+/// (and tests) can serve or `oneshot` it directly.
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(health))
@@ -38,6 +39,13 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/state", get(squire::get_state))
         .route("/claims", post(squire::submit_claim))
         .route("/redemption-requests", post(squire::request_redemption))
+        // ── Knight-role privileged endpoints (SQUIRE-T-0016) ───────────────────
+        .route("/admin/review-claim", post(knight::review_claim))
+        .route("/admin/review-redemption", post(knight::review_redemption))
+        .route("/admin/redeem", post(knight::redeem))
+        .route("/admin/adjust", post(knight::adjust))
+        .route("/admin/mark-done", post(knight::mark_done))
+        .route("/household-review", get(knight::household_review))
         .with_state(state)
 }
 

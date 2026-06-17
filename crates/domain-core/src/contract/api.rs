@@ -112,6 +112,7 @@ pub struct RequestRedemptionResp { pub request_id: RequestId, pub state: Redempt
 /// Parent (Knight) review read — pending work across ALL Squires, each labeled with its
 /// Squire, plus per-Squire balances. The Knight renders/triages this; the exact shape is
 /// still an open decision in SQUIRE-S-0003 / S-0006.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct HouseholdReview {
     pub generated_at: Timestamp,
@@ -119,10 +120,13 @@ pub struct HouseholdReview {
     pub pending_claims: Vec<PendingClaim>,
     pub pending_requests: Vec<PendingRequest>,
 }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct SquireSummary { pub squire: UserId, pub display_name: String, pub balance: Points }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct PendingClaim { pub claim_id: ClaimId, pub squire: UserId, pub quest_title: String, pub on: Date }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct PendingRequest { pub request_id: RequestId, pub squire: UserId, pub item_name: String, pub cost: Points }
 

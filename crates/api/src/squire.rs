@@ -117,15 +117,19 @@ pub fn handle_command(
     Ok(changes)
 }
 
-/// Map a [`DomainError`] onto an HTTP status. Caller-correctable conditions (not assigned,
-/// already claimed, taken, missing/inactive subject, bad subject role) are 4xx; the
-/// child-surface guard / malformed inputs are 400.
-fn domain_status(err: DomainError) -> StatusCode {
+/// Map a [`DomainError`] onto an HTTP status, shared by the Squire and Knight (T-0016) surfaces.
+/// Caller-correctable conditions are 4xx; a redemption blocked at commit time (insufficient
+/// points / achievement-locked / out of stock) is a 409 conflict against current state.
+///
+/// Note on `OccurrenceTaken`: over the Squire surface a Race occurrence already won by a sibling
+/// is "not yours to take" → 403; the Knight's direct mark-done can also hit it (a genuine
+/// conflict). We keep the single mapping (403) — the Knight rarely races a sibling, and 403 still
+/// signals "this occurrence is closed to you".
+pub(crate) fn domain_status(err: DomainError) -> StatusCode {
     match err {
         // The Squire isn't allowed to act on this subject / occurrence.
         DomainError::NotAssigned
         | DomainError::OccurrenceTaken
-        | DomainError::NotASquire
         | DomainError::BadCommandForActor => StatusCode::FORBIDDEN,
         // The referenced definition / subject doesn't exist.
         DomainError::QuestNotFound
@@ -134,12 +138,15 @@ fn domain_status(err: DomainError) -> StatusCode {
         | DomainError::ClaimNotFound
         | DomainError::RequestNotFound
         | DomainError::UserNotFound => StatusCode::NOT_FOUND,
-        // A duplicate live claim for today — the prior claim still stands.
+        // A duplicate live claim / a second review of an already-resolved claim — the prior
+        // resolution stands (a genuine double-action, not an idempotent replay).
         DomainError::AlreadyClaimedToday | DomainError::AlreadyReviewed => StatusCode::CONFLICT,
-        // Archived / unavailable, or a malformed request body.
-        DomainError::Inactive
-        | DomainError::InvalidDefinition
-        | DomainError::Redeem(_) => StatusCode::BAD_REQUEST,
+        // A redeem blocked by current state (can't afford / locked / out of stock): a conflict.
+        DomainError::Redeem(_) => StatusCode::CONFLICT,
+        // A malformed subject role / malformed authoring input → 400.
+        DomainError::NotASquire | DomainError::InvalidDefinition => StatusCode::BAD_REQUEST,
+        // Archived / unavailable subject.
+        DomainError::Inactive => StatusCode::BAD_REQUEST,
     }
 }
 
