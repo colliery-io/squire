@@ -47,6 +47,7 @@ pub mod achievements;
 pub mod items;
 pub mod members;
 pub mod quests;
+pub mod review;
 
 /// Embedded web UI assets (`assets/`), baked into the binary so the Keep is one self-contained
 /// artifact (ADR A-0008 — no separate asset host, no node build step).
@@ -347,6 +348,12 @@ pub fn router(state: Arc<KeepState>) -> Router {
         // ── Member administration (SQUIRE-T-0028) ──────────────────────────────
         .route("/api/members", get(members::list_members).post(members::add_member))
         .route("/api/members/{id}/active", post(members::set_active))
+        // ── Cross-Squire review queue + redeem + adjust (SQUIRE-T-0029) ─────────
+        .route("/api/review", get(review::get_review))
+        .route("/api/review/claim", post(review::review_claim))
+        .route("/api/review/redemption", post(review::review_redemption))
+        .route("/api/redeem", post(review::redeem))
+        .route("/api/adjust", post(review::adjust))
         .with_state(state)
 }
 
