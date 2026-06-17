@@ -4,14 +4,14 @@ level: task
 title: "Knight app: :knight-core privileged outbox + ack-based sync engine + HouseholdReview cache (JVM-tested)"
 short_code: "SQUIRE-T-0039"
 created_at: 2026-06-17T16:58:52.860702+00:00
-updated_at: 2026-06-17T16:58:52.860702+00:00
+updated_at: 2026-06-17T17:09:47.754347+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,11 +30,15 @@ Build the Knight's pure-Kotlin/JVM offline engine — the parent analog of the S
 
 ## Acceptance Criteria
 
-- [ ] A new `:knight-core` Gradle module (pure Kotlin/JVM, depends on `:sdk`) added to `settings.gradle.kts`.
-- [ ] A `PrivilegedOutbox` of `KnightCommand` variants (ReviewClaim/ReviewRedemption/Redeem/Adjust/MarkDone), each carrying its client-minted idempotency id (`claim_id`/`request_id`/`command_id`); idempotent `enqueue` by id (REQ-K8/NFR-3), `pending()`, `markResolved(ids)`.
-- [ ] An ack-based `KnightSyncEngine`: for each pending command POST via the outbound port; on **2xx** or **terminal-benign** (`AlreadyReviewed`/409, `OccurrenceTaken`/403) mark resolved; on **network failure** stop and report `Offline` (outbox intact); on other **4xx** (poison, e.g. blank reason/404) drop with a logged terminal outcome so it can't retry forever. Never throws (REQ-K10/NFR-1).
-- [ ] A `ReviewCache` (save/load the last `HouseholdReview` JSON) and a `KnightStore` presentation store exposing a `KnightUiState` (Loading / Ready(review, fromCache) / Error) with offline fallback to cache; quick-action methods mint ids, enqueue, sync, refetch — never throw.
-- [ ] JVM unit tests (fakes) cover: idempotent enqueue, ack-resolves-on-2xx, 409-resolves, offline-keeps-outbox, poison-drops, and offline-render-from-cache. `./gradlew :knight-core:test` green.
+## Acceptance Criteria
+
+## Acceptance Criteria
+
+- [x] A new `:knight-core` Gradle module (pure Kotlin/JVM, depends on `:sdk`) added to `settings.gradle.kts`.
+- [x] A `PrivilegedOutbox` of `KnightCommand` variants (ReviewClaim/ReviewRedemption/Redeem/Adjust/MarkDone), each carrying its client-minted idempotency id (`claim_id`/`request_id`/`command_id`); idempotent `enqueue` keyed by a composite `kind:id` (REQ-K8/NFR-3), `pending()`, `markResolved(keys)`.
+- [x] An ack-based `KnightSyncEngine`: for each pending command submit via `KnightSubmit`; on **Ack**(2xx) or **AlreadyDone**(409/403 occurrence-taken) mark resolved; on **Offline** stop and report `Offline` (outbox intact); on **Poison**(other 4xx) drop with an `onPoison` callback so it can't retry forever. Never throws (REQ-K10/NFR-1).
+- [x] A `ReviewCache` (save/load the last `HouseholdReview` JSON) and a `KnightStore` presentation store exposing a `KnightUiState` (Loading / Ready(review, fromCache) / Error) with offline fallback to cache; quick-action methods mint ids, enqueue, sync, refetch — never throw (`adjust` requires a non-blank reason).
+- [x] JVM unit tests (fakes) cover: idempotent enqueue, cross-kind no-collision, ack-resolves, already-done-resolves, offline-stops-drain, poison-drops, offline-render-from-cache, error-when-no-cache, quick-action paths. `./gradlew :knight-core:test` green (12 tests).
 
 ## Implementation Notes
 
@@ -49,4 +53,4 @@ The ack-based reconcile is deliberately simpler than the Squire's id-in-state re
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Done.** New `:knight-core` pure-Kotlin/JVM module (`build.gradle.kts` mirrors `:core`; depends on `:sdk` + coroutines, serializes SDK types so no kotlinx plugin needed). Files under `com.squire.knight.core`: `KnightCommand` (sealed, wraps the 5 SDK request DTOs; composite `kind:id` key so cross-kind id reuse can't collide), `PrivilegedOutbox` (+`InMemory`), `Ports` (`KnightSubmit`→`SubmitResult{Ack,AlreadyDone,Offline,Poison}`, `ReviewFetcher`), `ReviewCache` (+`InMemory`), `KnightSyncEngine` (ack-based drain with `onPoison` logger + `SyncOutcome{Synced(acked,dropped,remaining),Offline}`), `KnightStore` (offline-first `refresh`, `syncNow`, and the 7 quick-actions — approve/reject claim, approve/reject request, redeem, adjust [reason-required], markDone). 12 JVM tests across 2 files, all green; `:core` still green after the SDK regen. Key design note recorded in the task: the Knight resolves by **ack**, not by id-in-state (privileged commands commit before acking) — simpler and correct because every command is server-idempotent on its minted id.

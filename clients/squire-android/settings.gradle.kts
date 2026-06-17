@@ -23,3 +23,4 @@ rootProject.name = "squire-android"
 include(":sdk")
 include(":core")
 include(":app")
+include(":knight-core")
