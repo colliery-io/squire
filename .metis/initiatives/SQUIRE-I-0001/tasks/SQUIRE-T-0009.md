@@ -4,14 +4,14 @@ level: task
 title: "Store: domain ↔ row mapping (lossless serialization)"
 short_code: "SQUIRE-T-0009"
 created_at: 2026-06-17T04:08:41.165831+00:00
-updated_at: 2026-06-17T04:26:16.554410+00:00
+updated_at: 2026-06-17T04:33:52.313670+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,10 +32,12 @@ Implement lossless encode/decode between the domain types and their rows for eve
 
 ## Acceptance Criteria
 
-- [ ] Each `User`/`Quest`/`RedeemableItem`/`Achievement` maps to/from its row (ids encoded portably, enums encoded portably, `BTreeSet<UserId>`/`BTreeSet<Weekday>` serialized losslessly, `Option`s handled).
-- [ ] Every `Event` variant round-trips (a `kind` discriminator + typed/nullable columns, or a portable encoding), preserving order and snapshotted values exactly (AR-4); event rows are insert-only.
-- [ ] Property/round-trip tests: encode→decode == original for randomized values of every type and every event variant.
-- [ ] No backend-specific encoding.
+## Acceptance Criteria
+
+- [x] `User`/`Quest`/`RedeemableItem`/`Achievement` ↔ row (`UserRow`/`QuestRow`/`ItemRow`/`AchievementRow`): ids as decimal TEXT, all enums as TEXT tags, `BTreeSet<UserId>`/`BTreeSet<Weekday>` as sorted comma-delimited TEXT (empty ⇄ `""`), `Option`s handled; audit columns carried by the row (via an `Audit{by,at}` param), not the pure domain struct.
+- [x] All 8 `Event` variants ↔ `EventRow` (`from_event(seq,&Event)`/`to_event`), preserving every field + the snapshotted points/cost (AR-4); rows insert-only; `seq` caller-assigned.
+- [x] proptest pure round-trip (decode∘encode == original via debug-string equality) for every domain type + every event variant.
+- [x] Backend-agnostic encoding, **verified on both backends**: a parametrized `each_backend` harness runs the DB insert→select round-trips on SQLite (always) AND on the compose Postgres (`--features postgres` + `DATABASE_URL`). Decoding is total (`RowError`, never panics).
 
 ## Implementation Notes
 
@@ -52,4 +54,8 @@ SQUIRE-T-0008 (column layout / schema must be fixed first).
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Completed.** New `crates/store/src/rows.rs`: `Insertable`/`Queryable`/`Selectable`/`AsChangeset` row structs (`UserRow`/`QuestRow`/`ItemRow`/`AchievementRow`/`EventRow`) matching `schema.rs`; per-type `encode`/`decode` (definition encoders take an `Audit{created_by/at, updated_by/at}` so T-0010 can stamp; decoders ignore audit → domain stays pure); helpers for id⇄TEXT, enum⇄tag (every enum), set⇄comma-delimited, bool⇄0/1, BigInt scalars, `Option`. Decode is total → `RowError{BadId,BadTag,BadInt,MissingField,BadWeekday}`, never panics. Added `proptest` to store dev-deps.
+
+Tests `tests/mapping.rs` (11): proptest pure round-trips for all domain types + all 8 event variants (debug-string equality, no contract derives added), and a `each_backend` DB insert→select round-trip harness — SQLite temp-file always + the compose Postgres under `#[cfg(feature="postgres")]`+`DATABASE_URL` (resets via `store::pg::provision_clean`, serialized behind a `Mutex` since cargo runs tests concurrently and they share the PG `public` schema). Identical insert/select code runs on both backends via `AnyConnection`.
+
+Results: SQLite `cargo test -p store` → mapping 11 + migrations 4 green; Postgres run (`--features postgres` + compose DB) → the 11 DB round-trips run on Postgres too, green; `cargo test --workspace` → domain-core 70 intact. Committed.

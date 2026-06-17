@@ -4,14 +4,14 @@ level: task
 title: "Store: snapshot + atomic apply(by) + audit columns"
 short_code: "SQUIRE-T-0010"
 created_at: 2026-06-17T04:08:42.088609+00:00
-updated_at: 2026-06-17T04:08:42.088609+00:00
+updated_at: 2026-06-17T04:34:34.165904+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Implement `domain_core::contract::Repository` over Diesel: `snapshot()` loads the full `Snapshot` (users + definitions + ordered events) and `apply(by, &[Change])` commits the batch atomically, plus provide the `Clock` impl. Stamp audit columns, enforce append-only and archive-not-delete semantics, and map failures to `RepoError`.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
