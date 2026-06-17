@@ -2,6 +2,7 @@
 //! projections. Pure functions over a `Snapshot`.
 
 use crate::contract::*;
+use std::collections::BTreeSet;
 
 pub fn find_quest(snap: &Snapshot, id: QuestId) -> Option<&Quest> {
     snap.quests.iter().find(|q| q.id == id)
@@ -250,4 +251,84 @@ pub fn last_redeemed(snap: &Snapshot, item_id: ItemId) -> Option<Timestamp> {
             _ => None,
         })
         .max()
+}
+
+// ── Streaks / achievements scope + scheduling helpers (T-0006) ──
+
+/// Does `quest_id` fall within `scope`? `Any` ⇒ always; `Quest(qid)` ⇒ exact match;
+/// `Category(cat)` ⇒ the quest exists and carries that category.
+pub fn quest_in_scope(snap: &Snapshot, quest_id: QuestId, scope: &Scope) -> bool {
+    match scope {
+        Scope::Any => true,
+        Scope::Quest(qid) => quest_id == *qid,
+        Scope::Category(cat) => {
+            find_quest(snap, quest_id).and_then(|q| q.category.as_ref()) == Some(cat)
+        }
+    }
+}
+
+/// Did `squire` have ANY approved completion in `scope` on `on`?
+pub fn squire_completed_in_scope_on(
+    snap: &Snapshot,
+    squire: UserId,
+    scope: &Scope,
+    on: Date,
+) -> bool {
+    snap.events.iter().any(|e| match e {
+        Event::CompletionApproved { claim_id, squire: s, .. } if *s == squire => claim_meta(snap, *claim_id)
+            .is_some_and(|(_, q, d)| d == on && quest_in_scope(snap, q, scope)),
+        _ => false,
+    })
+}
+
+/// Count of DISTINCT `(quest, day)` occurrences `squire` has approved in `scope` on/before
+/// `asof` — a repeatable quest completed twice in one day still counts once.
+pub fn total_completions(snap: &Snapshot, squire: UserId, scope: &Scope, asof: Date) -> u32 {
+    let mut seen: BTreeSet<(u128, i32)> = BTreeSet::new();
+    for e in &snap.events {
+        if let Event::CompletionApproved { claim_id, squire: s, .. } = e {
+            if *s == squire {
+                if let Some((_, q, d)) = claim_meta(snap, *claim_id) {
+                    if d.0 <= asof.0 && quest_in_scope(snap, q, scope) {
+                        seen.insert((q.0, d.0));
+                    }
+                }
+            }
+        }
+    }
+    seen.len() as u32
+}
+
+/// Lifetime positive earnings for `squire`: approval points + achievement bonuses. This is
+/// NOT the net balance (spends/adjustments are excluded) — it backs the `PointsEarned`
+/// criterion.
+pub fn points_earned(snap: &Snapshot, squire: UserId) -> u32 {
+    snap.events
+        .iter()
+        .map(|e| match e {
+            Event::CompletionApproved { squire: s, points, .. } if *s == squire => *points,
+            Event::AchievementUnlocked { squire: s, bonus, .. } if *s == squire => *bonus,
+            _ => 0,
+        })
+        .sum()
+}
+
+/// The latest day on/before `day` on which `quest` is scheduled, or `None` if there is none.
+/// Drives the `ScheduledOccurrences` streak walk (skips non-scheduled days like weekends).
+pub fn latest_scheduled_on_or_before(quest: &Quest, day: Date) -> Option<Date> {
+    match &quest.cadence {
+        Cadence::OneOff { due } => due.filter(|d| d.0 <= day.0),
+        Cadence::Recurring(Schedule::Daily) => Some(day),
+        Cadence::Recurring(Schedule::Weekly { days }) => {
+            (0..7).map(|k| Date(day.0 - k)).find(|d| days.contains(&weekday_of(*d)))
+        }
+        Cadence::Recurring(Schedule::EveryNDays { n, anchor }) => {
+            if *n == 0 || day.0 < anchor.0 {
+                None
+            } else {
+                let step = *n as i32;
+                Some(Date(anchor.0 + ((day.0 - anchor.0) / step) * step))
+            }
+        }
+    }
 }

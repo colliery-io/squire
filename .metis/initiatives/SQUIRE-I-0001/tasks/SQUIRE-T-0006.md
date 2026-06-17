@@ -4,14 +4,14 @@ level: task
 title: "Domain Core: streaks & achievements (current_streak, is_unlocked, unlock emission)"
 short_code: "SQUIRE-T-0006"
 created_at: 2026-06-17T03:02:02.897657+00:00
-updated_at: 2026-06-17T03:02:02.897657+00:00
+updated_at: 2026-06-17T03:48:31.005082+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Implement `current_streak`, `is_unlocked`, achievement criterion evaluation with sticky unlock emission on approval (bonus + gate), all per-Squire; plus `StreakView` field derivation for the view.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

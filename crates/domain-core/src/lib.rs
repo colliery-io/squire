@@ -20,6 +20,7 @@ pub mod projections;
 pub mod testkit;
 
 // Per-command-family handlers + shared helpers (crate-internal).
+mod achievements;
 mod authoring;
 mod claims;
 pub(crate) mod common;
@@ -27,4 +28,4 @@ mod redemption;
 
 pub use contract::*;
 pub use engine::{child_originable, DomainEngine};
-pub use projections::{quest_status, reward_view, Proj};
+pub use projections::{quest_status, reward_view, streak_view, Proj};

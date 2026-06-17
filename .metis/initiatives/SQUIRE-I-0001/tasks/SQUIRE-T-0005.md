@@ -4,14 +4,14 @@ level: task
 title: "Domain Core: redemption & ledger (balance, can_redeem, redeem, adjust)"
 short_code: "SQUIRE-T-0005"
 created_at: 2026-06-17T03:01:58.823486+00:00
-updated_at: 2026-06-17T03:42:00.968302+00:00
+updated_at: 2026-06-17T03:45:24.474186+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,14 +32,16 @@ Implement the per-Squire `balance` projection, `can_redeem`, and the redemption 
 
 ## Acceptance Criteria
 
-- [ ] `balance(snap, squire)` = derived per-Squire sum of `CompletionApproved(+points)`, `ItemRedeemed(−cost)`, `AchievementUnlocked(+bonus)`, `PointsAdjusted(±)`; pending claims/requests contribute 0; never stored.
-- [ ] `RequestRedemption` emits `RedemptionRequested{squire}`; idempotent on `request_id`; reserves no points.
-- [ ] `can_redeem(snap, squire, item, on)` passes only if item active + gating achievement unlocked **for that Squire** + that Squire's balance ≥ cost + (`Once` ⇒ no existing `ItemRedeemed` for the item, else `OutOfStock`); `Repeatable` never availability-blocked; `last_redeemed` (most-recent `ItemRedeemed`) surfaced on `RewardCard`. Failures → `Blocked::{InsufficientPoints|AchievementLocked|OutOfStock}`.
-- [ ] `ReviewRedemption(Approve)` and direct `RedeemItem` RE-CHECK `can_redeem` at commit → `ItemRedeemed{squire, actor:Some(knight), request_id|command_id}`; a request that no longer clears fails `InsufficientPoints` at approval (AC-6).
-- [ ] Direct `RedeemItem` / `AdjustPoints` are idempotent on `command_id` (a replay is a no-op, deduped from the log).
-- [ ] `AdjustPoints` requires a non-empty reason; emits `PointsAdjusted{squire, actor, amount, reason}`; it is the ONLY path to a negative balance.
-- [ ] `ReviewRedemption(Reject)` → `RedemptionRejected{actor, reason}`; second review → `AlreadyReviewed`; unknown → `RequestNotFound`.
-- [ ] Unit tests for each branch.
+## Acceptance Criteria
+
+- [x] `balance(snap, squire)` = derived per-Squire sum of `CompletionApproved(+)`, `ItemRedeemed(−)`, `AchievementUnlocked(+bonus)`, `PointsAdjusted(±)`; pending contribute 0; never stored.
+- [x] `RequestRedemption` emits `RedemptionRequested{squire}`; idempotent on `request_id`; reserves nothing.
+- [x] `can_redeem` passes only if item active + gate unlocked **for that Squire** + balance ≥ cost + (`Once` ⇒ not already redeemed, else `OutOfStock`); `Repeatable` never blocked; `reward_view` exposes affordable/lock/`last_redeemed` for the card. Failures → `Blocked::{InsufficientPoints|AchievementLocked|OutOfStock}`.
+- [x] `ReviewRedemption(Approve)` + direct `RedeemItem` RE-CHECK `can_redeem` at commit → `ItemRedeemed{squire, actor:Some(knight), request_id|command_id}`; a request that no longer clears fails `InsufficientPoints` at approval (AC-6, tested).
+- [x] Direct `RedeemItem` / `AdjustPoints` idempotent on `command_id` (replay = no-op, deduped from the log).
+- [x] `AdjustPoints` requires a non-empty reason (empty → `InvalidDefinition`); emits `PointsAdjusted{squire, actor, amount, reason}`; only path to a negative balance.
+- [x] `ReviewRedemption(Reject)` → `RedemptionRejected{actor, reason}`; second review → `AlreadyReviewed`; unknown → `RequestNotFound`.
+- [x] `tests/redemption.rs` (10 tests) covering every branch.
 
 ## Implementation Notes
 
@@ -54,4 +56,8 @@ T-0001; gate-unlocked-for-squire uses `is_unlocked` from T-0006 (coordinate); ba
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-16 — Completed.** Implemented `Projections::balance` (per-Squire signed fold over the log), `is_unlocked` (sticky per-Squire lookup — emission is T-0006), and `can_redeem` (active + gate-unlocked + balance + `Once`-out-of-stock → `Blocked`), all in `src/projections.rs`; plus `reward_view` (affordable / lock / `last_redeemed`) for the StateView card (re-exported). `src/redemption.rs` handles `RequestRedemption` (idempotent on `request_id`, no reservation), `ReviewRedemption` (approve→`commit_redeem`, reject→`RedemptionRejected`, `RequestNotFound`/`AlreadyReviewed`), direct `RedeemItem` (idempotent on `command_id`), and `AdjustPoints` (idempotent on `command_id`, non-empty reason). Shared `commit_redeem` re-checks `can_redeem` at commit (AC-6) and snapshots cost; idempotency + Once-stock + last_redeemed all derived from the log via new `src/common.rs` helpers (`request_meta`/`request_resolved`/`command_already_applied`/`item_ever_redeemed`/`last_redeemed`).
+
+**Note:** empty-reason `AdjustPoints` reuses `DomainError::InvalidDefinition` (generic "malformed command input") rather than adding another variant.
+
+Tests `tests/redemption.rs` (10): balance per-Squire/signed, request/approve(actor,cost)/reject, idempotent request & command_id, can_redeem insufficient/gate/Once, AC-6 affordability-at-commit, negative-only-via-adjust. Full suite **49 passed**. Committed.
