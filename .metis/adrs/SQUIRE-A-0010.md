@@ -5,7 +5,7 @@ title: "Device pairing & per-user token provisioning over the LAN"
 number: 1
 short_code: "SQUIRE-A-0010"
 created_at: 2026-06-17T19:33:51.839900+00:00
-updated_at: 2026-06-17T19:33:51.839900+00:00
+updated_at: 2026-06-17T19:59:05.975851+00:00
 decision_date: 
 decision_maker: Dylan Storey
 parent: 
@@ -13,7 +13,7 @@ archived: false
 
 tags:
   - "#adr"
-  - "#phase/draft"
+  - "#phase/decided"
 
 
 exit_criteria_met: false
@@ -22,7 +22,9 @@ initiative_id: NULL
 
 # ADR SQUIRE-A-0010: Device pairing & per-user token provisioning over the LAN
 
-> **Status: DRAFT — awaiting decision.** Proposed to unblock [[SQUIRE-T-0042]]. Resolves the three "ADR: TBD" decision areas in [[SQUIRE-S-0006]] (Knight) and the equivalent in [[SQUIRE-S-0005]] (Squire). Extends, does not replace, [[SQUIRE-A-0004]] (per-user accounts + tenant-scoped tokens).
+> **Status: DECIDED (2026-06-17, Dylan Storey).** Unblocks [[SQUIRE-T-0042]]. Resolves the three "ADR: TBD" decision areas in [[SQUIRE-S-0006]] (Knight) and the equivalent in [[SQUIRE-S-0005]] (Squire). Extends, does not replace, [[SQUIRE-A-0004]] (per-user accounts + tenant-scoped tokens).
+>
+> **Resolved choices:** QR scanner = **ZXing** (`zxing-android-embedded`; offline, no Play Services). Demo path = **debug-only bypass** kept (release always pairs). Pairing code = **single-use, ≥128-bit, 30-min TTL**.
 
 ## Context
 
@@ -38,7 +40,7 @@ We need a one-time pairing flow that binds a phone to a household member's accou
 
 A **QR-based, Keep-mediated pairing** flow with **mDNS/NSD discovery** and **Keystore-backed encrypted storage**:
 
-1. **Mint (on the computer, the Keep).** The parent, already authenticated to the loopback Keep, opens a "Pair a device" screen, picks a household **member** (a specific Knight or Squire), and the Keep calls a new control-plane endpoint to mint a **one-time pairing code**: a high-entropy, single-use, short-TTL (≈5 min) token scoped to `{household, user_id, role}`. The Keep renders a **QR** encoding `{host, port, household_handle, pairing_code}` (and shows the code as text for manual fallback).
+1. **Mint (on the computer, the Keep).** The parent, already authenticated to the loopback Keep, opens a "Pair a device" screen, picks a household **member** (a specific Knight or Squire), and the Keep calls a new control-plane endpoint to mint a **one-time pairing code**: a high-entropy (≥128-bit), single-use, 30-minute-TTL token scoped to `{household, user_id, role}`. The Keep renders a **QR** encoding `{host, port, household_handle, pairing_code}` (and shows the code as text for manual fallback).
 2. **Discover + scan (on the phone).** On first run the app browses mDNS/NSD for the service type `_squire._tcp` (advertised by `squire-home`) to learn `{host, port}` — with a manual host-entry fallback if discovery fails. The app scans the QR (or accepts a typed code).
 3. **Exchange (phone → control plane).** The app POSTs the pairing code to a new `POST /pair` endpoint. Identity validates it (exists, unexpired, unused), marks it consumed, and returns the member's **per-user tenant-scoped token** (same kind A-0004/`/login` issues) plus the resolved `{household_handle, user_id, role}`.
 4. **Store (on the phone).** The app persists `{host, port, household_handle, token, role}` in **Android Keystore-backed `EncryptedSharedPreferences`** (Jetpack Security). Subsequent launches read this; the demo `MainActivity` constants are deleted. A "forget device" action clears it.
@@ -80,7 +82,7 @@ The Keep is already the authenticated, on-computer admin surface and the single 
 - Reuses the existing token + interceptor plumbing; only the *source* of host+token changes.
 
 ### Negative
-- New dependencies on the phone: a QR scanner (ML Kit or ZXing), `NsdManager`, Jetpack Security. Larger than the auto-refresh change.
+- New dependencies on the phone: a QR scanner (ZXing `zxing-android-embedded`), `NsdManager`, Jetpack Security. Larger than the auto-refresh change.
 - mDNS/NSD is environment-sensitive (notably on emulators) — the manual-host fallback is mandatory, not optional.
 - New server surface (`/pair` + the Keep "pair a device" screen) and Identity changes (mint/consume one-time codes) — a cross-component effort; should decompose into sub-tasks.
 
@@ -94,7 +96,7 @@ The Keep is already the authenticated, on-computer admin surface and the single 
 3. **Phone (shared)**: NSD discovery + manual fallback, QR scan, `/pair` exchange, Keystore `SessionStore`; replace the baked `MainActivity` constants in both apps; "forget device".
 4. **Demo path**: a debug-only bypass so emulator/`squire-home` flows stay frictionless.
 
-## Open questions for the decision
-- QR library preference: **ML Kit** (bundled, heavier) vs **ZXing** (lighter, manual)?
-- Keep a **debug demo-creds bypass**, or pair even in dev?
-- Pairing-code TTL/length (proposed: 5 min, single-use, ≥128-bit)?
+## Resolved decisions (2026-06-17)
+- **QR library: ZXing** (`zxing-android-embedded`) — fully on-device/offline, no Google Play Services dependency; right fit for a LAN-only app and a single QR format.
+- **Demo path: keep a debug-only bypass** — a build-flag path that skips pairing and uses the baked demo creds so the emulator + `squire-home` flows stay one-tap; **release builds always pair**.
+- **Pairing code: single-use, ≥128-bit, 30-minute TTL** — single-use + high entropy prevent replay/guessing; the 30-min window (vs 5-min) is more forgiving for a parent setting up a device a little later, an acceptable trade for a LAN-only, Keep-minted code.

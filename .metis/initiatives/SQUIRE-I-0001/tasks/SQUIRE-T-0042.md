@@ -36,7 +36,14 @@ The spec leaves these **Decision Areas: ADR TBD** — resolve before/within this
 - **Secure storage**: Android Keystore-backed `EncryptedSharedPreferences` for the token + host; iOS Keychain later. The token is presented on every call (already wired via the okhttp interceptor).
 - **Server surface**: a new `/pair` (consume one-time code → mint per-user token) on the control plane (SQUIRE-S-0003 / Identity SQUIRE-S-0007), and a Keep screen to **generate** a pairing code/QR for a chosen member.
 
-**[[SQUIRE-A-0010]]** ("Device pairing & per-user token provisioning over the LAN") captures the proposed decision — currently **DRAFT, awaiting approval**. This task is blocked until that ADR is *decided*; on approval it decomposes per the ADR's "Decomposition" section (server `/pair` + Identity → Keep pair screen → phone discovery/scan/storage → demo bypass).
+**[[SQUIRE-A-0010]] is DECIDED (2026-06-17).** Resolved choices: QR = **ZXing**; **debug-only demo bypass** kept (release always pairs); pairing code = **single-use, ≥128-bit, 30-min TTL**.
+
+This task is now an **umbrella** tracking three implementation sub-tasks (build them in order):
+- **[[SQUIRE-T-0044]]** — Identity mint/consume one-time codes + control-plane `POST /pair` (server foundation; pure Rust + tests).
+- **[[SQUIRE-T-0045]]** — Keep "Pair a device" screen (mint + render QR/text). *blocked_by T-0044.*
+- **[[SQUIRE-T-0046]]** — Phone pairing: NSD discovery, ZXing scan, `/pair` exchange, Keystore `SessionStore`, debug bypass; removes the baked creds. *blocked_by T-0044.*
+
+This umbrella closes when all three complete.
 
 ## Acceptance Criteria
 
