@@ -1,4 +1,4 @@
-//! The production [`Identity`] (task SQUIRE-T-0022).
+//! The production [`Identity`] (tasks SQUIRE-T-0022 / T-0023).
 //!
 //! This is the real auth/membership implementation, combining the pieces built in T-0020/T-0021:
 //!
@@ -10,15 +10,30 @@
 //! * **Tenant-scoped HMAC tokens.** Tokens are self-contained HMAC-SHA256 bearer tokens
 //!   ([`TokenSigner`]) carrying `(household, user, role, exp)`; `verify` recomputes the MAC and
 //!   checks expiry without a DB lookup, then confirms the presented handle matches the token's.
-//! * **Registry-routed tenants.** A [`TenantRegistry`] maps a [`HouseholdHandle`] to its
-//!   tenant-scoped [`Store`] (a SQLite file or a Postgres schema), in either local single-tenant
-//!   or hosted multi-tenant mode.
 //! * **Users via the single writer, with audit.** Member rows are written through
 //!   `Store::apply` (the single-writer seam), stamped with the acting caller (`by`) so the
 //!   `users` audit columns record who created/updated each member.
 //!
-//! The dev [`DevIdentity`](crate::DevIdentity) is kept as-is; T-0023 wires `ProdIdentity` into
-//! the API.
+//! ## Tenancy: where writes land (and the single-writer invariant under concurrency)
+//!
+//! The api services requests **concurrently**, so AR-1 (one writer per tenant) must hold against
+//! real interleaving, not just sequential calls. A tenant is exactly one connection behind one
+//! lock, and BOTH the api's feature handlers and this identity's control-plane writes
+//! (`register` / `add_member`) must go through that one lock — otherwise two independent
+//! connections race (on SQLite, `SQLITE_BUSY`; everywhere, lost-update hazards on `users`).
+//!
+//! [`Tenancy`] captures the three deployment shapes:
+//!
+//! * [`Tenancy::Shared`] — **the production local api.** The identity writes through the SAME
+//!   `Arc<Mutex<Store>>` ([`SharedStore`]) the api handlers hold, so every writer (handlers +
+//!   identity) serializes on one mutex over one connection. This is what [`ProdIdentity::shared_local`]
+//!   builds and what `api::AppState::local_prod` wires.
+//! * [`Tenancy::LocalRegistry`] — a single bound tenant routed through a [`TenantRegistry`] that
+//!   opens its own connection. For a standalone identity service (no shared api store) and for the
+//!   registry-path tests. NOT for the concurrent api — it would be a second writer.
+//! * [`Tenancy::Hosted`] — multi-tenant: each `register` derives + provisions a fresh tenant.
+//!   (Wiring a *concurrent* hosted api needs a per-tenant `SharedStore` map shared with the
+//!   handlers — out of scope for the local MVP; this mode is exercised at the identity layer.)
 
 use std::sync::Mutex;
 
@@ -26,42 +41,60 @@ use domain_core::contract::{
     AddMemberReq, AddMemberResp, AuthToken, Change, Clock, HouseholdHandle, LoginReq, LoginResp,
     RegisterHouseholdReq, RegisterHouseholdResp, Repository, Role, User, UserId,
 };
-use store::SystemClock;
+use store::{Store, SystemClock};
 
 use crate::creds::{hash_secret, verify_secret};
 use crate::tenant::{TenantError, TenantRegistry};
 use crate::token::TokenSigner;
-use crate::{AuthError, Identity, Principal};
+use crate::{AuthError, Identity, Principal, SharedStore};
 
-/// The deployment posture of a [`ProdIdentity`] — mirrors the [`TenantRegistry`] mode.
-///
-/// In **local** mode there is exactly one household, fixed at construction: `register` seeds its
-/// first Knight (and refuses if one already exists). In **hosted** mode each `register` derives a
-/// fresh handle from the household name and provisions a new tenant.
-enum Posture {
-    /// Single-tenant: the one bound household handle.
-    Local { handle: HouseholdHandle },
-    /// Multi-tenant: handles are derived per-registration.
-    Hosted,
+/// Where a [`ProdIdentity`]'s reads/writes land. See the module docs for the single-writer rationale.
+enum Tenancy {
+    /// Local single-tenant over a **shared** store: the api handlers' `Arc<Mutex<Store>>`. Both the
+    /// handlers and this identity write through the one lock/connection, so writes serialize under
+    /// concurrency (AR-1). `handle` is the one bound household.
+    Shared { handle: HouseholdHandle, store: SharedStore },
+    /// Local single-tenant routed through a registry that opens its own connection. `handle` is the
+    /// one bound household.
+    LocalRegistry { handle: HouseholdHandle, registry: TenantRegistry },
+    /// Hosted multi-tenant: `register` derives a fresh handle and provisions its tenant.
+    Hosted { registry: TenantRegistry },
 }
 
-/// The production [`Identity`]: hashed in-tenant credentials, tenant-scoped HMAC tokens,
-/// registry-routed tenants, audited member writes. See the module docs.
+/// The production [`Identity`]: hashed in-tenant credentials, tenant-scoped HMAC tokens, audited
+/// member writes, over one of the [`Tenancy`] shapes. See the module docs.
 pub struct ProdIdentity {
-    registry: TenantRegistry,
+    tenancy: Tenancy,
     signer: TokenSigner,
     clock: SystemClock,
     /// Token lifetime in milliseconds (`exp = now_ms + ttl_ms` at issue).
     token_ttl_ms: i64,
-    posture: Posture,
     /// Deterministic monotonic source for fresh `UserId`s and hosted handle suffixes (no rand).
     counter: Mutex<u128>,
 }
 
 impl ProdIdentity {
-    /// A **local single-tenant** identity bound to `handle`, over `registry` (which must itself be
-    /// in local mode for `handle`). `signer` signs/verifies tokens; `token_ttl_ms` is their
-    /// lifetime.
+    /// The **production local api** identity: writes through the SAME [`SharedStore`] the api
+    /// handlers hold, bound to `handle`, so identity and handler writes serialize on one
+    /// lock/connection under concurrency (AR-1). `register` seeds this one household's first Knight.
+    pub fn shared_local(
+        store: SharedStore,
+        signer: TokenSigner,
+        handle: HouseholdHandle,
+        token_ttl_ms: i64,
+    ) -> Self {
+        Self {
+            tenancy: Tenancy::Shared { handle, store },
+            signer,
+            clock: SystemClock,
+            token_ttl_ms,
+            counter: Mutex::new(0),
+        }
+    }
+
+    /// A **local single-tenant** identity bound to `handle`, routed through `registry` (which opens
+    /// its OWN connection). For a standalone identity (no shared api store) and registry-path tests;
+    /// for the concurrent api prefer [`shared_local`](Self::shared_local).
     pub fn local(
         registry: TenantRegistry,
         signer: TokenSigner,
@@ -69,11 +102,10 @@ impl ProdIdentity {
         token_ttl_ms: i64,
     ) -> Self {
         Self {
-            registry,
+            tenancy: Tenancy::LocalRegistry { handle, registry },
             signer,
             clock: SystemClock,
             token_ttl_ms,
-            posture: Posture::Local { handle },
             counter: Mutex::new(0),
         }
     }
@@ -82,11 +114,10 @@ impl ProdIdentity {
     /// `register` provisions a fresh tenant whose handle is derived from the household name.
     pub fn hosted(registry: TenantRegistry, signer: TokenSigner, token_ttl_ms: i64) -> Self {
         Self {
-            registry,
+            tenancy: Tenancy::Hosted { registry },
             signer,
             clock: SystemClock,
             token_ttl_ms,
-            posture: Posture::Hosted,
             counter: Mutex::new(0),
         }
     }
@@ -101,6 +132,50 @@ impl ProdIdentity {
     /// Current wall-clock time in unix millis, from the injected clock.
     fn now_ms(&self) -> i64 {
         self.clock.now().0
+    }
+
+    /// The one bound household for the single-tenant shapes (`None` for hosted).
+    fn bound_handle(&self) -> Option<&HouseholdHandle> {
+        match &self.tenancy {
+            Tenancy::Shared { handle, .. } | Tenancy::LocalRegistry { handle, .. } => Some(handle),
+            Tenancy::Hosted { .. } => None,
+        }
+    }
+
+    /// Run `f` against the [`Store`] for `handle`, abstracting over the tenancy shape:
+    ///
+    /// * [`Tenancy::Shared`] — lock the shared mutex (the single writer) and operate on the one
+    ///   connection. The whole closure runs under that lock, so a read-then-write inside `f` is
+    ///   atomic against any other handler/identity write.
+    /// * registry shapes — resolve a tenant-scoped store (its own connection) and operate on it.
+    ///
+    /// In the single-tenant shapes a `handle` other than the bound one is [`AuthError::WrongTenant`],
+    /// so an identity bound to household B never acts on a request routed for household A.
+    fn with_tenant_store<R>(
+        &self,
+        handle: &HouseholdHandle,
+        f: impl FnOnce(&mut Store<SystemClock>) -> Result<R, AuthError>,
+    ) -> Result<R, AuthError> {
+        match &self.tenancy {
+            Tenancy::Shared { handle: bound, store } => {
+                if handle != bound {
+                    return Err(AuthError::WrongTenant);
+                }
+                let mut guard = store.lock().map_err(|_| AuthError::BadToken)?;
+                f(&mut guard)
+            }
+            Tenancy::LocalRegistry { handle: bound, registry } => {
+                if handle != bound {
+                    return Err(AuthError::WrongTenant);
+                }
+                let mut store = registry.resolve(handle).map_err(tenant_err_to_auth)?;
+                f(&mut store)
+            }
+            Tenancy::Hosted { registry } => {
+                let mut store = registry.resolve(handle).map_err(tenant_err_to_auth)?;
+                f(&mut store)
+            }
+        }
     }
 }
 
@@ -154,12 +229,12 @@ impl Identity for ProdIdentity {
         if principal.household != *household {
             return Err(AuthError::WrongTenant);
         }
-        // Local single-tenant: this identity serves EXACTLY one household, and its store is that
-        // one tenant's. Reject any other handle outright (defense in depth) so a token valid for a
-        // *different* tenant can never resolve here even though its signature checks out — the api
+        // Single-tenant: this identity serves EXACTLY one household, and its store is that one
+        // tenant's. Reject any other handle outright (defense in depth) so a token valid for a
+        // *different* tenant can never resolve here even though its signature checks out — an api
         // bound to household B must never act on a token minted for household A.
-        if let Posture::Local { handle } = &self.posture {
-            if household != handle {
+        if let Some(bound) = self.bound_handle() {
+            if household != bound {
                 return Err(AuthError::WrongTenant);
             }
         }
@@ -167,51 +242,45 @@ impl Identity for ProdIdentity {
     }
 
     fn register(&self, req: RegisterHouseholdReq) -> Result<RegisterHouseholdResp, AuthError> {
-        // Pick / provision the tenant handle for this registration.
-        let handle = match &self.posture {
-            Posture::Local { handle } => {
-                // Single-tenant: the one bound household. Refuse if it already has a Knight
-                // (already registered) — re-registration is forbidden, not an overwrite.
-                let store = self.registry.resolve(handle).map_err(tenant_err_to_auth)?;
-                let already_registered = store
-                    .snapshot()
-                    .users
-                    .iter()
-                    .any(|u| u.role == Role::Knight);
-                if already_registered {
-                    return Err(AuthError::Forbidden);
-                }
-                handle.clone()
-            }
-            Posture::Hosted => {
-                // Multi-tenant: derive a fresh handle and provision its tenant.
+        // Pick the tenant handle: hosted derives + provisions a fresh one; single-tenant uses its
+        // bound household.
+        let handle = match &self.tenancy {
+            Tenancy::Hosted { registry } => {
                 let handle = derive_handle(&req.household_name, self.next());
-                self.registry.provision(&handle).map_err(tenant_err_to_auth)?;
+                registry.provision(&handle).map_err(tenant_err_to_auth)?;
                 handle
             }
+            _ => self.bound_handle().expect("single-tenant has a bound handle").clone(),
         };
 
-        // Resolve the (now provisioned) tenant store.
-        let mut store = self.registry.resolve(&handle).map_err(tenant_err_to_auth)?;
-
-        // Mint the first member: a Knight (the admin). System seed → by = None.
+        // Mint the first member (a Knight). The existing-Knight guard and the write happen inside
+        // ONE `with_tenant_store` closure, so under the shared lock the check-then-seed is atomic:
+        // two concurrent registers cannot both pass the guard and seed a second admin.
         let admin = UserId(self.next());
-        store
-            .apply(
-                None,
-                &[Change::PutUser(User {
-                    id: admin,
-                    role: Role::Knight,
-                    display_name: req.admin_name,
-                    active: true,
-                })],
-            )
-            .map_err(|_| AuthError::BadToken)?;
-
-        // Persist the admin's hashed secret IN the tenant's credentials table.
-        store
-            .set_credential(admin, &hash_secret(&req.admin_secret))
-            .map_err(|_| AuthError::BadToken)?;
+        let admin_name = req.admin_name;
+        let admin_hash = hash_secret(&req.admin_secret);
+        self.with_tenant_store(&handle, |store| {
+            // Refuse re-registration of an already-bootstrapped household (a fresh hosted tenant is
+            // empty, so this is a no-op there).
+            if store.snapshot().users.iter().any(|u| u.role == Role::Knight) {
+                return Err(AuthError::Forbidden);
+            }
+            // System seed → by = None.
+            store
+                .apply(
+                    None,
+                    &[Change::PutUser(User {
+                        id: admin,
+                        role: Role::Knight,
+                        display_name: admin_name,
+                        active: true,
+                    })],
+                )
+                .map_err(|_| AuthError::BadToken)?;
+            // Persist the admin's hashed secret IN the tenant's credentials table.
+            store.set_credential(admin, &admin_hash).map_err(|_| AuthError::BadToken)?;
+            Ok(())
+        })?;
 
         // Issue a tenant-scoped token for the new admin.
         let principal = Principal { household: handle.clone(), user: admin, role: Role::Knight };
@@ -221,23 +290,22 @@ impl Identity for ProdIdentity {
     }
 
     fn login(&self, req: LoginReq) -> Result<LoginResp, AuthError> {
-        let store = self.registry.resolve(&req.household).map_err(tenant_err_to_auth)?;
-
-        // Verify the member secret against the stored hash. A missing credential or a mismatch is
-        // an authentication failure (BadToken), never a 403.
-        let hash = store.credential(req.user).ok_or(AuthError::BadToken)?;
-        if !verify_secret(&req.secret, &hash) {
-            return Err(AuthError::BadToken);
-        }
-
-        // Resolve the member's current role from the store; missing / inactive → BadToken.
-        let role = store
-            .snapshot()
-            .users
-            .iter()
-            .find(|u| u.id == req.user && u.active)
-            .map(|u| u.role)
-            .ok_or(AuthError::BadToken)?;
+        // Verify the secret and resolve the role inside one store access (one lock hold for Shared).
+        let role = self.with_tenant_store(&req.household, |store| {
+            // A missing credential or a mismatch is an authentication failure (BadToken), never 403.
+            let hash = store.credential(req.user).ok_or(AuthError::BadToken)?;
+            if !verify_secret(&req.secret, &hash) {
+                return Err(AuthError::BadToken);
+            }
+            // Resolve the member's current role; missing / inactive → BadToken.
+            store
+                .snapshot()
+                .users
+                .iter()
+                .find(|u| u.id == req.user && u.active)
+                .map(|u| u.role)
+                .ok_or(AuthError::BadToken)
+        })?;
 
         let principal = Principal { household: req.household, user: req.user, role };
         let token = self.signer.issue(&principal, self.now_ms(), self.token_ttl_ms);
@@ -254,26 +322,27 @@ impl Identity for ProdIdentity {
             return Err(AuthError::Forbidden);
         }
 
-        let mut store = self.registry.resolve(&caller.household).map_err(tenant_err_to_auth)?;
-
-        // Mint a new member of the requested role, audited by the caller.
+        // Mint a new member of the requested role, audited by the caller, with its hashed secret —
+        // both writes under the single lock (Shared), so they serialize with all other writers.
         let new_id = UserId(self.next());
-        store
-            .apply(
-                Some(caller.user),
-                &[Change::PutUser(User {
-                    id: new_id,
-                    role: req.role,
-                    display_name: req.display_name,
-                    active: true,
-                })],
-            )
-            .map_err(|_| AuthError::BadToken)?;
-
-        // Persist the new member's hashed initial secret in the tenant.
-        store
-            .set_credential(new_id, &hash_secret(&req.initial_secret))
-            .map_err(|_| AuthError::BadToken)?;
+        let display_name = req.display_name;
+        let role = req.role;
+        let secret_hash = hash_secret(&req.initial_secret);
+        self.with_tenant_store(&caller.household, |store| {
+            store
+                .apply(
+                    Some(caller.user),
+                    &[Change::PutUser(User {
+                        id: new_id,
+                        role,
+                        display_name,
+                        active: true,
+                    })],
+                )
+                .map_err(|_| AuthError::BadToken)?;
+            store.set_credential(new_id, &secret_hash).map_err(|_| AuthError::BadToken)?;
+            Ok(())
+        })?;
 
         Ok(AddMemberResp { user: new_id })
     }

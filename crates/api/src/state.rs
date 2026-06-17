@@ -15,7 +15,6 @@ use domain_core::DomainEngine;
 use store::tenant::{Backend, ProvisionError, Provisioner};
 use store::SystemClock;
 
-use identity::tenant::TenantRegistry;
 use identity::{Identity, ProdIdentity, TokenSigner};
 
 /// The tenant store shared (interior-mutably, single-writer) across the API. Held by both
@@ -59,28 +58,26 @@ impl AppState {
     /// Argon2id credentials, HMAC tokens signed by `signer`, `token_ttl_ms` lifetime) bound to the
     /// SAME `handle` over the same backend.
     ///
-    /// The store the handlers read/write and the store the identity seeds (`register` /
-    /// `add_member`) are SEPARATE connections to the SAME tenant (one SQLite file / one Postgres
-    /// schema). At household scale requests are handled sequentially (single writer, NFR-1.1.3),
-    /// so the two never hold overlapping write transactions and the backend serializes the writes.
-    /// `ProdIdentity` only ever writes the `users` + `credentials` rows (never the event log), so
-    /// it never contends with the handlers' app-assigned event `seq`.
+    /// The api services requests **concurrently**, so both the feature handlers and the identity's
+    /// control-plane writes (`register` / `add_member`) go through the SAME `Arc<Mutex<Store>>` —
+    /// one lock over one connection is the single writer (AR-1). `ProdIdentity::shared_local` is
+    /// handed that same [`SharedStore`], so there is no second, uncoordinated connection to race it
+    /// (which on SQLite would surface as `SQLITE_BUSY`, and anywhere risks lost updates on `users`).
     pub fn local_prod(
         backend: Backend,
         handle: HouseholdHandle,
         signer: TokenSigner,
         token_ttl_ms: i64,
     ) -> Result<Arc<Self>, ProvisionError> {
-        // Create + migrate the tenant once (idempotent), then open the handlers' store over it.
-        let provisioner = Provisioner::new(backend.clone());
+        // Create + migrate the tenant once (idempotent — required on Postgres, where `open` alone
+        // does not create the schema), then open the ONE store both sides share.
+        let provisioner = Provisioner::new(backend);
         provisioner.provision(&handle.0)?;
         let store = provisioner.open(&handle.0, SystemClock)?;
         let store: SharedStore = Arc::new(Mutex::new(store));
 
-        // The production identity over the SAME tenant (its registry opens its own connection to
-        // the same file/schema). Local single-tenant: `register` seeds the one household's Knight.
-        let registry = TenantRegistry::local(backend, handle.clone());
-        let identity = ProdIdentity::local(registry, signer, handle, token_ttl_ms);
+        // The production identity writes through that same shared store (single writer).
+        let identity = ProdIdentity::shared_local(store.clone(), signer, handle, token_ttl_ms);
 
         Ok(AppState::new(store, Arc::new(identity)))
     }
