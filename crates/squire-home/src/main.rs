@@ -1,54 +1,39 @@
-//! `squire-home` — the **home server**: one process that hosts BOTH the Keep (the loopback admin
-//! UI, ADR SQUIRE-A-0008) AND the LAN api (the phone clients, SQUIRE-S-0003) over **one shared,
-//! single-writer store + identity**, for the same household.
+//! `squire-home` — the **demo** home server: a throwaway harness that wipes a fixed `/tmp` dir and
+//! re-seeds a deterministic "demo" household every launch (admin Knight `UserId(1)`/`demo`, Squire
+//! `UserId(2)`/`demo`, sample quests + a streak achievement + a gated reward). For the emulator
+//! one-tap flow and manual demos. Run: `cargo run -p squire-home` (ports via `API_PORT`/`KEEP_PORT`).
 //!
-//! This is the coherent topology the product actually deploys: the parent's Keep and the child's
-//! phone talk to the *same* data — what the child submits on the phone shows up in the parent's
-//! Keep review queue. (The earlier `serve_demo` only ran the api, on a separate household from a
-//! standalone Keep, so the two looked disconnected.)
-//!
-//! Demo seed is deterministic (a fixed SQLite dir recreated each run): household `demo`, admin
-//! Knight `UserId(1)`/`demo`, Squire `UserId(2)`/`demo`, a few quests + a streak achievement + a
-//! gated reward. Run: `cargo run -p squire-home` (ports via `API_PORT` / `KEEP_PORT`).
+//! The **persistent** production server is the sibling binary `squire-serve` (durable data dir,
+//! register-or-load, stable signing key — SQUIRE-T-0048). Shared wiring lives in this crate's `lib.rs`.
 
-use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
-
-use api::AppState;
-use keep::KeepState;
+use std::path::Path;
 
 use domain_core::contract::{
     Achievement, AchievementId, AddMemberReq, Assignment, Availability, Cadence, Change, Completion,
     Criterion, HouseholdHandle, ItemId, Quest, QuestId, RedeemableItem, RegisterHouseholdReq,
     Repository, Role, Schedule, Scope, StreakBasis, UserId,
 };
-use identity::{Identity, Principal, ProdIdentity, SharedStore, TokenSigner};
-use store::tenant::{Backend, Provisioner};
-use store::SystemClock;
+use identity::Principal;
+
+use squire_home::{env_u16, open_household, serve, TOKEN_TTL_MS};
 
 /// Fixed on-disk location for the demo tenant, recreated each run for a deterministic seed.
 const DIR: &str = "/tmp/squire-home";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // DEMO: wipe so every run starts from the same deterministic seed.
     let _ = std::fs::remove_dir_all(DIR);
 
-    let api_port: u16 = env_u16("API_PORT", 8080);
-    let keep_port: u16 = env_u16("KEEP_PORT", 4920);
+    let api_port = env_u16("API_PORT", 8080);
+    let keep_port = env_u16("KEEP_PORT", 4920);
     let handle = HouseholdHandle("demo".into());
 
-    // ── ONE shared store + identity (single writer across BOTH surfaces) ─────────────────────────
-    let provisioner = Provisioner::new(Backend::Sqlite { dir: DIR.into() });
-    provisioner.provision(&handle.0)?;
-    let store: SharedStore = Arc::new(Mutex::new(provisioner.open(&handle.0, SystemClock)?));
-    let identity: Arc<dyn Identity> = Arc::new(ProdIdentity::shared_local(
-        store.clone(),
-        TokenSigner::new(b"squire-home-signing-key"),
-        handle.clone(),
-        24 * 60 * 60 * 1000, // 24h tokens
-    ));
+    // One shared store + identity (a fixed demo signing key — fine for a throwaway tenant).
+    let (store, identity) =
+        open_household(Path::new(DIR), &handle, b"squire-home-signing-key", TOKEN_TTL_MS)?;
 
-    // ── Seed via the same public APIs the tests use ──────────────────────────────────────────────
+    // ── Seed the demo household via the same public APIs the tests use ────────────────────────────
     identity
         .register(RegisterHouseholdReq {
             household_name: "demo".into(),
@@ -126,60 +111,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         )
         .expect("seed quests + achievement + rewards");
 
-    // ── Two surfaces over the ONE store/identity ─────────────────────────────────────────────────
-    let app = AppState::new(store.clone(), identity.clone()); // LAN api (phones)
-    let keep_state = KeepState::from_parts(store.clone(), identity.clone(), handle.clone()); // loopback admin
-
-    // Best-effort mDNS: advertise the LAN api as `_squire._tcp` so phones can discover host/port
-    // without a typed IP (SQUIRE-T-0047 / NFR-6). Held for the process lifetime; never fatal.
-    let _mdns = start_mdns(api_port, &handle.0);
-
     println!("════════════════════════════════════════════════════════════════════");
-    println!("  Squire HOME server — one household, two surfaces, one shared store");
+    println!("  Squire DEMO server (squire-home) — wiped + re-seeded each run");
     println!("  Keep (parent, loopback): http://127.0.0.1:{keep_port}   login: Knight 1 / demo");
     println!("  LAN api (phones):        http://0.0.0.0:{api_port}   (emulator: http://10.0.2.2:{api_port})");
     println!("  Squire (child) login:    household=demo, user=2, secret=demo");
-    println!("  Same data: a phone claim shows up in the Keep's Review queue.");
+    println!("  Persistent server:       cargo run -p squire-home --bin squire-serve");
     println!("════════════════════════════════════════════════════════════════════");
 
-    // Serve both concurrently; if either listener fails, the process exits.
-    tokio::try_join!(
-        api::serve(app, SocketAddr::from(([0, 0, 0, 0], api_port))),
-        keep::serve(keep_state, keep_port),
-    )?;
-    Ok(())
-}
-
-fn env_u16(key: &str, default: u16) -> u16 {
-    std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
-}
-
-/// Advertise the LAN api over mDNS/DNS-SD as `_squire._tcp` on `api_port` (SQUIRE-T-0047 / NFR-6),
-/// so a pairing phone's NSD browse can prefill the host/port. **Best-effort**: opt out with
-/// `SQUIRE_MDNS=off`, and a responder failure only logs — serving never depends on it. The returned
-/// guard `(Responder, Service)` must be kept alive for the advertisement to persist; the caller
-/// binds it for the process lifetime. `libmdns` enumerates the host's interfaces and announces the
-/// machine's LAN address (not loopback) itself.
-fn start_mdns(api_port: u16, household: &str) -> Option<(libmdns::Responder, libmdns::Service)> {
-    if std::env::var("SQUIRE_MDNS").is_ok_and(|v| v.eq_ignore_ascii_case("off")) {
-        println!("  mDNS:                    disabled (SQUIRE_MDNS=off)");
-        return None;
-    }
-    match libmdns::Responder::new() {
-        Ok(responder) => {
-            let txt = format!("household={household}");
-            let service = responder.register(
-                "_squire._tcp".to_owned(),
-                "Squire".to_owned(),
-                api_port,
-                &[txt.as_str()],
-            );
-            println!("  mDNS:                    advertising _squire._tcp on :{api_port}");
-            Some((responder, service))
-        }
-        Err(e) => {
-            eprintln!("  mDNS:                    disabled (responder failed: {e})");
-            None
-        }
-    }
+    serve(store, identity, handle, api_port, keep_port).await
 }
