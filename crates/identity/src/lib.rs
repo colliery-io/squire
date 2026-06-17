@@ -11,9 +11,11 @@
 //! so a production identity can be built without a cycle back through the HTTP layer.
 
 pub mod creds;
+pub mod prod;
 pub mod tenant;
 pub mod token;
 
+pub use prod::ProdIdentity;
 pub use token::TokenSigner;
 
 use std::collections::HashMap;

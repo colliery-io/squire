@@ -401,6 +401,32 @@ fn clock_today_is_monday_aligned() {
     assert_eq!(sys.today(), Date(expected_day));
 }
 
+/// Credentials live IN the tenant store (SQUIRE-S-0007 / REQ-1.6) and are written/read directly
+/// (bypassing `apply`). `set_credential` upserts by `user_id`; `credential` reads the hash back.
+/// Runs on both backends so the upsert dispatch is proven on SQLite and Postgres alike.
+#[test]
+fn credentials_set_and_read_back() {
+    each_backend(|conn| {
+        let store = Store::new(conn, SystemClock);
+
+        // Absent before any write.
+        assert_eq!(store.credential(UserId(1)), None);
+
+        // Set, then read back verbatim.
+        store.set_credential(UserId(1), "$argon2id$hash-one").expect("set credential");
+        assert_eq!(store.credential(UserId(1)).as_deref(), Some("$argon2id$hash-one"));
+
+        // Upsert by user_id: a second set replaces the hash (no duplicate row).
+        store.set_credential(UserId(1), "$argon2id$hash-two").expect("replace credential");
+        assert_eq!(store.credential(UserId(1)).as_deref(), Some("$argon2id$hash-two"));
+
+        // A different user is independent.
+        store.set_credential(UserId(2), "$argon2id$other").expect("set other");
+        assert_eq!(store.credential(UserId(2)).as_deref(), Some("$argon2id$other"));
+        assert_eq!(store.credential(UserId(1)).as_deref(), Some("$argon2id$hash-two"));
+    });
+}
+
 // ─── small helpers ─────────────────────────────────────────────────────────────
 
 /// Read the raw `seq` column values in ascending order.

@@ -4,14 +4,14 @@ level: task
 title: "Identity: production Identity impl (register/login/add-member/verify/authorize)"
 short_code: "SQUIRE-T-0022"
 created_at: 2026-06-17T09:52:24.150966+00:00
-updated_at: 2026-06-17T09:52:24.150966+00:00
+updated_at: 2026-06-17T10:10:18.595392+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 In `crates/identity`, implement the production `Identity` impl that ties together hashing (T-0020), tokens (T-0020), the tenant registry (T-0021), and the `Store` writer. Users and their hashed credentials live IN the tenant schema; there is no global user directory.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

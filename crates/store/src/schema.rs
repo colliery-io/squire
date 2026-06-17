@@ -107,6 +107,13 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    credentials (user_id) {
+        user_id -> Text,
+        secret_hash -> Text,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     users,
     quests,
