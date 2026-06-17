@@ -24,13 +24,70 @@
     document.getElementById("login").hidden = true;
     document.getElementById("who").textContent = `${who.display_name || "Knight"} (#${who.user})`;
     document.getElementById("shell").hidden = false;
-    for (const id of ["quests-panel", "items-panel", "achievements-panel"]) {
+    for (const id of ["quests-panel", "items-panel", "achievements-panel", "members-panel"]) {
       document.getElementById(id).hidden = false;
     }
     loadQuests();
     loadCatalog("items", "item-list");
     loadCatalog("achievements", "achievement-list");
+    loadMembers();
   });
+
+  // ── Members (T-0028) ─────────────────────────────────────────────────────────
+  async function loadMembers() {
+    const res = await fetch("/api/members");
+    if (!res.ok) return;
+    const rows = await res.json();
+    const ul = document.getElementById("member-list");
+    ul.innerHTML = "";
+    for (const m of rows) {
+      const li = document.createElement("li");
+      li.textContent = `${m.display_name} — ${m.role}${m.active ? "" : " (inactive)"} `;
+      const btn = document.createElement("button");
+      btn.textContent = m.active ? "Deactivate" : "Reactivate";
+      btn.addEventListener("click", async () => {
+        await fetch(`/api/members/${m.user}/active`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ active: !m.active }),
+        });
+        loadMembers();
+      });
+      li.appendChild(btn);
+      ul.appendChild(li);
+    }
+  }
+
+  const memberForm = document.getElementById("member-form");
+  const memberErr = document.getElementById("member-error");
+  const memberTok = document.getElementById("member-token");
+  if (memberForm) {
+    memberForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      memberErr.hidden = true;
+      memberTok.hidden = true;
+      const fd = new FormData(memberForm);
+      const res = await fetch("/api/members", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          role: fd.get("role"),
+          display_name: fd.get("display_name"),
+          initial_secret: fd.get("initial_secret"),
+        }),
+      });
+      if (!res.ok) {
+        memberErr.textContent = "Could not add member.";
+        memberErr.hidden = false;
+        return;
+      }
+      const added = await res.json();
+      memberTok.textContent = `Pairing token for ${fd.get("display_name")}: ${added.token}`;
+      memberTok.hidden = false;
+      memberForm.reset();
+      loadMembers();
+    });
+  }
 
   // ── Generic catalog list/archive (items, achievements) ───────────────────────
   async function loadCatalog(kind, listId) {

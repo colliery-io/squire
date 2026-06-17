@@ -4,14 +4,14 @@ level: task
 title: "Keep: member administration (add Knights/Squires, mint tokens, audit)"
 short_code: "SQUIRE-T-0028"
 created_at: 2026-06-17T11:09:58.675568+00:00
-updated_at: 2026-06-17T11:09:58.675568+00:00
+updated_at: 2026-06-17T11:36:12.550114+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Keep **member administration**: add Knights & Squires and mint their tenant-scoped tokens via the Identity component, and list members with audit ("who added / last changed X"). All member writes go through the one single-writer store the Keep holds.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -45,6 +45,7 @@ use identity::{Identity, Principal, ProdIdentity, SharedStore, TokenSigner};
 
 pub mod achievements;
 pub mod items;
+pub mod members;
 pub mod quests;
 
 /// Embedded web UI assets (`assets/`), baked into the binary so the Keep is one self-contained
@@ -126,6 +127,18 @@ impl KeepState {
     /// A fresh snapshot under the store lock (reads are pure over it afterwards).
     pub fn snapshot(&self) -> Snapshot {
         self.store.lock().expect("store mutex poisoned").snapshot()
+    }
+
+    /// Apply `changes` directly through the single writer, stamping `by`. For member administration
+    /// (`PutUser` / `SetUserActive`) which — like the identity component's member writes — is a
+    /// direct store write, NOT an engine `Command`. Authoring/claim/redemption commands go through
+    /// [`commit`](Self::commit) instead.
+    pub fn apply_changes(
+        &self,
+        by: Option<UserId>,
+        changes: &[Change],
+    ) -> Result<(), domain_core::contract::RepoError> {
+        self.store.lock().expect("store mutex poisoned").apply(by, changes)
     }
 }
 
@@ -331,6 +344,9 @@ pub fn router(state: Arc<KeepState>) -> Router {
             get(achievements::list_achievements).post(achievements::create_achievement),
         )
         .route("/api/achievements/{id}/archive", post(achievements::archive_achievement))
+        // ── Member administration (SQUIRE-T-0028) ──────────────────────────────
+        .route("/api/members", get(members::list_members).post(members::add_member))
+        .route("/api/members/{id}/active", post(members::set_active))
         .with_state(state)
 }
 
