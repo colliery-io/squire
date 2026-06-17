@@ -4,14 +4,14 @@ level: task
 title: "Identity: tenant registry + provisioning/routing"
 short_code: "SQUIRE-T-0021"
 created_at: 2026-06-17T09:52:22.732130+00:00
-updated_at: 2026-06-17T09:52:22.732130+00:00
+updated_at: 2026-06-17T10:04:23.953626+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 In `crates/identity`, implement the tenant registry plus provisioning/routing on top of `store::Provisioner`. This task RESOLVES the "tenant-registry storage & routing" and "how provisioning invokes migrations" decision areas. A tenant is a Household, fully isolated per ADR A-0002 (SQLite file-per-tenant / Postgres schema-per-tenant).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
