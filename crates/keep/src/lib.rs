@@ -47,6 +47,7 @@ pub mod achievements;
 pub mod inspector;
 pub mod items;
 pub mod members;
+pub mod pair;
 pub mod quests;
 pub mod review;
 
@@ -387,6 +388,8 @@ pub fn router(state: Arc<KeepState>) -> Router {
         // ── Member administration (SQUIRE-T-0028) ──────────────────────────────
         .route("/api/members", get(members::list_members).post(members::add_member))
         .route("/api/members/{id}/active", post(members::set_active))
+        // Device pairing (ADR A-0010): mint a one-time code + QR for a chosen member.
+        .route("/api/pair/codes", post(pair::mint_pair_code))
         // ── Cross-Squire review queue + redeem + adjust (SQUIRE-T-0029) ─────────
         .route("/api/review", get(review::get_review))
         .route("/api/review/claim", post(review::review_claim))

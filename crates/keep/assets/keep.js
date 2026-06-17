@@ -24,7 +24,7 @@
     document.getElementById("login").hidden = true;
     document.getElementById("who").textContent = `${who.display_name || "Knight"} (#${who.user})`;
     document.getElementById("shell").hidden = false;
-    for (const id of ["review-panel", "quests-panel", "items-panel", "achievements-panel", "members-panel", "log-panel"]) {
+    for (const id of ["review-panel", "quests-panel", "items-panel", "achievements-panel", "members-panel", "pair-panel", "log-panel"]) {
       document.getElementById(id).hidden = false;
     }
     loadReview();
@@ -33,6 +33,7 @@
     loadCatalog("items", "item-list");
     loadCatalog("achievements", "achievement-list");
     loadMembers();
+    loadPairMembers();
   });
 
   // ── Review queue (T-0029) ────────────────────────────────────────────────────
@@ -256,10 +257,56 @@
       document.getElementById("login").hidden = true;
       document.getElementById("who").textContent = `${who.display_name || "Admin"} (#${who.user})`;
       document.getElementById("shell").hidden = false;
-      for (const id of ["review-panel", "quests-panel", "items-panel", "achievements-panel", "members-panel", "log-panel"]) {
+      for (const id of ["review-panel", "quests-panel", "items-panel", "achievements-panel", "members-panel", "pair-panel", "log-panel"]) {
         document.getElementById(id).hidden = false;
       }
-      loadReview(); loadQuests(); loadAchScopeQuests(); loadCatalog("items", "item-list"); loadCatalog("achievements", "achievement-list"); loadMembers();
+      loadReview(); loadQuests(); loadAchScopeQuests(); loadCatalog("items", "item-list"); loadCatalog("achievements", "achievement-list"); loadMembers(); loadPairMembers();
+    });
+  }
+
+  // ── Device pairing (ADR A-0010 / T-0045) ─────────────────────────────────────
+  // Populate the member dropdown, then mint a one-time code + QR for the chosen member.
+  async function loadPairMembers() {
+    const sel = document.getElementById("pair-member");
+    if (!sel) return;
+    const res = await fetch("/api/members");
+    if (!res.ok) return;
+    const rows = await res.json();
+    sel.innerHTML = "";
+    for (const m of rows.filter((m) => m.active)) {
+      const opt = document.createElement("option");
+      opt.value = m.user;
+      opt.textContent = `${m.display_name} — ${m.role}`;
+      sel.appendChild(opt);
+    }
+  }
+
+  const pairForm = document.getElementById("pair-form");
+  if (pairForm) {
+    pairForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const err = document.getElementById("pair-error");
+      const result = document.getElementById("pair-result");
+      err.hidden = true;
+      result.hidden = true;
+      const user = document.getElementById("pair-member").value;
+      const res = await fetch("/api/pair/codes", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ user }),
+      });
+      if (!res.ok) {
+        err.textContent = "Could not mint a pairing code.";
+        err.hidden = false;
+        return;
+      }
+      const p = await res.json();
+      document.getElementById("pair-qr").innerHTML = p.qr_svg;
+      document.getElementById("pair-code").textContent = p.code;
+      const mins = Math.max(0, Math.round((p.expires_at - Date.now()) / 60000));
+      document.getElementById("pair-expiry").textContent =
+        `Reaches ${p.host}:${p.port} · household "${p.household}" · expires in ~${mins} min (single use).`;
+      result.hidden = false;
     });
   }
 

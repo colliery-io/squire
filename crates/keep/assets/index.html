@@ -44,6 +44,7 @@
         <a href="#review">Review</a> ·
         <a href="#items">Items</a> ·
         <a href="#members">Members</a> ·
+        <a href="#pair">Pair</a> ·
         <a href="#log">Log</a>
       </nav>
     </section>
@@ -175,6 +176,25 @@
       <p id="member-token" class="sub" hidden></p>
       <p id="member-error" class="error" hidden></p>
       <ul id="member-list"></ul>
+    </section>
+
+    <!-- Device pairing (ADR SQUIRE-A-0010 / T-0045): mint a one-time code + QR for a member's phone.
+         The phone scans the QR (or types the code) and exchanges it at the LAN api's POST /pair. -->
+    <section id="pair-panel" hidden>
+      <h2 id="pair">Pair a device</h2>
+      <form id="pair-form">
+        <label>Member
+          <select name="user" id="pair-member"></select>
+        </label>
+        <button type="submit">Generate pairing QR</button>
+      </form>
+      <p id="pair-error" class="error" hidden></p>
+      <div id="pair-result" hidden>
+        <div id="pair-qr"></div>
+        <p class="sub">Scan from the Squire/Knight app, or enter this code manually:</p>
+        <p><code id="pair-code"></code></p>
+        <p class="sub" id="pair-expiry"></p>
+      </div>
     </section>
 
     <!-- Read-only event-log inspector (SQUIRE-T-0030): trace how a balance/streak was reached. -->
