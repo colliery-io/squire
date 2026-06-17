@@ -1,0 +1,26 @@
+# Test infrastructure for Squire's dual-backend store (ADR SQUIRE-A-0003).
+# Brings up a Postgres instance so the `store` crate's Postgres integration tests can run
+# (the SQLite backend needs no service — it's a bundled file DB). Port 5433 avoids clashing
+# with any local Postgres on 5432.
+#
+#   docker compose up -d postgres        # start
+#   DATABASE_URL=postgres://squire:squire@localhost:55432/squire_test \
+#     PQ_LIB_DIR=$(pg_config --libdir) \
+#     cargo test -p store --features postgres
+#   docker compose down                  # stop
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: squire
+      POSTGRES_PASSWORD: squire
+      POSTGRES_DB: squire_test
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U squire -d squire_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs:
+      - /var/lib/postgresql/data   # ephemeral: test data lives only for the container's life

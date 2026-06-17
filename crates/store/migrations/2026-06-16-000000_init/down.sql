@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS idx_events_squire;
+DROP INDEX IF EXISTS idx_events_item;
+DROP INDEX IF EXISTS idx_events_quest;
+DROP INDEX IF EXISTS idx_events_seq;
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS achievements;
+DROP TABLE IF EXISTS items;
+DROP TABLE IF EXISTS quests;
+DROP TABLE IF EXISTS users;

@@ -1,0 +1,21 @@
+[package]
+name = "store"
+version = "0.1.0"
+edition = "2021"
+description = "Squire — Diesel-backed persistence (Repository + Clock) for the domain core, per task SQUIRE-T-0008"
+
+[dependencies]
+domain-core = { path = "../domain-core" }
+diesel = { version = "2.2", default-features = false, features = ["sqlite", "64-column-tables"] }
+diesel_migrations = "2.2"
+# Bundled SQLite so no system sqlite is needed for the default build.
+libsqlite3-sys = { version = "0.30", features = ["bundled"] }
+
+[features]
+default = []
+# Postgres is OPT-IN: enabling it pulls diesel's postgres backend, which requires
+# a system libpq at build/link time. Not exercised in the default build/tests.
+postgres = ["diesel/postgres"]
+
+[dev-dependencies]
+tempfile = "3"
