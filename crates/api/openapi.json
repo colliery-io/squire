@@ -1,0 +1,1475 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Squire Local API",
+    "description": "The LAN HTTP wire contract for the Squire household reward system — emitted from the Rust types (ADR SQUIRE-A-0009). IDs are int64 on the wire (a 'fits in i64' invariant).",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/admin/adjust": {
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/adjust` — a Knight balance override on `squire`. An empty / whitespace reason is\nrejected with **400** before the engine is touched. Idempotent on `command_id`.",
+        "operationId": "adjust",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ack"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Blank reason"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "Squire not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/admin/mark-done": {
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/mark-done` — the Knight marks a quest done *for* a Squire: submit the claim\n(`by = None`, child submission) then immediately approve it (acting Knight). Two commands\nthrough the shared writer. The `claim_id` is Knight-minted so a retried outbox is idempotent:\nthe submit replay no-ops, and a re-approve of the now-resolved claim is `AlreadyReviewed` →\n409 (a genuine second mark-done), which is correct.",
+        "operationId": "mark_done",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkDoneReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ack"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight, or occurrence taken"
+          },
+          "404": {
+            "description": "Quest or Squire not found"
+          },
+          "409": {
+            "description": "Already reviewed"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/admin/redeem": {
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/redeem` — a direct Knight redeem for `squire`. `by = None` (an activity event,\nnot authoring). Idempotent on `command_id`: an empty-changeset replay is treated as success.",
+        "operationId": "redeem",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ack"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "Item or Squire not found"
+          },
+          "409": {
+            "description": "Redeem blocked by current state"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/admin/review-claim": {
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/review-claim` — approve / reject a Squire's pending completion claim. The acting\nKnight is the token's user. A second review of an already-resolved claim is `AlreadyReviewed`\n→ 409.",
+        "operationId": "review_claim",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewClaimReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ack"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "Claim not found"
+          },
+          "409": {
+            "description": "Claim already reviewed"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/admin/review-redemption": {
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/review-redemption` — approve (→ `ItemRedeemed`) / reject a Squire's redemption\nrequest. A second review is `AlreadyReviewed` → 409.",
+        "operationId": "review_redemption",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRedemptionReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ack"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "Request not found"
+          },
+          "409": {
+            "description": "Request already reviewed, or blocked at commit"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/claims": {
+      "post": {
+        "tags": [
+          "squire"
+        ],
+        "summary": "`POST /claims` (RequireSquire) — submit a completion claim for the authenticated Squire.\nIdempotent on the phone-minted `claim_id` (a replay returns the current state). Returns the\nresulting [`ClaimState`] (`Pending`, or `Approved { points }` if the quest auto-approves).",
+        "operationId": "submit_claim",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitClaimReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The claim's resulting state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitClaimResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Squire, or not allowed to act on this occurrence"
+          },
+          "404": {
+            "description": "Quest not found"
+          },
+          "409": {
+            "description": "Already claimed today"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/household-review": {
+      "get": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`GET /household-review` — the Knight's cross-Squire triage view, assembled from one snapshot:\nevery active Squire with a clamped balance, plus the household-wide pending claims and pending\nredemption requests (each labelled with its Squire and the quest/item name).",
+        "operationId": "household_review",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cross-Squire triage view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdReview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/login": {
+      "post": {
+        "tags": [
+          "control"
+        ],
+        "summary": "`POST /login` (unauthenticated) — exchange a member secret for a tenant-scoped token. A bad\nsecret (or unknown member) is a 401.",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A tenant-scoped token and the member's role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bad secret or unknown member"
+          }
+        }
+      }
+    },
+    "/members": {
+      "post": {
+        "tags": [
+          "control"
+        ],
+        "summary": "`POST /members` ([`RequireKnight`]) — add a member (Knight or Squire). The acting caller comes\nfrom the verified token; a Squire token never reaches here (the extractor 403s it).",
+        "operationId": "add_member",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMemberReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The new member's user id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddMemberResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/redemption-requests": {
+      "post": {
+        "tags": [
+          "squire"
+        ],
+        "summary": "`POST /redemption-requests` (RequireSquire) — record a redemption request for the\nauthenticated Squire. No affordability check (it is re-checked at approval time). Idempotent\non the phone-minted `request_id`; always reports `Pending` (a fresh request is never resolved\nin the same call, and an idempotent replay returns the still-pending request).",
+        "operationId": "request_redemption",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestRedemptionReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The redemption request's state (always Pending)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestRedemptionResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Squire"
+          },
+          "404": {
+            "description": "Item not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/register": {
+      "post": {
+        "tags": [
+          "control"
+        ],
+        "summary": "`POST /register` (unauthenticated) — create a household + seed its first Knight, returning the\nnew handle, the admin's [`UserId`](domain_core::contract::UserId), and the admin's token.",
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterHouseholdReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Household created; returns the handle, admin id, and admin token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterHouseholdResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state": {
+      "get": {
+        "tags": [
+          "squire"
+        ],
+        "summary": "`GET /state` (RequireSquire) — assemble the authenticated Squire's full [`StateView`] from a\nsingle snapshot. Returns 200 JSON; the Squire is always `principal.user` (token-derived).",
+        "operationId": "get_state",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The authenticated Squire's full state view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Squire"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AchievementId": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "Ack": {
+        "type": "object",
+        "description": "The small JSON ack every quick-action returns on success.",
+        "required": [
+          "ok"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AddMemberReq": {
+        "type": "object",
+        "description": "Knight-only — add a member (Knight or Squire). No assumed counts or family shape.",
+        "required": [
+          "role",
+          "display_name",
+          "initial_secret"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "initial_secret": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          }
+        }
+      },
+      "AddMemberResp": {
+        "type": "object",
+        "required": [
+          "user"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
+      "AdjustReq": {
+        "type": "object",
+        "description": "`POST /admin/adjust` body — a Knight balance override on `squire`. Deduped on `command_id`.",
+        "required": [
+          "command_id",
+          "squire",
+          "amount",
+          "reason"
+        ],
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "command_id": {
+            "$ref": "#/components/schemas/CommandId"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "squire": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
+      "AuthToken": {
+        "type": "string",
+        "description": "A tenant-scoped bearer token proving (household, user, role). Presented on every call."
+      },
+      "Category": {
+        "type": "string",
+        "description": "Free-form text labels — the parent types whatever grouping they like."
+      },
+      "ClaimId": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "ClaimState": {
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "Pending"
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "Approved"
+            ],
+            "properties": {
+              "Approved": {
+                "type": "object",
+                "required": [
+                  "points"
+                ],
+                "properties": {
+                  "points": {
+                    "$ref": "#/components/schemas/u32"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "Rejected"
+            ],
+            "properties": {
+              "Rejected": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ClaimStatus": {
+        "type": "object",
+        "required": [
+          "claim_id",
+          "quest_title",
+          "on",
+          "state"
+        ],
+        "properties": {
+          "claim_id": {
+            "$ref": "#/components/schemas/ClaimId"
+          },
+          "on": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "quest_title": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ClaimState"
+          }
+        }
+      },
+      "CommandId": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Client-minted idempotency key for privileged commands that lack a natural one\n(`RedeemItem` direct, `AdjustPoints`). The parent phone's offline outbox mints it\nonce and reuses it on every retry; the engine dedupes by finding an emitted event\nthat already carries it, so retry-safety stays *derived from the append-only log*\n— the same mechanism as `claim_id` / `request_id`. See ADR SQUIRE-A-0001."
+      },
+      "Date": {
+        "type": "integer",
+        "format": "int32"
+      },
+      "DecisionDto": {
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "approve"
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "reject"
+            ],
+            "properties": {
+              "reject": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "description": "A review decision as it arrives on the wire: `approve`, or `reject` with an optional reason.\nMaps onto the domain [`Decision`]. Tagged so the JSON is `{\"approve\":{}}` / `{\"reject\":{...}}`."
+      },
+      "HouseholdHandle": {
+        "type": "string",
+        "description": "Opaque handle a paired device presents to route to its household (and, hosted, to\nselect the schema — ADR SQUIRE-A-0002). Established at registration/pairing."
+      },
+      "HouseholdReview": {
+        "type": "object",
+        "description": "Parent (Knight) review read — pending work across ALL Squires, each labeled with its\nSquire, plus per-Squire balances. The Knight renders/triages this; the exact shape is\nstill an open decision in SQUIRE-S-0003 / S-0006.",
+        "required": [
+          "generated_at",
+          "squires",
+          "pending_claims",
+          "pending_requests"
+        ],
+        "properties": {
+          "generated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "pending_claims": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingClaim"
+            }
+          },
+          "pending_requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingRequest"
+            }
+          },
+          "squires": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SquireSummary"
+            }
+          }
+        }
+      },
+      "ItemId": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "LockReason": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "NeedsAchievement"
+            ],
+            "properties": {
+              "NeedsAchievement": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "string",
+            "enum": [
+              "OutOfStock"
+            ]
+          }
+        ]
+      },
+      "LoginReq": {
+        "type": "object",
+        "description": "POST /login (or device pair) — exchange a member secret for a tenant-scoped token.",
+        "required": [
+          "household",
+          "user",
+          "secret"
+        ],
+        "properties": {
+          "household": {
+            "$ref": "#/components/schemas/HouseholdHandle"
+          },
+          "secret": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
+      "LoginResp": {
+        "type": "object",
+        "required": [
+          "token",
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "token": {
+            "$ref": "#/components/schemas/AuthToken"
+          }
+        }
+      },
+      "MarkDoneReq": {
+        "type": "object",
+        "description": "`POST /admin/mark-done` body — submit-then-approve a claim for `squire` in one shot. The\n`claim_id` is Knight-minted for idempotency.",
+        "required": [
+          "claim_id",
+          "squire",
+          "quest_id",
+          "on"
+        ],
+        "properties": {
+          "claim_id": {
+            "$ref": "#/components/schemas/ClaimId"
+          },
+          "on": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "quest_id": {
+            "$ref": "#/components/schemas/QuestId"
+          },
+          "squire": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
+      "PendingClaim": {
+        "type": "object",
+        "required": [
+          "claim_id",
+          "squire",
+          "quest_title",
+          "on"
+        ],
+        "properties": {
+          "claim_id": {
+            "$ref": "#/components/schemas/ClaimId"
+          },
+          "on": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "quest_title": {
+            "type": "string"
+          },
+          "squire": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
+      "PendingRequest": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "squire",
+          "item_name",
+          "cost"
+        ],
+        "properties": {
+          "cost": {
+            "$ref": "#/components/schemas/u32"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/RequestId"
+          },
+          "squire": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
+      "QuestCard": {
+        "type": "object",
+        "required": [
+          "quest_id",
+          "title",
+          "reward",
+          "on",
+          "status"
+        ],
+        "properties": {
+          "category": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Category"
+              }
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "on": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "quest_id": {
+            "$ref": "#/components/schemas/QuestId"
+          },
+          "reward": {
+            "$ref": "#/components/schemas/u32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/QuestStatus"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "QuestId": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "QuestStatus": {
+        "type": "string",
+        "enum": [
+          "Available",
+          "Pending",
+          "CompletedToday",
+          "TakenByOther"
+        ]
+      },
+      "RedeemReq": {
+        "type": "object",
+        "description": "`POST /admin/redeem` body — a direct Knight redeem on a target `squire`. Deduped on\n`command_id`.",
+        "required": [
+          "command_id",
+          "squire",
+          "item_id"
+        ],
+        "properties": {
+          "command_id": {
+            "$ref": "#/components/schemas/CommandId"
+          },
+          "item_id": {
+            "$ref": "#/components/schemas/ItemId"
+          },
+          "squire": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
+      "RedemptionState": {
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "Pending"
+            ]
+          },
+          {
+            "type": "string",
+            "enum": [
+              "Approved"
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "Rejected"
+            ],
+            "properties": {
+              "Rejected": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "RedemptionStatus": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "item_name",
+          "cost",
+          "state"
+        ],
+        "properties": {
+          "cost": {
+            "$ref": "#/components/schemas/u32"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/RequestId"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RedemptionState"
+          }
+        }
+      },
+      "RegisterHouseholdReq": {
+        "type": "object",
+        "description": "POST /register — create a Household (tenant) + seed its first Knight (admin); provisions\nan isolated schema. Returns the handle and the admin's token.",
+        "required": [
+          "household_name",
+          "admin_name",
+          "admin_secret"
+        ],
+        "properties": {
+          "admin_name": {
+            "type": "string"
+          },
+          "admin_secret": {
+            "type": "string"
+          },
+          "household_name": {
+            "type": "string"
+          }
+        }
+      },
+      "RegisterHouseholdResp": {
+        "type": "object",
+        "required": [
+          "household",
+          "admin",
+          "token"
+        ],
+        "properties": {
+          "admin": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "household": {
+            "$ref": "#/components/schemas/HouseholdHandle"
+          },
+          "token": {
+            "$ref": "#/components/schemas/AuthToken"
+          }
+        }
+      },
+      "RequestId": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "RequestRedemptionReq": {
+        "type": "object",
+        "description": "POST /redemption-requests — idempotent on `request_id` (phone-minted), same as claims.\nAffordability is re-checked at approval time, so a request can be made even if the\nbalance is borderline; the parent sees whether it still clears when they review.",
+        "required": [
+          "request_id",
+          "item_id"
+        ],
+        "properties": {
+          "item_id": {
+            "$ref": "#/components/schemas/ItemId"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/RequestId"
+          }
+        }
+      },
+      "RequestRedemptionResp": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "state"
+        ],
+        "properties": {
+          "request_id": {
+            "$ref": "#/components/schemas/RequestId"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RedemptionState"
+          }
+        }
+      },
+      "ReviewClaimReq": {
+        "type": "object",
+        "description": "`POST /admin/review-claim` body. `actor` is the acting Knight, filled from the token.",
+        "required": [
+          "claim_id",
+          "decision"
+        ],
+        "properties": {
+          "claim_id": {
+            "$ref": "#/components/schemas/ClaimId"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionDto"
+          }
+        }
+      },
+      "ReviewRedemptionReq": {
+        "type": "object",
+        "description": "`POST /admin/review-redemption` body.",
+        "required": [
+          "request_id",
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/DecisionDto"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/RequestId"
+          }
+        }
+      },
+      "RewardCard": {
+        "type": "object",
+        "required": [
+          "item_id",
+          "name",
+          "cost",
+          "affordable"
+        ],
+        "properties": {
+          "affordable": {
+            "type": "boolean"
+          },
+          "cost": {
+            "$ref": "#/components/schemas/u32"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "item_id": {
+            "$ref": "#/components/schemas/ItemId"
+          },
+          "last_redeemed": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              }
+            ]
+          },
+          "lock": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LockReason"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Role": {
+        "type": "string",
+        "enum": [
+          "Knight",
+          "Squire"
+        ]
+      },
+      "SquireSummary": {
+        "type": "object",
+        "required": [
+          "squire",
+          "display_name",
+          "balance"
+        ],
+        "properties": {
+          "balance": {
+            "$ref": "#/components/schemas/u32"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "squire": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
+      "StateView": {
+        "type": "object",
+        "description": "GET /state — everything a Squire's phone renders, fully cacheable for offline use.\nScoped to one Squire (`squire`); the Knight's review queue is a separate parent read\n(`HouseholdReview`).",
+        "required": [
+          "squire",
+          "generated_at",
+          "balance",
+          "quests_today",
+          "streaks",
+          "rewards",
+          "my_claims",
+          "my_requests"
+        ],
+        "properties": {
+          "balance": {
+            "$ref": "#/components/schemas/u32"
+          },
+          "generated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "my_claims": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClaimStatus"
+            }
+          },
+          "my_requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RedemptionStatus"
+            }
+          },
+          "quests_today": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestCard"
+            }
+          },
+          "rewards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RewardCard"
+            }
+          },
+          "squire": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "streaks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StreakView"
+            }
+          }
+        }
+      },
+      "StreakView": {
+        "type": "object",
+        "required": [
+          "name",
+          "current",
+          "best",
+          "alive"
+        ],
+        "properties": {
+          "alive": {
+            "type": "boolean"
+          },
+          "best": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "current": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "next_milestone": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "SubmitClaimReq": {
+        "type": "object",
+        "description": "POST /claims — idempotent on `claim_id` (the phone mints it), so the offline\noutbox can retry safely. Returns Pending, or Approved if the quest auto-approves.",
+        "required": [
+          "claim_id",
+          "quest_id",
+          "on"
+        ],
+        "properties": {
+          "claim_id": {
+            "$ref": "#/components/schemas/ClaimId"
+          },
+          "on": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "quest_id": {
+            "$ref": "#/components/schemas/QuestId"
+          }
+        }
+      },
+      "SubmitClaimResp": {
+        "type": "object",
+        "required": [
+          "claim_id",
+          "state"
+        ],
+        "properties": {
+          "claim_id": {
+            "$ref": "#/components/schemas/ClaimId"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ClaimState"
+          }
+        }
+      },
+      "Timestamp": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "UserId": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Identifies a household member. A household has one-or-more Knights (adult/parent) and\nSquires (child/player) — counts are fixed nowhere. Player activity is attributed to a\nSquire via this id. See ADR SQUIRE-A-0004. (Tenancy is schema-level and absent from\nthese types — ADR SQUIRE-A-0002.)"
+      },
+      "u32": {
+        "type": "integer",
+        "format": "int32",
+        "minimum": 0
+      }
+    },
+    "securitySchemes": {
+      "bearer_auth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Tenant-scoped bearer token (proves household, user, role)."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "squire",
+      "description": "Squire-role endpoints (the child phone)."
+    },
+    {
+      "name": "knight",
+      "description": "Knight-role privileged endpoints (the parent phone)."
+    },
+    {
+      "name": "control",
+      "description": "Control plane: registration, login, member management."
+    }
+  ]
+}

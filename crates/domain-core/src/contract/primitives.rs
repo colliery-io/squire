@@ -4,21 +4,36 @@
 pub type Points = u32;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Date(pub i32); //   days since an epoch
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Timestamp(pub i64); // unix millis
 
+// The `u128` id newtypes are schema-typed `int64` (A-0009 invariant): ids stay numeric on the
+// wire (runtime serde is unchanged — still `u128`), but the schema advertises `integer`/`int64`
+// since every minted id fits in i64 with room to spare.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(value_type = i64))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct QuestId(pub u128);
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(value_type = i64))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct ItemId(pub u128);
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(value_type = i64))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct AchievementId(pub u128);
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(value_type = i64))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct ClaimId(pub u128);
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(value_type = i64))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct RequestId(pub u128);
 /// Client-minted idempotency key for privileged commands that lack a natural one
 /// (`RedeemItem` direct, `AdjustPoints`). The parent phone's offline outbox mints it
@@ -26,6 +41,8 @@ pub struct Timestamp(pub i64); // unix millis
 /// that already carries it, so retry-safety stays *derived from the append-only log*
 /// — the same mechanism as `claim_id` / `request_id`. See ADR SQUIRE-A-0001.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(value_type = i64))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] pub struct CommandId(pub u128);
 
 /// Identifies a household member. A household has one-or-more Knights (adult/parent) and
@@ -33,9 +50,12 @@ pub struct Timestamp(pub i64); // unix millis
 /// Squire via this id. See ADR SQUIRE-A-0004. (Tenancy is schema-level and absent from
 /// these types — ADR SQUIRE-A-0002.)
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(value_type = i64))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)] pub struct UserId(pub u128);
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Role { Knight, Squire }
 
@@ -45,5 +65,6 @@ pub enum Weekday { Mon, Tue, Wed, Thu, Fri, Sat, Sun }
 
 /// Free-form text labels — the parent types whatever grouping they like.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Category(pub String);
