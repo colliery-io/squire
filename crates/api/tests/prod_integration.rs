@@ -440,3 +440,72 @@ async fn two_households_are_fully_isolated() {
     })
     .await;
 }
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// Concurrency — the api services requests concurrently; control-plane and feature writes share ONE
+// store, so they serialize on one lock/connection (AR-1) instead of racing as two connections.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+
+/// SQLite-only (this is where two uncoordinated connections would collide with `SQLITE_BUSY`): fire
+/// many concurrent `/admin/adjust` (control-adjacent feature writes) AND `/members` (control-plane
+/// writes via `ProdIdentity`) on separate tasks. With the shared store every write succeeds and
+/// applies exactly once — no lost updates, no busy errors.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_control_plane_and_feature_writes_serialize() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (state, _today) = prod_app(Backend::Sqlite { dir: dir.path().to_path_buf() }, "concurrent");
+    seed_quest_and_item(&state);
+    let reg = register(&state, "Concurrent", "Admin", "secret").await;
+    let handle = reg.household.0.clone();
+    let knight = reg.token.0.clone();
+    let squire_id = add_member(&state, &knight, &handle, "Squire", "Sib", "s").await;
+
+    const ADJUSTS: u128 = 12; // each +1, distinct command_id → total credit must equal ADJUSTS
+    const ADDS: usize = 8; // concurrent new squires via the control plane
+
+    let mut tasks = Vec::new();
+    for i in 0..ADJUSTS {
+        let (s, h, k) = (state.clone(), handle.clone(), knight.clone());
+        tasks.push(tokio::spawn(async move {
+            let (st, _) = post_json(
+                &s,
+                "/admin/adjust",
+                &k,
+                &h,
+                json!({ "command_id": 10_000 + i, "squire": squire_id, "amount": 1, "reason": "bump" }),
+            )
+            .await;
+            assert_eq!(st, StatusCode::OK, "concurrent adjust must succeed (no SQLITE_BUSY)");
+        }));
+    }
+    for i in 0..ADDS {
+        let (s, h, k) = (state.clone(), handle.clone(), knight.clone());
+        tasks.push(tokio::spawn(async move {
+            let (st, _) = post_json(
+                &s,
+                "/members",
+                &k,
+                &h,
+                json!({ "role": "Squire", "display_name": format!("Sq{i}"), "initial_secret": "x" }),
+            )
+            .await;
+            assert_eq!(st, StatusCode::OK, "concurrent add_member must succeed (no SQLITE_BUSY)");
+        }));
+    }
+    for t in tasks {
+        t.await.expect("task panicked");
+    }
+
+    // Exactly ADJUSTS credited (no lost updates) and exactly 1 + ADDS squires created (no races).
+    let (st, review) = get(&state, "/household-review", &knight, &handle).await;
+    assert_eq!(st, StatusCode::OK);
+    let squires = review["squires"].as_array().unwrap();
+    assert_eq!(squires.len(), 1 + ADDS, "every concurrent add_member created exactly one squire");
+    let balance = squires
+        .iter()
+        .find(|s| s["squire"] == squire_id as u64)
+        .expect("the funded squire")["balance"]
+        .as_i64()
+        .unwrap();
+    assert_eq!(balance, ADJUSTS as i64, "every concurrent adjust applied exactly once");
+}
