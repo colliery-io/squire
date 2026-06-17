@@ -4,14 +4,14 @@ level: task
 title: "API: control-plane endpoints (register / login / add-member)"
 short_code: "SQUIRE-T-0017"
 created_at: 2026-06-17T05:13:27.752950+00:00
-updated_at: 2026-06-17T05:37:50.012016+00:00
+updated_at: 2026-06-17T05:44:52.075937+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,11 +32,13 @@ Expose the three control-plane endpoints — register, login, add-member — by 
 
 ## Acceptance Criteria
 
-- [ ] `POST /register` (unauthenticated): `RegisterHouseholdReq` → Identity creates the household, provisions an isolated schema via `store::Provisioner`, and seeds the first Knight → `RegisterHouseholdResp{household, admin UserId, AuthToken}`.
-- [ ] `POST /login`: `LoginReq{household, user, secret}` → resolve tenant → Identity verifies the member → `LoginResp{AuthToken, Role}`.
-- [ ] Knight-only add-member: `AddMemberReq{role, display_name, initial_secret}` → Identity creates the member in the caller's tenant → `AddMemberResp{UserId}`; Knight token required, Squire token → 403.
-- [ ] Dev Identity implements these minimally: provision the tenant store, seed the first Knight, hold an in-memory secret→token map, and seed members via `PutUser` through the store's single writer. Secrets and tokens stay opaque on the wire; hashes are never returned. (S-0007 hardens with real hashing, registry, and multi-tenant.)
-- [ ] Tests: register → login → token works; add-member by a Knight succeeds; add-member by a Squire → 403.
+## Acceptance Criteria
+
+- [x] `POST /register` (unauthenticated): `RegisterHouseholdReq` → dev Identity mints a `HouseholdHandle` + the first **Knight** (seeded via `PutUser` through the single writer) + a token → `RegisterHouseholdResp{household, admin UserId, AuthToken}`. *(MVP single-tenant seeds into the app's one store; `store::Provisioner` multi-tenant provisioning is the hosted model owned by S-0007 — noted.)*
+- [x] `POST /login` (unauthenticated): `LoginReq{household, user, secret}` → verify secret → look up role from the store → `LoginResp{AuthToken, Role}`; bad secret → 401.
+- [x] `POST /members` (RequireKnight): `AddMemberReq{role, display_name, initial_secret}` → seed the member (any Knight/Squire) via `PutUser` → `AddMemberResp{UserId}`; Squire token → 403.
+- [x] Dev Identity shares the store `Arc<Mutex<…>>` with `AppState` (members visible to handlers immediately); in-memory `secrets`/`tokens` maps + a `u128` counter (no rand/clock-now); secrets/tokens opaque on the wire. (S-0007 hardens: real hashing, registry, multi-tenant.)
+- [x] `tests/control.rs` (4): register→Knight-token-works; add Squire→login→Squire-token reads `/state`; add-member by Squire→403; wrong secret→401.
 
 ## Implementation Notes
 
@@ -51,4 +53,6 @@ SQUIRE-T-0014 (crate scaffold, app state, Identity port) and `store::Provisioner
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Completed.** Added serde derives to the 8 identity DTOs (`HouseholdHandle`/`AuthToken`/`RegisterHouseholdReq/Resp`/`LoginReq/Resp`/`AddMemberReq/Resp`). Refactored `AppState.store` to a shared `SharedStore = Arc<Mutex<Store<SystemClock>>>` held by both `AppState` and `DevIdentity`, so identity's `PutUser` seeds are immediately visible to the request handlers (single writer). `DevIdentity` fleshed out: `register` (mint handle + first Knight via PutUser + token), `login` (verify in-memory secret → role from store → token), `add_member` (Knight-only, PutUser, secret recorded); in-memory `secrets`/`tokens` maps + a `Mutex<u128>` counter (deterministic, no rand/clock-now). `crates/api/src/control.rs`: `register`/`login` unauthenticated, `POST /members` `RequireKnight`; `AuthError`→status (Forbidden 403, others 401). T-0015/16/health test setup updated to share the store Arc.
+
+Results: `cargo test -p api` → lib 6 + control 4 + health 7 + knight 7 + squire 5 green; `cargo test -p domain-core` (default) → 70; `cargo test --workspace` green; warning-free. Committed.

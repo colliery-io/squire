@@ -4,14 +4,14 @@ level: task
 title: "API: trust-boundary, idempotency & HTTP integration tests"
 short_code: "SQUIRE-T-0018"
 created_at: 2026-06-17T05:13:28.795978+00:00
-updated_at: 2026-06-17T05:13:28.795978+00:00
+updated_at: 2026-06-17T05:45:01.364840+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Prove the trust boundary, idempotency, and core flows end to end over a real axum app (real Store + Engine + dev Identity). The trust-boundary tests are the crux deliverable of this initiative.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
