@@ -6,6 +6,7 @@ use super::*;
 /// Scoped to one Squire (`squire`); the Knight's review queue is a separate parent read
 /// (`HouseholdReview`).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct StateView {
     pub squire: UserId,
@@ -19,6 +20,7 @@ pub struct StateView {
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct QuestCard {
     pub quest_id: QuestId,
@@ -30,10 +32,12 @@ pub struct QuestCard {
     pub status: QuestStatus,
 }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Copy, Debug)]
 pub enum QuestStatus { Available, Pending, CompletedToday, TakenByOther } // TakenByOther: a Race quest claimed/won by a sibling
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct StreakView {
     pub name: String,
@@ -44,6 +48,7 @@ pub struct StreakView {
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct RewardCard {
     pub item_id: ItemId,
@@ -55,10 +60,12 @@ pub struct RewardCard {
     pub last_redeemed: Option<Timestamp>, // most recent redemption of this item (any Squire); informational
 }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub enum LockReason { NeedsAchievement { name: String }, OutOfStock }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct ClaimStatus {
     pub claim_id: ClaimId,
@@ -67,6 +74,7 @@ pub struct ClaimStatus {
     pub state: ClaimState,
 }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub enum ClaimState {
     Pending,
@@ -75,6 +83,7 @@ pub enum ClaimState {
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct RedemptionStatus {
     pub request_id: RequestId,
@@ -83,6 +92,7 @@ pub struct RedemptionStatus {
     pub state: RedemptionState,
 }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub enum RedemptionState {
     Pending,
@@ -93,9 +103,11 @@ pub enum RedemptionState {
 /// POST /claims — idempotent on `claim_id` (the phone mints it), so the offline
 /// outbox can retry safely. Returns Pending, or Approved if the quest auto-approves.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct SubmitClaimReq { pub claim_id: ClaimId, pub quest_id: QuestId, pub on: Date }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct SubmitClaimResp { pub claim_id: ClaimId, pub state: ClaimState }
 
@@ -103,9 +115,11 @@ pub struct SubmitClaimResp { pub claim_id: ClaimId, pub state: ClaimState }
 /// Affordability is re-checked at approval time, so a request can be made even if the
 /// balance is borderline; the parent sees whether it still clears when they review.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct RequestRedemptionReq { pub request_id: RequestId, pub item_id: ItemId }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct RequestRedemptionResp { pub request_id: RequestId, pub state: RedemptionState }
 
@@ -113,6 +127,7 @@ pub struct RequestRedemptionResp { pub request_id: RequestId, pub state: Redempt
 /// Squire, plus per-Squire balances. The Knight renders/triages this; the exact shape is
 /// still an open decision in SQUIRE-S-0003 / S-0006.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct HouseholdReview {
     pub generated_at: Timestamp,
@@ -121,12 +136,15 @@ pub struct HouseholdReview {
     pub pending_requests: Vec<PendingRequest>,
 }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct SquireSummary { pub squire: UserId, pub display_name: String, pub balance: Points }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct PendingClaim { pub claim_id: ClaimId, pub squire: UserId, pub quest_title: String, pub on: Date }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct PendingRequest { pub request_id: RequestId, pub squire: UserId, pub item_name: String, pub cost: Points }
 
@@ -142,32 +160,40 @@ pub struct PendingRequest { pub request_id: RequestId, pub squire: UserId, pub i
 /// Opaque handle a paired device presents to route to its household (and, hosted, to
 /// select the schema — ADR SQUIRE-A-0002). Established at registration/pairing.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, PartialEq, Eq, Hash, Debug)] pub struct HouseholdHandle(pub String);
 /// A tenant-scoped bearer token proving (household, user, role). Presented on every call.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)] pub struct AuthToken(pub String);
 
 /// POST /register — create a Household (tenant) + seed its first Knight (admin); provisions
 /// an isolated schema. Returns the handle and the admin's token.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct RegisterHouseholdReq { pub household_name: String, pub admin_name: String, pub admin_secret: String }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct RegisterHouseholdResp { pub household: HouseholdHandle, pub admin: UserId, pub token: AuthToken }
 
 /// Knight-only — add a member (Knight or Squire). No assumed counts or family shape.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct AddMemberReq { pub role: Role, pub display_name: String, pub initial_secret: String }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct AddMemberResp { pub user: UserId }
 
 /// POST /login (or device pair) — exchange a member secret for a tenant-scoped token.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct LoginReq { pub household: HouseholdHandle, pub user: UserId, pub secret: String }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
 pub struct LoginResp { pub token: AuthToken, pub role: Role }

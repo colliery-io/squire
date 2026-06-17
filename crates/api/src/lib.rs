@@ -17,6 +17,7 @@
 pub mod auth;
 pub mod control;
 pub mod knight;
+pub mod openapi;
 pub mod squire;
 pub mod state;
 
@@ -26,6 +27,7 @@ use std::sync::Arc;
 use axum::routing::{get, post};
 use axum::Router;
 
+pub use openapi::{openapi_doc, ApiDoc};
 pub use state::AppState;
 
 /// Build the application [`Router`] with the shared [`AppState`] wired in.

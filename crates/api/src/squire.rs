@@ -29,6 +29,20 @@ use crate::state::AppState;
 
 /// `GET /state` (RequireSquire) — assemble the authenticated Squire's full [`StateView`] from a
 /// single snapshot. Returns 200 JSON; the Squire is always `principal.user` (token-derived).
+#[utoipa::path(
+    get,
+    path = "/state",
+    tag = "squire",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    responses(
+        (status = 200, description = "The authenticated Squire's full state view", body = StateView),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Squire"),
+    ),
+)]
 pub async fn get_state(
     State(state): State<Arc<AppState>>,
     RequireSquire(principal): RequireSquire,
@@ -46,6 +60,23 @@ pub async fn get_state(
 /// `POST /claims` (RequireSquire) — submit a completion claim for the authenticated Squire.
 /// Idempotent on the phone-minted `claim_id` (a replay returns the current state). Returns the
 /// resulting [`ClaimState`] (`Pending`, or `Approved { points }` if the quest auto-approves).
+#[utoipa::path(
+    post,
+    path = "/claims",
+    tag = "squire",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    request_body = SubmitClaimReq,
+    responses(
+        (status = 200, description = "The claim's resulting state", body = SubmitClaimResp),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Squire, or not allowed to act on this occurrence"),
+        (status = 404, description = "Quest not found"),
+        (status = 409, description = "Already claimed today"),
+    ),
+)]
 pub async fn submit_claim(
     State(state): State<Arc<AppState>>,
     RequireSquire(principal): RequireSquire,
@@ -76,6 +107,22 @@ pub async fn submit_claim(
 /// authenticated Squire. No affordability check (it is re-checked at approval time). Idempotent
 /// on the phone-minted `request_id`; always reports `Pending` (a fresh request is never resolved
 /// in the same call, and an idempotent replay returns the still-pending request).
+#[utoipa::path(
+    post,
+    path = "/redemption-requests",
+    tag = "squire",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    request_body = RequestRedemptionReq,
+    responses(
+        (status = 200, description = "The redemption request's state (always Pending)", body = RequestRedemptionResp),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Squire"),
+        (status = 404, description = "Item not found"),
+    ),
+)]
 pub async fn request_redemption(
     State(state): State<Arc<AppState>>,
     RequireSquire(principal): RequireSquire,

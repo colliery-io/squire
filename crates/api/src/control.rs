@@ -41,6 +41,15 @@ fn status_for(err: AuthError) -> StatusCode {
 
 /// `POST /register` (unauthenticated) — create a household + seed its first Knight, returning the
 /// new handle, the admin's [`UserId`](domain_core::contract::UserId), and the admin's token.
+#[utoipa::path(
+    post,
+    path = "/register",
+    tag = "control",
+    request_body = RegisterHouseholdReq,
+    responses(
+        (status = 200, description = "Household created; returns the handle, admin id, and admin token", body = RegisterHouseholdResp),
+    ),
+)]
 pub async fn register(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RegisterHouseholdReq>,
@@ -50,6 +59,16 @@ pub async fn register(
 
 /// `POST /login` (unauthenticated) — exchange a member secret for a tenant-scoped token. A bad
 /// secret (or unknown member) is a 401.
+#[utoipa::path(
+    post,
+    path = "/login",
+    tag = "control",
+    request_body = LoginReq,
+    responses(
+        (status = 200, description = "A tenant-scoped token and the member's role", body = LoginResp),
+        (status = 401, description = "Bad secret or unknown member"),
+    ),
+)]
 pub async fn login(
     State(state): State<Arc<AppState>>,
     Json(req): Json<LoginReq>,
@@ -59,6 +78,21 @@ pub async fn login(
 
 /// `POST /members` ([`RequireKnight`]) — add a member (Knight or Squire). The acting caller comes
 /// from the verified token; a Squire token never reaches here (the extractor 403s it).
+#[utoipa::path(
+    post,
+    path = "/members",
+    tag = "control",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    request_body = AddMemberReq,
+    responses(
+        (status = 200, description = "The new member's user id", body = AddMemberResp),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+    ),
+)]
 pub async fn add_member(
     State(state): State<Arc<AppState>>,
     RequireKnight(principal): RequireKnight,

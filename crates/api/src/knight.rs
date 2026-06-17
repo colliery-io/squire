@@ -39,7 +39,7 @@ use crate::state::AppState;
 
 /// A review decision as it arrives on the wire: `approve`, or `reject` with an optional reason.
 /// Maps onto the domain [`Decision`]. Tagged so the JSON is `{"approve":{}}` / `{"reject":{...}}`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DecisionDto {
     Approve,
@@ -56,14 +56,14 @@ impl From<DecisionDto> for Decision {
 }
 
 /// `POST /admin/review-claim` body. `actor` is the acting Knight, filled from the token.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewClaimReq {
     pub claim_id: ClaimId,
     pub decision: DecisionDto,
 }
 
 /// `POST /admin/review-redemption` body.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewRedemptionReq {
     pub request_id: RequestId,
     pub decision: DecisionDto,
@@ -71,7 +71,7 @@ pub struct ReviewRedemptionReq {
 
 /// `POST /admin/redeem` body — a direct Knight redeem on a target `squire`. Deduped on
 /// `command_id`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RedeemReq {
     pub command_id: CommandId,
     pub squire: UserId,
@@ -79,7 +79,7 @@ pub struct RedeemReq {
 }
 
 /// `POST /admin/adjust` body — a Knight balance override on `squire`. Deduped on `command_id`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AdjustReq {
     pub command_id: CommandId,
     pub squire: UserId,
@@ -89,7 +89,7 @@ pub struct AdjustReq {
 
 /// `POST /admin/mark-done` body — submit-then-approve a claim for `squire` in one shot. The
 /// `claim_id` is Knight-minted for idempotency.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MarkDoneReq {
     pub claim_id: ClaimId,
     pub squire: UserId,
@@ -98,7 +98,7 @@ pub struct MarkDoneReq {
 }
 
 /// The small JSON ack every quick-action returns on success.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Ack {
     pub ok: bool,
 }
@@ -114,6 +114,23 @@ impl Ack {
 /// `POST /admin/review-claim` — approve / reject a Squire's pending completion claim. The acting
 /// Knight is the token's user. A second review of an already-resolved claim is `AlreadyReviewed`
 /// → 409.
+#[utoipa::path(
+    post,
+    path = "/admin/review-claim",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    request_body = ReviewClaimReq,
+    responses(
+        (status = 200, description = "Acknowledged", body = Ack),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "Claim not found"),
+        (status = 409, description = "Claim already reviewed"),
+    ),
+)]
 pub async fn review_claim(
     State(state): State<Arc<AppState>>,
     RequireKnight(principal): RequireKnight,
@@ -132,6 +149,23 @@ pub async fn review_claim(
 
 /// `POST /admin/review-redemption` — approve (→ `ItemRedeemed`) / reject a Squire's redemption
 /// request. A second review is `AlreadyReviewed` → 409.
+#[utoipa::path(
+    post,
+    path = "/admin/review-redemption",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    request_body = ReviewRedemptionReq,
+    responses(
+        (status = 200, description = "Acknowledged", body = Ack),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "Request not found"),
+        (status = 409, description = "Request already reviewed, or blocked at commit"),
+    ),
+)]
 pub async fn review_redemption(
     State(state): State<Arc<AppState>>,
     RequireKnight(principal): RequireKnight,
@@ -148,6 +182,23 @@ pub async fn review_redemption(
 
 /// `POST /admin/redeem` — a direct Knight redeem for `squire`. `by = None` (an activity event,
 /// not authoring). Idempotent on `command_id`: an empty-changeset replay is treated as success.
+#[utoipa::path(
+    post,
+    path = "/admin/redeem",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    request_body = RedeemReq,
+    responses(
+        (status = 200, description = "Acknowledged", body = Ack),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "Item or Squire not found"),
+        (status = 409, description = "Redeem blocked by current state"),
+    ),
+)]
 pub async fn redeem(
     State(state): State<Arc<AppState>>,
     RequireKnight(principal): RequireKnight,
@@ -167,6 +218,23 @@ pub async fn redeem(
 
 /// `POST /admin/adjust` — a Knight balance override on `squire`. An empty / whitespace reason is
 /// rejected with **400** before the engine is touched. Idempotent on `command_id`.
+#[utoipa::path(
+    post,
+    path = "/admin/adjust",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    request_body = AdjustReq,
+    responses(
+        (status = 200, description = "Acknowledged", body = Ack),
+        (status = 400, description = "Blank reason"),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "Squire not found"),
+    ),
+)]
 pub async fn adjust(
     State(state): State<Arc<AppState>>,
     RequireKnight(principal): RequireKnight,
@@ -194,6 +262,23 @@ pub async fn adjust(
 /// through the shared writer. The `claim_id` is Knight-minted so a retried outbox is idempotent:
 /// the submit replay no-ops, and a re-approve of the now-resolved claim is `AlreadyReviewed` →
 /// 409 (a genuine second mark-done), which is correct.
+#[utoipa::path(
+    post,
+    path = "/admin/mark-done",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    request_body = MarkDoneReq,
+    responses(
+        (status = 200, description = "Acknowledged", body = Ack),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight, or occurrence taken"),
+        (status = 404, description = "Quest or Squire not found"),
+        (status = 409, description = "Already reviewed"),
+    ),
+)]
 pub async fn mark_done(
     State(state): State<Arc<AppState>>,
     RequireKnight(principal): RequireKnight,
@@ -221,6 +306,20 @@ pub async fn mark_done(
 /// `GET /household-review` — the Knight's cross-Squire triage view, assembled from one snapshot:
 /// every active Squire with a clamped balance, plus the household-wide pending claims and pending
 /// redemption requests (each labelled with its Squire and the quest/item name).
+#[utoipa::path(
+    get,
+    path = "/household-review",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    responses(
+        (status = 200, description = "Cross-Squire triage view", body = HouseholdReview),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+    ),
+)]
 pub async fn household_review(
     State(state): State<Arc<AppState>>,
     RequireKnight(_principal): RequireKnight,

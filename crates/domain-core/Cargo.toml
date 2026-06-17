@@ -10,9 +10,14 @@ description = "Squire — pure, portable domain engine (Engine + Projections) pe
 # (SQUIRE-T-0015). Gated behind the `serde` feature so the default build of the core
 # stays dependency-free (NFR-1.1.4) — only the `api` crate enables it.
 serde = { version = "1", features = ["derive"], optional = true }
+# Optional: OpenAPI 3 schema derivation for the wire DTOs (SQUIRE-T-0031 / ADR SQUIRE-A-0009).
+# Gated behind the `openapi` feature (which also pulls in `serde`) so the default/no-serde
+# build of the core stays dependency-free (NFR-1.1.4) — only the `api` crate enables it.
+utoipa = { version = "5", optional = true }
 
 [features]
 serde = ["dep:serde"]
+openapi = ["dep:utoipa", "serde"]
 
 [dev-dependencies]
 proptest = "1.11.0"
