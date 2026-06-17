@@ -53,58 +53,21 @@ impl Engine for DomainEngine {
             | Command::DefineItem(_)
             | Command::ArchiveItem(_)
             | Command::DefineAchievement(_)
-            | Command::ArchiveAchievement(_) => authoring::handle(snap, cmd, clock),
+            | Command::ArchiveAchievement(_) => crate::authoring::handle(snap, cmd, clock),
 
             // ── Claim & review (T-0003) ─────────────────────────────────────────
             Command::SubmitClaim { .. } | Command::ReviewClaim { .. } => {
-                claims::handle(snap, cmd, clock)
+                crate::claims::handle(snap, cmd, clock)
             }
 
             // ── Redemption & ledger (T-0005) ────────────────────────────────────
             Command::RequestRedemption { .. }
             | Command::ReviewRedemption { .. }
             | Command::RedeemItem { .. }
-            | Command::AdjustPoints { .. } => redemption::handle(snap, cmd, clock),
+            | Command::AdjustPoints { .. } => crate::redemption::handle(snap, cmd, clock),
         }
     }
 }
 
-// Per-family handlers. Stubs in T-0001 (return no Changes); replaced with real validation
-// and event/Change emission in the named tasks.
-
-mod authoring {
-    use super::*;
-    pub fn handle(
-        _snap: &Snapshot,
-        _cmd: Command,
-        _clock: &dyn Clock,
-    ) -> Result<Vec<Change>, DomainError> {
-        // TODO(T-0002): validate definitions (incl. quest assignment) → Put*/SetXActive.
-        Ok(vec![])
-    }
-}
-
-mod claims {
-    use super::*;
-    pub fn handle(
-        _snap: &Snapshot,
-        _cmd: Command,
-        _clock: &dyn Clock,
-    ) -> Result<Vec<Change>, DomainError> {
-        // TODO(T-0003): subject validation, assignment/Race gating, auto-approve,
-        // snapshot-at-approval, single-review, actor stamping, claim idempotency.
-        Ok(vec![])
-    }
-}
-
-mod redemption {
-    use super::*;
-    pub fn handle(
-        _snap: &Snapshot,
-        _cmd: Command,
-        _clock: &dyn Clock,
-    ) -> Result<Vec<Change>, DomainError> {
-        // TODO(T-0005): request/review/redeem/adjust; can_redeem at commit; idempotency.
-        Ok(vec![])
-    }
-}
+// Per-family handlers live in their own modules: `crate::authoring` (T-0002),
+// `crate::claims` (T-0003), `crate::redemption` (T-0005).
