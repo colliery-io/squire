@@ -4,14 +4,14 @@ level: task
 title: "API: Knight quick-action surface + HouseholdReview"
 short_code: "SQUIRE-T-0016"
 created_at: 2026-06-17T05:13:26.850593+00:00
-updated_at: 2026-06-17T05:31:02.255076+00:00
+updated_at: 2026-06-17T05:37:19.381022+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,11 +32,13 @@ Implement the Knight-role privileged quick-action surface plus the cross-Squire 
 
 ## Acceptance Criteria
 
-- [ ] `POST /admin/*` (Knight token): dispatch `ReviewClaim{Approve/Reject}`, `ReviewRedemption{Approve/Reject}`, `RedeemItem`(target squire), `AdjustPoints`(target squire, non-empty reason), and mark-done (mint `claim_id` → SubmitClaim + approve). `actor` is filled from the Knight token, never client-supplied.
-- [ ] `GET /household-review` (Knight token): returns `HouseholdReview` — `pending_claims` + `pending_requests` across ALL squires (each labeled `squire`) plus per-Squire balances (`SquireSummary`); cacheable.
-- [ ] Idempotency: reviews keyed on `claim_id`/`request_id`, redeem/adjust on `command_id`; replay re-returns the prior outcome with no double-apply.
-- [ ] `AdjustPoints` with empty reason → 400; engine errors (`OccurrenceTaken`, `AlreadyReviewed`, `Redeem(Blocked)`, `NotFound`) map to sensible HTTP statuses.
-- [ ] A Squire-role token on `/admin/*` or `/household-review` → 403; covered by `oneshot` tests.
+## Acceptance Criteria
+
+- [x] `POST /admin/{review-claim,review-redemption,redeem,adjust,mark-done}` (RequireKnight): each dispatches the matching `Command` with `actor` filled from the Knight token — never in the body; mark-done = SubmitClaim then approve. (5 handlers in `knight.rs`.)
+- [x] `GET /household-review` (RequireKnight): `HouseholdReview` — `pending_claims`+`pending_requests` across all squires (labeled `squire`) + per-Squire balances (`SquireSummary`), from one snapshot.
+- [x] Idempotency: redeem/adjust replay (same `command_id`) → engine empty change set → handler re-returns `{ok}` (no double-spend, tested); a genuine second review → engine `AlreadyReviewed` → 409.
+- [x] `/admin/adjust` empty/whitespace reason → 400 (up front); shared `domain_status` maps engine errors (OccurrenceTaken/NotAssigned/BadCommandForActor→403, …NotFound→404, AlreadyReviewed/AlreadyClaimedToday/Redeem→409, NotASquire/InvalidDefinition/Inactive→400).
+- [x] Squire token on every `/admin/*` + `/household-review` → 403; missing token → 401; `tests/knight.rs` (7) via `oneshot`.
 
 ## Implementation Notes
 
@@ -51,4 +53,6 @@ SQUIRE-T-0014 (crate scaffold, auth/tenant middleware, app state).
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Completed.** `crates/api/src/knight.rs`: 5 quick-action handlers (`/admin/review-claim`, `/admin/review-redemption`, `/admin/redeem`, `/admin/adjust`, `/admin/mark-done`) under `RequireKnight`, each building the privileged `Command` with `actor = principal.user` (never from the body) and running through the shared `handle_command` (by=None); `/admin/mark-done` = SubmitClaim then approve. `GET /household-review` assembles `HouseholdReview` (per-Squire `SquireSummary` balances + cross-Squire pending claims/requests) from one snapshot. Added serde derives to `HouseholdReview`/`SquireSummary`/`PendingClaim`/`PendingRequest` + `CommandId`. Shared `domain_status` error mapping refined (Redeem→409). Idempotent redeem/adjust replays (empty change set) treated as success; genuine double-review → `AlreadyReviewed`→409.
+
+Tests `tests/knight.rs` (7): household-review labeling + balances, approve credits + review-removed, double-approve→409, adjust empty-reason→400 + idempotent replay, redeem idempotent (no double-spend), and the trust-boundary sweep (Squire token → 403 on every admin route + review; missing → 401). Results: `cargo test -p api` → lib 3 + health 7 + knight 7 + squire 5 green; `cargo test -p domain-core` (default) → 70; `cargo test --workspace` green; 0 build warnings. Committed.

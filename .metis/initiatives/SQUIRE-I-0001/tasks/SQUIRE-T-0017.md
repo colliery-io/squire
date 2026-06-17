@@ -4,14 +4,14 @@ level: task
 title: "API: control-plane endpoints (register / login / add-member)"
 short_code: "SQUIRE-T-0017"
 created_at: 2026-06-17T05:13:27.752950+00:00
-updated_at: 2026-06-17T05:13:27.752950+00:00
+updated_at: 2026-06-17T05:37:50.012016+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Expose the three control-plane endpoints — register, login, add-member — by delegating to the `Identity` port, and flesh out the minimal dev `Identity` so the LAN-local MVP can bootstrap households and members end to end.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

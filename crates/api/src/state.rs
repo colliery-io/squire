@@ -15,12 +15,18 @@ use store::{Store, SystemClock};
 
 use crate::identity::Identity;
 
+/// The tenant store shared (interior-mutably, single-writer) across the API. Held by both
+/// [`AppState`] (the request handlers) and the [`crate::identity::Identity`] impl (the
+/// control-plane, which seeds the `users` table on register / add-member). `Arc` so the two
+/// sides share one store; `Mutex` because writes are serialized (single writer) and `Store`
+/// is not `Sync` on its own.
+pub type SharedStore = Arc<Mutex<Store<SystemClock>>>;
+
 /// Everything a handler needs: the per-tenant store (single-writer, behind a `Mutex`), the
 /// pure domain engine, the wall clock, and the identity port.
 pub struct AppState {
-    /// The tenant-scoped persistence. `Mutex` because writes are serialized (single writer)
-    /// and `Store` is not `Sync` on its own.
-    pub store: Mutex<Store<SystemClock>>,
+    /// The tenant-scoped persistence, shared with the identity port (see [`SharedStore`]).
+    pub store: SharedStore,
     /// The pure, stateless domain engine (the one validated entry point).
     pub engine: DomainEngine,
     /// Real wall-clock, passed to [`domain_core::contract::Engine::handle`].
@@ -30,10 +36,12 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Wire the pieces into shared, ref-counted state.
-    pub fn new(store: Store<SystemClock>, identity: Arc<dyn Identity>) -> Arc<Self> {
+    /// Wire the pieces into shared, ref-counted state. The `store` is the same [`SharedStore`]
+    /// the `identity` impl was built over, so register / add-member writes land in the store
+    /// these handlers read.
+    pub fn new(store: SharedStore, identity: Arc<dyn Identity>) -> Arc<Self> {
         Arc::new(Self {
-            store: Mutex::new(store),
+            store,
             engine: DomainEngine,
             clock: SystemClock,
             identity,
