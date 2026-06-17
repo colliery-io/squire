@@ -12,7 +12,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use api::identity::DevIdentity;
+use identity::DevIdentity;
 use api::{router, AppState};
 
 use axum::body::Body;

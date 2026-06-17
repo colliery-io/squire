@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use api::auth::{Auth, RequireKnight};
-use api::identity::{DevIdentity, Principal};
+use identity::{DevIdentity, Principal};
 use api::{router, AppState};
 
 use axum::body::Body;

@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use api::identity::{DevIdentity, Principal};
+use identity::{DevIdentity, Principal};
 use api::{router, AppState};
 
 use axum::body::Body;

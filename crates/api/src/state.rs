@@ -8,19 +8,19 @@
 //! [`Store`] borrows interior-mutably ([`std::cell::RefCell`]) and so is not `Sync`; the
 //! `Mutex` provides the `Sync` boundary required to share it across axum's worker tasks.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use domain_core::DomainEngine;
-use store::{Store, SystemClock};
+use store::SystemClock;
 
-use crate::identity::Identity;
+use identity::Identity;
 
 /// The tenant store shared (interior-mutably, single-writer) across the API. Held by both
-/// [`AppState`] (the request handlers) and the [`crate::identity::Identity`] impl (the
-/// control-plane, which seeds the `users` table on register / add-member). `Arc` so the two
-/// sides share one store; `Mutex` because writes are serialized (single writer) and `Store`
-/// is not `Sync` on its own.
-pub type SharedStore = Arc<Mutex<Store<SystemClock>>>;
+/// [`AppState`] (the request handlers) and the [`identity::Identity`] impl (the control-plane,
+/// which seeds the `users` table on register / add-member). `Arc` so the two sides share one
+/// store; `Mutex` because writes are serialized (single writer) and `Store` is not `Sync` on
+/// its own. Defined by the `identity` crate (the seam that also owns it) and re-exported here.
+pub use identity::SharedStore;
 
 /// Everything a handler needs: the per-tenant store (single-writer, behind a `Mutex`), the
 /// pure domain engine, the wall clock, and the identity port.
@@ -32,7 +32,7 @@ pub struct AppState {
     /// Real wall-clock, passed to [`domain_core::contract::Engine::handle`].
     pub clock: SystemClock,
     /// The authentication / membership seam (dev impl now, production in SQUIRE-S-0007).
-    pub identity: Arc<dyn Identity>,
+    pub identity: Arc<dyn identity::Identity>,
 }
 
 impl AppState {

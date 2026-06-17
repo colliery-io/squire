@@ -1,6 +1,6 @@
 //! The three **control-plane** endpoints (SQUIRE-T-0017): household registration, member login,
 //! and Knight-only member creation. Each is a thin handler that delegates straight to the
-//! [`Identity`](crate::identity::Identity) port — the API owns no credential logic itself.
+//! [`Identity`](identity::Identity) port — the API owns no credential logic itself.
 //!
 //! ## Auth posture
 //! * `POST /register` — **unauthenticated**: it bootstraps a household and seeds its first
@@ -23,8 +23,9 @@ use domain_core::contract::{
     AddMemberReq, AddMemberResp, LoginReq, LoginResp, RegisterHouseholdReq, RegisterHouseholdResp,
 };
 
+use identity::AuthError;
+
 use crate::auth::RequireKnight;
-use crate::identity::AuthError;
 use crate::state::AppState;
 
 /// Map an [`AuthError`] from a control-plane call onto its HTTP status: only `Forbidden` is a 403;

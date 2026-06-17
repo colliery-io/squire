@@ -16,7 +16,6 @@
 
 pub mod auth;
 pub mod control;
-pub mod identity;
 pub mod knight;
 pub mod squire;
 pub mod state;

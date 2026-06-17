@@ -5,7 +5,7 @@
 //! a missing token a 401 — the trust boundary is enforced in the extractor, before any handler
 //! body runs. The Keep remains the **sole writer**: each privileged command is run through the
 //! shared [`handle_command`] (snapshot → engine → apply under the store mutex), and the `actor`
-//! on every command is filled from the **Knight's verified token** ([`Principal::user`]), never
+//! on every command is filled from the **Knight's verified token** ([`identity::Principal::user`]), never
 //! from the client body — the request DTOs below intentionally omit it.
 //!
 //! ## Idempotency
