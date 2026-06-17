@@ -4,14 +4,14 @@ level: task
 title: "Keep: event-log inspector, definition audit surfacing & integration tests"
 short_code: "SQUIRE-T-0030"
 created_at: 2026-06-17T11:10:01.147679+00:00
-updated_at: 2026-06-17T11:10:01.147679+00:00
+updated_at: 2026-06-17T11:43:53.931609+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 The read-only **event-log inspector** and **definition-audit surfacing**, plus the Keep's end-to-end integration suite proving authoring→review→state and the no-network-authoring / loopback guarantees.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -24,7 +24,7 @@
     document.getElementById("login").hidden = true;
     document.getElementById("who").textContent = `${who.display_name || "Knight"} (#${who.user})`;
     document.getElementById("shell").hidden = false;
-    for (const id of ["review-panel", "quests-panel", "items-panel", "achievements-panel", "members-panel"]) {
+    for (const id of ["review-panel", "quests-panel", "items-panel", "achievements-panel", "members-panel", "log-panel"]) {
       document.getElementById(id).hidden = false;
     }
     loadReview();
@@ -303,6 +303,18 @@
       }
       achForm.reset();
       loadCatalog("achievements", "achievement-list");
+    });
+  }
+
+  // ── Event-log inspector (T-0030) ─────────────────────────────────────────────
+  const logForm = document.getElementById("log-form");
+  if (logForm) {
+    logForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(logForm);
+      const res = await fetch(`/api/log/${fd.get("scope")}/${fd.get("id")}`);
+      const out = document.getElementById("log-output");
+      out.textContent = res.ok ? JSON.stringify(await res.json(), null, 2) : `Error ${res.status}`;
     });
   }
 })();

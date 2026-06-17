@@ -114,6 +114,22 @@
       <p id="member-error" class="error" hidden></p>
       <ul id="member-list"></ul>
     </section>
+
+    <!-- Read-only event-log inspector (SQUIRE-T-0030): trace how a balance/streak was reached. -->
+    <section id="log-panel" hidden>
+      <h2 id="log">Event log</h2>
+      <form id="log-form">
+        <label>Scope
+          <select name="scope">
+            <option value="quest">Quest</option>
+            <option value="item">Item</option>
+          </select>
+        </label>
+        <label>Id <input name="id" inputmode="numeric" required /></label>
+        <button type="submit">View log</button>
+      </form>
+      <pre id="log-output"></pre>
+    </section>
   </main>
 
   <script src="/static/keep.js"></script>
