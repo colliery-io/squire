@@ -8,3 +8,4 @@ description = "Squire — pure, portable domain engine (Engine + Projections) pe
 [dependencies]
 
 [dev-dependencies]
+proptest = "1.11.0"

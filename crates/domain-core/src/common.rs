@@ -2,7 +2,59 @@
 //! projections. Pure functions over a `Snapshot`.
 
 use crate::contract::*;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
+
+// ── Claim index (T-0007 perf, NFR-1.1.2) ──
+//
+// Several log helpers below call `claim_meta` inside an `any()`/`filter` over the event log,
+// which is O(n²) at the few-thousand-event scale (NFR-1.1.2). For the projection sweep we build
+// a one-pass `ClaimId → (squire, quest, on)` map once per call and use the `*_with` variants
+// instead of re-scanning. Behaviour is identical to the scanning helpers; only the cost changes.
+// Public signatures are unchanged — callers that don't care (the engine command path, which is
+// per-command and small) keep using the plain helpers.
+
+/// One-pass index of `CompletionClaimed` facts and per-claim resolution.
+pub struct ClaimIndex {
+    /// claim_id → (squire, quest, on), from `CompletionClaimed`.
+    meta: HashMap<u128, (UserId, QuestId, Date)>,
+    /// claim_id of every claim that has been approved or rejected.
+    resolved: HashMap<u128, ClaimResolution>,
+}
+
+impl ClaimIndex {
+    /// Build in a single pass over the event log.
+    pub fn build(snap: &Snapshot) -> Self {
+        let mut meta = HashMap::new();
+        let mut resolved = HashMap::new();
+        for e in &snap.events {
+            match e {
+                Event::CompletionClaimed { claim_id, squire, quest_id, on, .. } => {
+                    meta.insert(claim_id.0, (*squire, *quest_id, *on));
+                }
+                Event::CompletionApproved { claim_id, .. } => {
+                    resolved.insert(claim_id.0, ClaimResolution::Approved);
+                }
+                Event::CompletionRejected { claim_id, .. } => {
+                    resolved.insert(claim_id.0, ClaimResolution::Rejected);
+                }
+                _ => {}
+            }
+        }
+        Self { meta, resolved }
+    }
+
+    /// `(squire, quest, on)` of a claim from the index, or `None`. Mirrors `claim_meta`.
+    pub fn meta(&self, claim_id: ClaimId) -> Option<(UserId, QuestId, Date)> {
+        self.meta.get(&claim_id.0).copied()
+    }
+
+    fn resolution(&self, claim_id: ClaimId) -> Option<ClaimResolution> {
+        if !self.meta.contains_key(&claim_id.0) {
+            return None;
+        }
+        Some(self.resolved.get(&claim_id.0).copied().unwrap_or(ClaimResolution::Pending))
+    }
+}
 
 pub fn find_quest(snap: &Snapshot, id: QuestId) -> Option<&Quest> {
     snap.quests.iter().find(|q| q.id == id)
@@ -92,11 +144,22 @@ pub fn occurrence_closed(snap: &Snapshot, quest_id: QuestId, on: Date) -> bool {
     })
 }
 
+/// `occurrence_closed` over a prebuilt index (perf path; identical result).
+pub fn occurrence_closed_with(snap: &Snapshot, idx: &ClaimIndex, quest_id: QuestId, on: Date) -> bool {
+    snap.events.iter().any(|e| match e {
+        Event::CompletionApproved { claim_id, .. } => {
+            idx.meta(*claim_id).is_some_and(|(_, q, d)| q == quest_id && d == on)
+        }
+        _ => false,
+    })
+}
+
 /// EachAssignee: does `squire` already have an approved completion for `(quest, on)`?
-pub fn squire_satisfied(snap: &Snapshot, squire: UserId, quest_id: QuestId, on: Date) -> bool {
+/// (Index variant `squire_satisfied_with` is the perf path used by the projections.)
+pub fn squire_satisfied_with(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, quest_id: QuestId, on: Date) -> bool {
     snap.events.iter().any(|e| match e {
         Event::CompletionApproved { claim_id, squire: s, .. } if *s == squire => {
-            claim_meta(snap, *claim_id).is_some_and(|(_, q, d)| q == quest_id && d == on)
+            idx.meta(*claim_id).is_some_and(|(_, q, d)| q == quest_id && d == on)
         }
         _ => false,
     })
@@ -110,6 +173,18 @@ pub fn squire_has_live_claim(snap: &Snapshot, squire: UserId, quest_id: QuestId,
             if *s == squire && *q == quest_id && *d == on =>
         {
             !matches!(claim_resolution(snap, *claim_id), Some(ClaimResolution::Rejected))
+        }
+        _ => false,
+    })
+}
+
+/// `squire_has_live_claim` over a prebuilt index (perf path; identical result).
+pub fn squire_has_live_claim_with(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, quest_id: QuestId, on: Date) -> bool {
+    snap.events.iter().any(|e| match e {
+        Event::CompletionClaimed { claim_id, squire: s, quest_id: q, on: d, .. }
+            if *s == squire && *q == quest_id && *d == on =>
+        {
+            !matches!(idx.resolution(*claim_id), Some(ClaimResolution::Rejected))
         }
         _ => false,
     })
@@ -156,15 +231,51 @@ pub fn cadence_matches(quest: &Quest, on: Date) -> bool {
 }
 
 /// Does `squire` have a *pending* (un-reviewed) claim for `(quest, on)`?
-pub fn squire_pending(snap: &Snapshot, squire: UserId, quest_id: QuestId, on: Date) -> bool {
+/// (Index variant `squire_pending_with` is the perf path used by the projections.)
+pub fn squire_pending_with(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, quest_id: QuestId, on: Date) -> bool {
     snap.events.iter().any(|e| match e {
         Event::CompletionClaimed { claim_id, squire: s, quest_id: q, on: d, .. }
             if *s == squire && *q == quest_id && *d == on =>
         {
-            matches!(claim_resolution(snap, *claim_id), Some(ClaimResolution::Pending))
+            matches!(idx.resolution(*claim_id), Some(ClaimResolution::Pending))
         }
         _ => false,
     })
+}
+
+/// `submit_rejection` over a prebuilt index (perf path; identical result). Used by
+/// `quests_due` so a full per-squire due sweep stays linear-ish in the log size.
+pub fn submit_rejection_with(
+    snap: &Snapshot,
+    idx: &ClaimIndex,
+    squire: UserId,
+    quest: &Quest,
+    on: Date,
+) -> Option<DomainError> {
+    if !quest.active {
+        return Some(DomainError::Inactive);
+    }
+    if !is_assignee(snap, quest, squire) {
+        return Some(DomainError::NotAssigned);
+    }
+    match quest.completion {
+        Completion::Race => {
+            if occurrence_closed_with(snap, idx, quest.id, on) {
+                return Some(DomainError::OccurrenceTaken);
+            }
+            if squire_has_live_claim_with(snap, idx, squire, quest.id, on) {
+                return Some(DomainError::AlreadyClaimedToday);
+            }
+        }
+        Completion::EachAssignee => {
+            if !quest.repeatable_within_day
+                && squire_has_live_claim_with(snap, idx, squire, quest.id, on)
+            {
+                return Some(DomainError::AlreadyClaimedToday);
+            }
+        }
+    }
+    None
 }
 
 /// The reason a `SubmitClaim` for `(squire, quest, on)` would be rejected *right now*, or
@@ -268,14 +379,17 @@ pub fn quest_in_scope(snap: &Snapshot, quest_id: QuestId, scope: &Scope) -> bool
 }
 
 /// Did `squire` have ANY approved completion in `scope` on `on`?
-pub fn squire_completed_in_scope_on(
+/// (Index variant `squire_completed_in_scope_on_with` is the perf path used by the projections.)
+pub fn squire_completed_in_scope_on_with(
     snap: &Snapshot,
+    idx: &ClaimIndex,
     squire: UserId,
     scope: &Scope,
     on: Date,
 ) -> bool {
     snap.events.iter().any(|e| match e {
-        Event::CompletionApproved { claim_id, squire: s, .. } if *s == squire => claim_meta(snap, *claim_id)
+        Event::CompletionApproved { claim_id, squire: s, .. } if *s == squire => idx
+            .meta(*claim_id)
             .is_some_and(|(_, q, d)| d == on && quest_in_scope(snap, q, scope)),
         _ => false,
     })
