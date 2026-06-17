@@ -1,0 +1,10 @@
+[package]
+name = "domain-core"
+version = "0.1.0"
+edition = "2021"
+description = "Squire — pure, portable domain engine (Engine + Projections) per spec SQUIRE-S-0001"
+
+# Pure core: no storage / transport / UI / time dependencies (NFR-1.1.4, AR-7).
+[dependencies]
+
+[dev-dependencies]
