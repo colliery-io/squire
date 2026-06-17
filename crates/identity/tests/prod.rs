@@ -5,7 +5,8 @@
 //! writes through the single writer.
 
 use domain_core::contract::{
-    AddMemberReq, AuthToken, HouseholdHandle, LoginReq, RegisterHouseholdReq, Role, UserId,
+    AddMemberReq, AuthToken, HouseholdHandle, LoginReq, RegisterHouseholdReq, Repository, Role,
+    UserId,
 };
 
 use identity::creds::verify_secret;
@@ -211,4 +212,76 @@ fn token_for_other_household_is_wrong_tenant() {
     // A token minted for household A (the bound handle) presented with handle B → WrongTenant.
     let other = HouseholdHandle("house2".into());
     assert_eq!(id.verify(&other, &admin.token), Err(AuthError::WrongTenant));
+}
+
+#[test]
+fn hosted_two_households_are_fully_isolated() {
+    // The local-posture tests above cover one tenant; this proves the HOSTED multi-tenant flow:
+    // two households registered through the real `register`, each provisioning its own tenant, with
+    // no cross-tenant reach and no global user directory (NFR-2.1). A `probe` registry over the same
+    // backend re-opens each tenant to assert on its rows directly.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let backend = Backend::Sqlite { dir: dir.path().to_path_buf() };
+    let id = ProdIdentity::hosted(
+        TenantRegistry::hosted(backend.clone()),
+        TokenSigner::new(b"test-server-key"),
+        60_000,
+    );
+    let probe = TenantRegistry::hosted(backend);
+
+    let a = id
+        .register(RegisterHouseholdReq {
+            household_name: "Alpha".into(),
+            admin_name: "Alice".into(),
+            admin_secret: "asecret".into(),
+        })
+        .expect("register Alpha");
+    let b = id
+        .register(RegisterHouseholdReq {
+            household_name: "Beta".into(),
+            admin_name: "Bob".into(),
+            admin_secret: "bsecret".into(),
+        })
+        .expect("register Beta");
+
+    assert_ne!(a.household, b.household, "distinct tenants get distinct handles");
+
+    // Each admin token verifies against its OWN household only.
+    assert!(id.verify(&a.household, &a.token).is_ok(), "A's token verifies on A");
+    assert_eq!(
+        id.verify(&b.household, &a.token),
+        Err(AuthError::WrongTenant),
+        "A's token must NOT verify against B"
+    );
+
+    // No global directory: A's admin cannot log into B (B holds no credential for that id), but can
+    // into A.
+    assert_eq!(
+        id.login(LoginReq { household: b.household.clone(), user: a.admin, secret: "asecret".into() })
+            .err(),
+        Some(AuthError::BadToken),
+        "A's admin must not log into B"
+    );
+    assert!(
+        id.login(LoginReq { household: a.household.clone(), user: a.admin, secret: "asecret".into() })
+            .is_ok(),
+        "A's admin logs into A"
+    );
+
+    // A member added to A exists ONLY in A's tenant.
+    let caller = Principal { household: a.household.clone(), user: a.admin, role: Role::Knight };
+    let added = id
+        .add_member(
+            &caller,
+            AddMemberReq { role: Role::Squire, display_name: "Gareth".into(), initial_secret: "g".into() },
+        )
+        .expect("add member to A");
+
+    probe.register_known(&a.household).expect("know A");
+    probe.register_known(&b.household).expect("know B");
+    let a_users = probe.resolve(&a.household).expect("resolve A").snapshot().users;
+    let b_users = probe.resolve(&b.household).expect("resolve B").snapshot().users;
+    assert!(a_users.iter().any(|u| u.id == added.user), "A sees its new Squire");
+    assert!(b_users.iter().all(|u| u.id != added.user), "B never sees A's Squire");
+    assert_eq!(b_users.len(), 1, "B still has only its own admin");
 }

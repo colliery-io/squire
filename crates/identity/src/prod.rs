@@ -154,6 +154,15 @@ impl Identity for ProdIdentity {
         if principal.household != *household {
             return Err(AuthError::WrongTenant);
         }
+        // Local single-tenant: this identity serves EXACTLY one household, and its store is that
+        // one tenant's. Reject any other handle outright (defense in depth) so a token valid for a
+        // *different* tenant can never resolve here even though its signature checks out — the api
+        // bound to household B must never act on a token minted for household A.
+        if let Posture::Local { handle } = &self.posture {
+            if household != handle {
+                return Err(AuthError::WrongTenant);
+            }
+        }
         Ok(principal)
     }
 

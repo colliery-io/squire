@@ -4,14 +4,14 @@ level: task
 title: "Identity: integration, isolation, dual-backend & MVP seed; wire API to prod identity"
 short_code: "SQUIRE-T-0023"
 created_at: 2026-06-17T09:52:25.200559+00:00
-updated_at: 2026-06-17T09:52:25.200559+00:00
+updated_at: 2026-06-17T10:19:26.088456+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Wire the api onto the production `Identity`, prove full tenant isolation and per-user no-bypass end-to-end, seed the MVP household through the real flow, and run the suite on both backends.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

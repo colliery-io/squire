@@ -4,14 +4,14 @@ level: task
 title: "Identity: production Identity impl (register/login/add-member/verify/authorize)"
 short_code: "SQUIRE-T-0022"
 created_at: 2026-06-17T09:52:24.150966+00:00
-updated_at: 2026-06-17T10:10:18.595392+00:00
+updated_at: 2026-06-17T10:18:53.972652+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,13 +32,15 @@ In `crates/identity`, implement the production `Identity` impl that ties togethe
 
 ## Acceptance Criteria
 
-- [ ] `register(req)`: provision a tenant, seed the first **Knight** with a hashed credential via `PutUser` through `Repository::apply(by=None, …)` (system seed), mint a token → `RegisterHouseholdResp{household, admin UserId, token}`.
-- [ ] `add_member(caller, req)`: Knight-only; create the member (Knight|Squire) via `PutUser` with `apply(by=Some(caller.user))` (audited); store the hashed `initial_secret` → `AddMemberResp{user}`. No assumed counts or fixed shape.
-- [ ] `login(req)`: resolve tenant → verify the member's secret against the stored hash → look up `Role` from the tenant `users` → issue token → `LoginResp{token, role}`.
-- [ ] `verify(handle, token)`: verify token (tamper/expiry) → resolve `(tenant, user, role)`; invalid is rejected; the token's tenant must match the presented handle.
-- [ ] Authorize by `(tenant, user, role)`: Knight = full surface; Squire = read + propose for itself; credentials stored only as hashes; users in-tenant; no global directory.
-- [ ] Audit: identity `Change`s flow through `apply(by, …)` — `by`=caller for add-member, `None` for the register seed; the users-table audit columns answer "who added member X".
-- [ ] Tests: register→login (hashed cred); add-member by Knight (audited) / by Squire → Forbidden; wrong secret → reject; token tamper/expiry → reject; cross-tenant token → reject.
+## Acceptance Criteria
+
+- [x] `ProdIdentity::register(req)`: provision/resolve tenant, seed first **Knight** via `apply(None, [PutUser])`, store `hash_secret(admin_secret)` in-tenant, mint token → `{household, admin, token}`.
+- [x] `add_member(caller, req)`: Knight-only (else `Forbidden`); `PutUser` via `apply(Some(caller.user))` (audited); `set_credential(hash(initial_secret))` → `{user}`. Any N Knights/Squires.
+- [x] `login(req)`: resolve tenant → `verify_secret` against the stored hash → role from `users` → token → `{token, role}`; bad/missing → `BadToken`.
+- [x] `verify(handle, token)`: `TokenSigner::verify` (tamper/expiry) → Principal; `principal.household != handle` → `WrongTenant`.
+- [x] Authorize by `(tenant, user, role)`: credentials stored only as Argon2id hashes in the **in-tenant `credentials` table** (plaintext never stored); users in-tenant; no global directory.
+- [x] Audit: `by=Some(caller)` on add-member, `None` on register seed → users-table audit answers "who added member X".
+- [x] Tests (`tests/prod.rs`, 8): register→verify(Knight), hash-not-plaintext, add-member Knight (audited)/Squire→Forbidden, login wrong-secret/unknown→BadToken, token tamper/expiry→BadToken, cross-tenant→WrongTenant. + store `credentials_set_and_read_back` (both backends).
 
 ## Implementation Notes
 
@@ -53,4 +55,6 @@ SQUIRE-T-0019, SQUIRE-T-0020, SQUIRE-T-0021.
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Completed.** **In-tenant credentials (store change):** added a portable `credentials(user_id TEXT PK, secret_hash TEXT)` table to the store's migration (+ `down.sql`, `schema.rs`, `pg::provision_clean` check); `Store::set_credential` (upsert via `run_upsert!`) + `Store::credential` — NOT a domain `Change`, written directly (no audit cols); migrates on both backends. `crates/identity/src/prod.rs`: `ProdIdentity{ registry, signer, clock, ttl, counter }` impl `Identity`: `register` (provision/resolve tenant → seed Knight via `apply(None,[PutUser])` → `set_credential(hash)` → token), `add_member` (Knight-only → `apply(Some(caller))` → set_credential), `login` (resolve → verify_secret vs stored hash → role from users → token), `verify` (signer verify + household match → else `WrongTenant`). **register local vs hosted:** local uses the registry's bound handle (`Forbidden` if already has a Knight); hosted derives a sanitized handle from `household_name`+counter then `registry.provision`. Credentials stored only as Argon2id hashes in-tenant; plaintext never stored. `DevIdentity` unchanged.
+
+Tests: `tests/prod.rs` (8) + store `credentials_set_and_read_back` (both backends). Results: `cargo test -p identity` → 15 unit + 8 prod + 2 tenant green; `cargo test -p store` → 28 (incl. credentials); PG run (`--features postgres`+compose) → credentials + migration green on PG; `cargo test --workspace` green; 0 warnings. Committed.
