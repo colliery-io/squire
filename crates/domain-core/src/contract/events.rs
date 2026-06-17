@@ -6,6 +6,7 @@ use super::*;
 /// (`squire`) — the household's log is the union of its Squires' sub-logs, so per-Squire
 /// balance / streaks / `StateView` are derived by filtering on `squire`. Knight-committed
 /// events also record the acting Knight (`actor`; `None` = auto-approve / system).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum Event {
     /// Proposed by/for a Squire; appended by the server on submit.

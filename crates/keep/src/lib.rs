@@ -44,6 +44,7 @@ use store::SystemClock;
 use identity::{Identity, Principal, ProdIdentity, SharedStore, TokenSigner};
 
 pub mod achievements;
+pub mod inspector;
 pub mod items;
 pub mod members;
 pub mod quests;
@@ -354,6 +355,9 @@ pub fn router(state: Arc<KeepState>) -> Router {
         .route("/api/review/redemption", post(review::review_redemption))
         .route("/api/redeem", post(review::redeem))
         .route("/api/adjust", post(review::adjust))
+        // ── Read-only event-log inspector (SQUIRE-T-0030) ──────────────────────
+        .route("/api/log/quest/{id}", get(inspector::quest_log))
+        .route("/api/log/item/{id}", get(inspector::item_log))
         .with_state(state)
 }
 
