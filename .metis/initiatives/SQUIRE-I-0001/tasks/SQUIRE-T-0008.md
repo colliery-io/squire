@@ -4,14 +4,14 @@ level: task
 title: "Store: crate scaffold, Diesel dual-backend schema & migrations"
 short_code: "SQUIRE-T-0008"
 created_at: 2026-06-17T04:08:39.757127+00:00
-updated_at: 2026-06-17T04:14:00.845729+00:00
+updated_at: 2026-06-17T04:25:45.312982+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,11 +32,13 @@ Create the new `crates/store` Rust crate (depending on `domain-core`), wire Dies
 
 ## Acceptance Criteria
 
-- [ ] `crates/store` builds; depends on `domain-core` (uses `domain_core::contract` types), Diesel (features `sqlite` bundled + `postgres`), and `diesel_migrations`.
-- [ ] One migration set creates `users`, `quests`, `items`, `achievements` (each with `active` + audit cols `created_by/created_at/updated_by/updated_at`) and an append-only `events` table, plus indices for event ordering and quest/item keys; DDL stays in the portable subset (no backend-specific syntax).
-- [ ] A backend abstraction (Diesel 2.x `#[derive(MultiConnection)]` enum, or generic-over-`Backend` code) lets the same repository code target `Sqlite` and `Pg`, chosen at startup.
-- [ ] A migration runner migrates a fresh connection; a test creates a temp-file/in-memory SQLite DB and migrates it clean.
-- [ ] `cargo test -p store` green on SQLite; Postgres path compiles; live PG tests gated on `DATABASE_URL`.
+## Acceptance Criteria
+
+- [x] `crates/store` builds; depends on `domain-core`, Diesel 2.2 (`sqlite` + bundled `libsqlite3-sys`; `postgres` is an **optional feature, off by default**), `diesel_migrations`. Default build needs no system libpq.
+- [x] One migration creates `users`/`quests`/`items`/`achievements` (each with `active` + audit cols `created_by/created_at/updated_by/updated_at`) and an append-only `events` table + indices (seq order, quest/item keys, squire); **portable subset** DDL.
+- [x] Backend abstraction: `AnyConnection` via `#[derive(MultiConnection)]` — `Sqlite` always, `#[cfg(feature="postgres")] Pg`.
+- [x] `run_migrations` + `SqliteStore::open` (migrates on open); temp-file SQLite tests migrate clean.
+- [x] **Dual-backend tested via Docker Compose** (user directive): `docker-compose.yml` runs Postgres; a `postgres`-gated test (`store::pg::provision_clean`) resets the schema, migrates, and verifies all tables on **real Postgres**. `cargo test -p store` green on SQLite (4); PG migration test green via compose (1). *(This caught a real portability bug — see notes.)*
 
 ## Implementation Notes
 
@@ -53,4 +55,10 @@ domain-core (T-0001..T-0007). PG integration gated on the `DATABASE_URL` env var
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Completed.** New `crates/store` crate. **Chosen event/serialization layout (resolves the spec's schema decision area):** typed-nullable-columns keyed by a `kind` discriminant — one `events` row per `Event`, union of variant fields across nullable typed columns (`claim_id/quest_id/on_date/points/amount/reason/request_id/command_id/item_id/achievement_id`), every row carries `squire`+`at`, `actor` NULL for auto/system. `seq` is an **application-assigned** `BIGINT PRIMARY KEY` (the single-writer `apply` sets `max(seq)+1`). Ids = decimal-string TEXT; enums = TEXT discriminants; sets (`assignment_squires`, `cadence_weekdays`) = comma-delimited TEXT; bools = INTEGER 0/1; Points/Date/Timestamp = BIGINT. Definition+identity tables carry the four audit columns. Indices: seq (order), quest_id, item_id, squire. `AnyConnection` (`#[derive(MultiConnection)]`, Pg arm under feature); `run_migrations`; `SqliteStore::open`.
+
+**Docker Compose dual-backend testing (per user directive):** added `docker-compose.yml` (Postgres 16 on :55432, tmpfs, healthcheck). `store::pg::provision_clean` (postgres-gated) resets `public`, migrates, and verifies all tables on real Postgres. Run via `docker compose up -d postgres` + `PQ_LIB_DIR=$(pg_config --libdir) DYLD_FALLBACK_LIBRARY_PATH=$(pg_config --libdir) DATABASE_URL=postgres://squire:squire@localhost:55432/squire_test cargo test -p store --features postgres`. The `postgres` feature is optional/off-by-default (libpq from MacPorts `/opt/local`).
+
+**Portability bug caught by the PG run:** the initial migration used SQLite's `INTEGER PRIMARY KEY AUTOINCREMENT`, which Postgres rejects (`syntax error at "AUTOINCREMENT"`). Fixed by making `seq` an app-assigned `BIGINT PRIMARY KEY` — fully portable; the writer owns ordering. Exactly the class of regression NFR-2.6 (test both backends) exists to catch.
+
+Results: SQLite `cargo test -p store` → 4 passed; Postgres migration test via compose → 1 passed; `cargo test --workspace` → all green (domain-core 70 intact). Committed `b81aa82`.

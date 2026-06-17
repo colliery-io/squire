@@ -677,6 +677,7 @@ dependencies = [
  "diesel_migrations",
  "domain-core",
  "libsqlite3-sys",
+ "proptest",
  "tempfile",
 ]
 

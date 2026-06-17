@@ -4,14 +4,14 @@ level: task
 title: "Store: domain ↔ row mapping (lossless serialization)"
 short_code: "SQUIRE-T-0009"
 created_at: 2026-06-17T04:08:41.165831+00:00
-updated_at: 2026-06-17T04:08:41.165831+00:00
+updated_at: 2026-06-17T04:26:16.554410+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Implement lossless encode/decode between the domain types and their rows for every `User`, every definition (and the nested enums `Cadence`/`Schedule`/`Assignment`/`Completion`/`Availability`/`Criterion`/`Scope`/`StreakBasis`/`Role`/`Category`/`Weekday`), and every `Event` variant with all of its fields (`claim_id`/`request_id`/`command_id`/`squire`/`actor`/`points`/`cost`/`bonus`/`amount`/`reason`/`on`/`at`). Encoding must be backend-portable.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
