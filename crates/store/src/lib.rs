@@ -679,6 +679,41 @@ pub fn user_audit(conn: &mut AnyConnection, id: UserId) -> Result<Option<AuditCo
     row.map(|(cb, ca, ub, ua)| audit_from_parts(cb, ca, ub, ua)).transpose()
 }
 
+/// Read the audit columns of the `items` row with this id (`None` if absent).
+pub fn item_audit(conn: &mut AnyConnection, id: ItemId) -> Result<Option<AuditCols>, RepoError> {
+    let row: Option<(Option<String>, i64, Option<String>, i64)> = items::table
+        .filter(items::id.eq(id_to_text(id.0)))
+        .select((
+            items::created_by,
+            items::created_at,
+            items::updated_by,
+            items::updated_at,
+        ))
+        .first(conn)
+        .optional()
+        .map_err(map_err)?;
+    row.map(|(cb, ca, ub, ua)| audit_from_parts(cb, ca, ub, ua)).transpose()
+}
+
+/// Read the audit columns of the `achievements` row with this id (`None` if absent).
+pub fn achievement_audit(
+    conn: &mut AnyConnection,
+    id: AchievementId,
+) -> Result<Option<AuditCols>, RepoError> {
+    let row: Option<(Option<String>, i64, Option<String>, i64)> = achievements::table
+        .filter(achievements::id.eq(id_to_text(id.0)))
+        .select((
+            achievements::created_by,
+            achievements::created_at,
+            achievements::updated_by,
+            achievements::updated_at,
+        ))
+        .first(conn)
+        .optional()
+        .map_err(map_err)?;
+    row.map(|(cb, ca, ub, ua)| audit_from_parts(cb, ca, ub, ua)).transpose()
+}
+
 // ─── SQLite convenience store ─────────────────────────────────────────────────
 
 /// A SQLite-backed store with the real [`SystemClock`]. Convenience wrapper around the

@@ -43,6 +43,8 @@ use store::SystemClock;
 
 use identity::{Identity, Principal, ProdIdentity, SharedStore, TokenSigner};
 
+pub mod achievements;
+pub mod items;
 pub mod quests;
 
 /// Embedded web UI assets (`assets/`), baked into the binary so the Keep is one self-contained
@@ -321,6 +323,14 @@ pub fn router(state: Arc<KeepState>) -> Router {
         // ── Authoring: quests (SQUIRE-T-0026) ──────────────────────────────────
         .route("/api/quests", get(quests::list_quests).post(quests::create_quest))
         .route("/api/quests/{id}/archive", post(quests::archive_quest))
+        // ── Authoring: items + achievements (SQUIRE-T-0027) ─────────────────────
+        .route("/api/items", get(items::list_items).post(items::create_item))
+        .route("/api/items/{id}/archive", post(items::archive_item))
+        .route(
+            "/api/achievements",
+            get(achievements::list_achievements).post(achievements::create_achievement),
+        )
+        .route("/api/achievements/{id}/archive", post(achievements::archive_achievement))
         .with_state(state)
 }
 

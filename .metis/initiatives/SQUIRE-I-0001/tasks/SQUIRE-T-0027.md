@@ -4,14 +4,14 @@ level: task
 title: "Keep: item & achievement authoring (define/archive)"
 short_code: "SQUIRE-T-0027"
 created_at: 2026-06-17T11:09:57.777171+00:00
-updated_at: 2026-06-17T11:09:57.777171+00:00
+updated_at: 2026-06-17T11:31:10.370247+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Keep authoring for **RedeemableItems** (cost, optional achievement `gate`, availability `Once`/`Repeatable` — no rate math) and **Achievements** (criterion, scope, bonus points), submitted engine-direct as Define/Archive, audited by the acting Knight.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
