@@ -14,6 +14,7 @@
 //! testable without a socket — the [`router`] is driven in tests via
 //! `tower::ServiceExt::oneshot`, so the whole request path is exercised in-process.
 
+pub mod app_dist;
 pub mod auth;
 pub mod control;
 pub mod knight;
@@ -59,6 +60,9 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/admin/adjust", post(knight::adjust))
         .route("/admin/mark-done", post(knight::mark_done))
         .route("/household-review", get(knight::household_review))
+        // App-update distribution (SQUIRE-T-0051): version manifest + APK download, unauthenticated.
+        .route("/app/manifest", get(app_dist::manifest))
+        .route("/app/{file}", get(app_dist::download))
         .with_state(state)
 }
 
