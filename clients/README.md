@@ -40,7 +40,18 @@ clients/squire-sdk/  (Kotlin: SquireApi, KnightApi, ControlApi + models)   ← g
 | SDK generation | JVM (Java 17+) | `clients/generate-sdk.sh`; jar auto-fetched |
 | Android app build | Android SDK + Gradle | not in MacPorts — install Google's command-line tools (see below) |
 
-### Installing the Android toolchain (for the app build, not the SDK)
+### Status on this machine (installed)
+
+The toolchain is installed out-of-band (not in MacPorts):
+- Android SDK → `~/Library/Android/sdk` (build-tools 34.0.0, platform-tools, platforms;android-34)
+- Gradle 8.11.1 → `~/.local/bin/gradle`
+- JDK 17 (MacPorts openjdk17) pinned via `JAVA_HOME`
+
+Interactive zsh gets these from a managed block in `~/.zshrc`; for scripts/CI run
+`source clients/android-env.sh`. Verified: `gradle` compiles + runs Kotlin/JVM unit tests on JDK 17
+(the `:core` dev loop), and `adb` / `sdkmanager` resolve.
+
+### Installing the Android toolchain elsewhere (for the app build, not the SDK)
 
 MacPorts does not package the Android SDK. Use Google's command-line tools:
 
