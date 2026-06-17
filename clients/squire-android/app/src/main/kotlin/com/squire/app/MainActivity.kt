@@ -6,7 +6,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.squire.app.data.RoomOutbox
 import com.squire.app.data.RoomStateCache
 import com.squire.app.data.SquireApiAdapter
@@ -15,8 +18,12 @@ import com.squire.app.ui.PlayerHomeScreen
 import com.squire.core.PlayerStore
 import com.squire.core.PlayerUiState
 import com.squire.core.SyncEngine
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicLong
+
+/** Foreground auto-refresh cadence (SQUIRE-T-0041). */
+private const val AUTO_REFRESH_MS = 5_000L
 
 /**
  * Compose host for the Squire player home.
@@ -64,22 +71,32 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()
+                val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-                // DEMO connect: log in once to obtain a tenant token, then refresh. If login
+                // DEMO connect: log in once to obtain a tenant token, then auto-refresh. If login
                 // fails (server down / wrong creds) the PlayerStore's offline path still shows the
-                // cached/empty state gracefully, so we swallow the error and refresh regardless.
+                // cached/empty state gracefully, so we swallow the error and poll regardless.
                 LaunchedEffect(Unit) {
                     try {
                         adapter.login()
                     } catch (_: Throwable) {
-                        // Offline / login failure — fall through to refresh (offline path).
+                        // Offline / login failure — fall through to the poll loop (offline path).
                     }
-                    viewModel.refresh()
+                    // Foreground auto-refresh (SQUIRE-T-0041): while the screen is visible, sync on
+                    // a cadence so queued claims flush and fresh state appears without a manual
+                    // Refresh. `repeatOnLifecycle` cancels the loop when backgrounded (no drain);
+                    // `syncNow()` never throws, so a poll while the computer is asleep is a no-op.
+                    lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        while (true) {
+                            viewModel.refresh().join()
+                            delay(AUTO_REFRESH_MS)
+                        }
+                    }
                 }
 
                 PlayerHomeScreen(
                     state = state,
-                    onRefresh = viewModel::refresh,
+                    onRefresh = { viewModel.refresh() },
                     onMarkDone = { questId ->
                         val on = (state as? PlayerUiState.Ready)
                             ?.view

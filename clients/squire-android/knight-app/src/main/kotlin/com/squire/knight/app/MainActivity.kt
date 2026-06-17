@@ -6,7 +6,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.squire.knight.app.data.KnightApiAdapter
 import com.squire.knight.app.data.RoomPrivilegedOutbox
 import com.squire.knight.app.data.RoomReviewCache
@@ -14,8 +17,12 @@ import com.squire.knight.app.data.db.KnightDb
 import com.squire.knight.app.ui.KnightHomeScreen
 import com.squire.knight.core.KnightStore
 import com.squire.knight.core.KnightSyncEngine
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicLong
+
+/** Foreground auto-refresh cadence (SQUIRE-T-0041). */
+private const val AUTO_REFRESH_MS = 5_000L
 
 /**
  * Compose host for the Knight (parent) review home.
@@ -61,17 +68,27 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()
+                val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-                // DEMO connect: log in once to obtain a Knight token, then sync. If login fails
-                // (server down / offline) the store's offline path renders cache gracefully, and
-                // the adapter's lazy login retries on the next action/refresh.
+                // DEMO connect: log in once to obtain a Knight token, then auto-refresh. If login
+                // fails (server down / offline) the store's offline path renders cache gracefully,
+                // and the adapter's lazy login retries on the next poll/action.
                 LaunchedEffect(Unit) {
                     try {
                         adapter.login()
                     } catch (_: Throwable) {
-                        // Offline / login failure — fall through to refresh (offline path).
+                        // Offline / login failure — fall through to the poll loop (offline path).
                     }
-                    viewModel.refresh()
+                    // Foreground auto-refresh (SQUIRE-T-0041): while the review screen is visible,
+                    // sync on a cadence so a child's new claim/request appears and queued approvals
+                    // flush without a manual Refresh. Cancels when backgrounded; `syncNow()` never
+                    // throws, so polling while the Keep is asleep is a harmless no-op.
+                    lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        while (true) {
+                            viewModel.refresh().join()
+                            delay(AUTO_REFRESH_MS)
+                        }
+                    }
                 }
 
                 KnightHomeScreen(
