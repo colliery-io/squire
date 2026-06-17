@@ -4,14 +4,14 @@ level: task
 title: "Squire app: player home UI (Compose) + presentation store over the SDK"
 short_code: "SQUIRE-T-0034"
 created_at: 2026-06-17T13:26:03.813760+00:00
-updated_at: 2026-06-17T13:26:53.266900+00:00
+updated_at: 2026-06-17T13:34:37.675357+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,10 +32,12 @@ Build the Squire (child) **player home UI** in Jetpack Compose, driven by a pure
 
 ## Acceptance Criteria
 
-- [ ] **Presentation store (`:core`, pure JVM, tested):** a `PlayerStore` exposing a `StateFlow<PlayerUiState>` (`Loading` / `Ready(view, fromCache)` / `Error`). `refresh()` fetches `StateView` (via a `StateFetcher` port), caches it (`StateCache`), and on failure falls back to the cached view flagged `fromCache=true` (never throws — NFR-1/6). `submitClaim(...)`/`requestRedemption(...)` mint an id, enqueue to the `Outbox`, and run a `SyncEngine` pass. JVM tests cover: refresh→Ready; refresh-offline→Ready(fromCache) from cache; submit enqueues + a sync reconciles.
-- [ ] **Transport adapter (`:app`):** a `SquireApiAdapter` implementing `:core`'s `StateFetcher` + `SubmissionApi` + `StatePort` over the generated okhttp `SquireApi` (configured base URL + bearer token + `X-Household`). Reconciliation ids come from `StateView.myClaims/myRequests`.
-- [ ] **Compose UI (`:app`):** a `PlayerHomeScreen` rendering balance, today's quests (`QuestCard` with `QuestStatus`; a "Mark done" action on Available quests → submit claim; `TakenByOther`/`Pending`/`CompletedToday` shown, not actionable), rewards (`RewardCard` affordable / lock reason / request action), streaks (current/best/next milestone), and recent claims/requests with their state. An offline banner when `fromCache`. A refresh action. Hosted by `MainActivity` via a thin `SquireViewModel` wrapping `PlayerStore`.
-- [ ] `./gradlew :core:test` green (incl. the new `PlayerStore` tests) and `./gradlew :app:assembleDebug` builds a debug APK. Rust workspace untouched + still green.
+## Acceptance Criteria
+
+- [x] **Presentation store (`:core`, pure JVM, tested):** `PlayerStore` exposes `StateFlow<PlayerUiState>` (`Loading`/`Ready(view, fromCache)`/`Error`); offline-first `refresh()` (fetch→cache→Ready; on throw→cached→`Ready(fromCache=true)`; else `Error`; never throws); `submitClaim`/`requestRedemption` mint id → enqueue `Outbox` → `SyncEngine` → refresh. 5 new JVM tests (10 total green).
+- [x] **Transport adapter (`:app`):** `SquireApiAdapter` implements `StateFetcher`+`SubmissionApi`+`StatePort` over the generated okhttp `SquireApi` (bearer + `X-Household` via interceptor/per-call; `Dispatchers.IO`); `resolvedIds` from `myClaims/myRequests`.
+- [x] **Compose UI (`:app`):** `PlayerHomeScreen` (Material3) — balance, offline banner on `fromCache`, quests (Mark-done only on `Available`; Pending/Done/Taken labels), rewards (Redeem when affordable & unlocked, else lock/out-of-stock/can't-afford), streaks (current/best/next), recent claims/requests with state; refresh action; `@Preview`. `MainActivity` + `SquireViewModel` wire it.
+- [x] `./gradlew :core:test` green (PlayerStore + SyncEngine) and `./gradlew :app:assembleDebug` builds the debug APK (~10 MB). Rust workspace untouched + green.
 
 ## Implementation Notes
 
@@ -50,4 +52,10 @@ Compose plugin/BOM version matching (pin to the matrix). **Deferred to follow-up
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Done (`6061f15`).** The Squire player-home UI + presentation layer.
+
+- **`:core` `PlayerStore`** (pure JVM): `StateFetcher` port, `PlayerUiState` (`Loading`/`Ready(view,fromCache)`/`Error`), offline-first `refresh()` (never throws), `submitClaim`/`requestRedemption` (mint id → `Outbox` → `SyncEngine` → refresh). 5 new tests; `:core:test` = 10 green.
+- **`:app`**: `SquireApiAdapter` (the three `:core` ports over the generated okhttp `SquireApi`, bearer + `X-Household`), `SquireViewModel`, Material3 `PlayerHomeScreen` (balance, offline banner, quests with Mark-done on `Available`, rewards with redeem/lock, streaks, recent claims/requests), `MainActivity`. Compose plugin 2.0.20 + BOM 2024.09.03.
+- **Verified independently:** `:core:test` BUILD SUCCESSFUL; `:app:assembleDebug` → ~10 MB debug APK; Rust untouched.
+
+**Deferred (follow-up tasks):** durable Room cache+outbox (`:core` is in-memory now), pairing + secure token storage (placeholder config in `MainActivity`), background sync trigger, instrumented Compose UI tests. `DecisionDto` clean-up is the Knight's (S-0006).
