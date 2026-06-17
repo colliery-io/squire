@@ -43,6 +43,8 @@ use store::SystemClock;
 
 use identity::{Identity, Principal, ProdIdentity, SharedStore, TokenSigner};
 
+pub mod quests;
+
 /// Embedded web UI assets (`assets/`), baked into the binary so the Keep is one self-contained
 /// artifact (ADR A-0008 — no separate asset host, no node build step).
 #[derive(rust_embed::RustEmbed)]
@@ -316,6 +318,9 @@ pub fn router(state: Arc<KeepState>) -> Router {
         .route("/static/{*path}", get(static_asset))
         .route("/login", post(login))
         .route("/api/whoami", get(whoami))
+        // ── Authoring: quests (SQUIRE-T-0026) ──────────────────────────────────
+        .route("/api/quests", get(quests::list_quests).post(quests::create_quest))
+        .route("/api/quests/{id}/archive", post(quests::archive_quest))
         .with_state(state)
 }
 

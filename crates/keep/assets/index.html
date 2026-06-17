@@ -30,12 +30,26 @@
     <section id="shell" hidden>
       <p>Signed in as <strong id="who"></strong>.</p>
       <nav>
-        <a href="#review">Review</a> ·
         <a href="#quests">Quests</a> ·
+        <a href="#review">Review</a> ·
         <a href="#items">Items</a> ·
         <a href="#members">Members</a> ·
         <a href="#log">Log</a>
       </nav>
+    </section>
+
+    <!-- Quest authoring (SQUIRE-T-0026). A minimal create form (daily / all squires / each
+         assignee); the JSON API behind it supports the full cadence/assignment/completion shape. -->
+    <section id="quests-panel" hidden>
+      <h2 id="quests">Quests</h2>
+      <form id="quest-form">
+        <label>Title <input name="title" required /></label>
+        <label>Reward (points) <input name="reward" type="number" min="0" value="5" required /></label>
+        <label><input name="auto_approve" type="checkbox" /> Auto-approve (skip review)</label>
+        <button type="submit">Add quest</button>
+      </form>
+      <p id="quest-error" class="error" hidden></p>
+      <ul id="quest-list"></ul>
     </section>
   </main>
 

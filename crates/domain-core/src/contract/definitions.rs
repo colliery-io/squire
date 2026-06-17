@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 
 /// A chore template. Each scheduled occurrence is claimed/completed separately;
 /// editing a Quest never rewrites past completions (points are snapshotted).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct Quest {
     pub id: QuestId,
@@ -26,6 +27,7 @@ pub struct Quest {
 }
 
 /// Which Squires a quest is for — always at least one.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum Assignment {
     AllSquires,                  // every active Squire (auto-includes Squires added later)
@@ -33,6 +35,7 @@ pub enum Assignment {
 }
 
 /// How an assigned occurrence is satisfied.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Completion {
     /// Every assignee completes it independently — each has their own occurrence,
@@ -46,12 +49,14 @@ pub enum Completion {
     Race,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum Cadence {
     OneOff { due: Option<Date> },
     Recurring(Schedule),
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum Schedule {
     Daily,
@@ -60,6 +65,7 @@ pub enum Schedule {
     EveryNDays { n: u16, anchor: Date },
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct RedeemableItem {
     pub id: ItemId,
@@ -74,6 +80,7 @@ pub struct RedeemableItem {
 
 /// MVP keeps this deliberately simple — no rate-limit math; parents eyeball the last
 /// redemption and adjudicate. See ADR SQUIRE-A-0006.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Availability {
     /// A one-off (e.g. a toy): a single household-wide redemption. After the first
@@ -87,6 +94,7 @@ pub enum Availability {
 
 /// Defining an achievement IS how you "define a streak" with teeth — it attaches
 /// a reward and/or (via an item's `gate`) unlocks something in the store.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct Achievement {
     pub id: AchievementId,
@@ -97,6 +105,7 @@ pub struct Achievement {
     pub active: bool,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum Criterion {
     Streak { scope: Scope, length: u32, basis: StreakBasis },
@@ -104,6 +113,7 @@ pub enum Criterion {
     PointsEarned { total: Points },
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum Scope {
     Quest(QuestId),
@@ -111,6 +121,7 @@ pub enum Scope {
     Any,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Debug)]
 pub enum StreakBasis {
     /// Respects the quest's schedule — a Mon/Wed/Fri chore isn't broken by Saturday.
