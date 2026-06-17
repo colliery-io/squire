@@ -9,9 +9,13 @@
 
 pub mod conn;
 pub mod migrations;
+pub mod rows;
 pub mod schema;
 
 pub use conn::AnyConnection;
+pub use rows::{
+    Audit, AchievementRow, EventRow, ItemRow, QuestRow, RowError, UserRow,
+};
 pub use migrations::{run_migrations, MIGRATIONS};
 
 /// Postgres-backend helpers, compiled only under the `postgres` feature (which links libpq).
