@@ -4,14 +4,14 @@ level: task
 title: "Domain Core: scheduling & due logic (quests_due)"
 short_code: "SQUIRE-T-0004"
 created_at: 2026-06-17T03:01:57.435794+00:00
-updated_at: 2026-06-17T03:01:57.435794+00:00
+updated_at: 2026-06-17T03:35:19.851931+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Implement `quests_due(snap, squire, on)` — cadence resolution + assignment + Race-open gating + per-Squire already-satisfied subtraction, timezone-stable; plus the `QuestStatus` derivation for the view.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -153,3 +153,51 @@ pub fn cadence_matches(quest: &Quest, on: Date) -> bool {
         Cadence::Recurring(s) => schedule_matches(s, on),
     }
 }
+
+/// Does `squire` have a *pending* (un-reviewed) claim for `(quest, on)`?
+pub fn squire_pending(snap: &Snapshot, squire: UserId, quest_id: QuestId, on: Date) -> bool {
+    snap.events.iter().any(|e| match e {
+        Event::CompletionClaimed { claim_id, squire: s, quest_id: q, on: d, .. }
+            if *s == squire && *q == quest_id && *d == on =>
+        {
+            matches!(claim_resolution(snap, *claim_id), Some(ClaimResolution::Pending))
+        }
+        _ => false,
+    })
+}
+
+/// The reason a `SubmitClaim` for `(squire, quest, on)` would be rejected *right now*, or
+/// `None` if it would be accepted. Assumes `squire` is an active Squire and `quest` exists;
+/// does NOT enforce scheduling (claims are deliberately lenient — see `claims`) and does NOT
+/// check `claim_id` idempotency. Shared by `claims::submit` and `quests_due` so they agree.
+pub fn submit_rejection(
+    snap: &Snapshot,
+    squire: UserId,
+    quest: &Quest,
+    on: Date,
+) -> Option<DomainError> {
+    if !quest.active {
+        return Some(DomainError::Inactive);
+    }
+    if !is_assignee(snap, quest, squire) {
+        return Some(DomainError::NotAssigned);
+    }
+    match quest.completion {
+        Completion::Race => {
+            if occurrence_closed(snap, quest.id, on) {
+                return Some(DomainError::OccurrenceTaken);
+            }
+            if squire_has_live_claim(snap, squire, quest.id, on) {
+                return Some(DomainError::AlreadyClaimedToday);
+            }
+        }
+        Completion::EachAssignee => {
+            if !quest.repeatable_within_day
+                && squire_has_live_claim(snap, squire, quest.id, on)
+            {
+                return Some(DomainError::AlreadyClaimedToday);
+            }
+        }
+    }
+    None
+}
