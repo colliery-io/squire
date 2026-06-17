@@ -63,6 +63,36 @@ In the Keep (on the computer):
 
 Repeat for each phone. "Forget" on a phone clears its pairing to re-pair.
 
+## Pushing an app update (optional)
+
+The server can offer app updates over the LAN so you don't have to re-sideload each phone by hand:
+
+1. Build new **signed** release APKs (bump `versionCode` in each app's `build.gradle.kts`, same
+   keystore — see `SQUIRE-T-0049`).
+2. Put the APKs + a `manifest.json` in a directory, and point the server at it with `SQUIRE_APK_DIR`:
+
+   ```
+   <SQUIRE_APK_DIR>/
+     squire.apk
+     knight.apk
+     manifest.json
+   ```
+   ```json
+   {
+     "squire": { "versionCode": 2, "versionName": "0.2.0", "file": "squire.apk" },
+     "knight": { "versionCode": 2, "versionName": "0.2.0", "file": "knight.apk" }
+   }
+   ```
+
+   ```sh
+   SQUIRE_APK_DIR=/path/to/apks SQUIRE_ADMIN_SECRET=... \
+     cargo run --release -p squire-home --bin squire-serve
+   ```
+3. Each phone shows an **"Update available — vX → Get update"** banner on next launch; tapping it
+   downloads the APK in the browser and the system installer takes over (the user confirms — Android
+   won't silently install a sideloaded app). The update installs over the old app, **keeping the
+   pairing + data** (same signing key, higher `versionCode`). No `SQUIRE_APK_DIR` set ⇒ no banner.
+
 ## 3. Use it (the loop)
 
 - **Squire (child):** sees today's quests → **Mark done**; sees rewards → **Redeem**.

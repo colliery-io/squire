@@ -1,8 +1,13 @@
 package com.squire.knight.app
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -10,6 +15,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -26,6 +33,9 @@ import com.squire.pairing.NsdDiscovery
 import com.squire.pairing.PairingScreen
 import com.squire.pairing.Session
 import com.squire.pairing.SessionStore
+import com.squire.pairing.UpdateBanner
+import com.squire.pairing.UpdateChecker
+import com.squire.pairing.UpdateInfo
 import com.squire.sdk.api.ControlApi
 import com.squire.sdk.model.LoginReq
 import kotlinx.coroutines.Dispatchers
@@ -123,6 +133,7 @@ private fun KnightHomeHost(
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val context = LocalContext.current
 
     LaunchedEffect(session) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -133,16 +144,31 @@ private fun KnightHomeHost(
         }
     }
 
-    KnightHomeScreen(
-        state = state,
-        onRefresh = { viewModel.refresh() },
-        onApproveClaim = { viewModel.approveClaim(it) },
-        onRejectClaim = { viewModel.rejectClaim(it, null) },
-        onApproveRequest = { viewModel.approveRequest(it) },
-        onRejectRequest = { viewModel.rejectRequest(it, null) },
-        onAddFunds = { squire, amount, reason -> viewModel.adjust(squire, amount, reason) },
-        onRedeem = { squire, itemId -> viewModel.redeem(squire, itemId) },
-        onMarkDone = { squire, questId, on -> viewModel.markDone(squire, questId, on) },
-        onForget = onForget,
-    )
+    // Server-distributed update check (SQUIRE-T-0051).
+    var update by remember(session) { mutableStateOf<UpdateInfo?>(null) }
+    LaunchedEffect(session) {
+        update = UpdateChecker.check(session.baseUrl, "knight", BuildConfig.VERSION_CODE)
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        update?.let { info ->
+            UpdateBanner(info) {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl)))
+            }
+        }
+        Box(modifier = Modifier.weight(1f)) {
+            KnightHomeScreen(
+                state = state,
+                onRefresh = { viewModel.refresh() },
+                onApproveClaim = { viewModel.approveClaim(it) },
+                onRejectClaim = { viewModel.rejectClaim(it, null) },
+                onApproveRequest = { viewModel.approveRequest(it) },
+                onRejectRequest = { viewModel.rejectRequest(it, null) },
+                onAddFunds = { squire, amount, reason -> viewModel.adjust(squire, amount, reason) },
+                onRedeem = { squire, itemId -> viewModel.redeem(squire, itemId) },
+                onMarkDone = { squire, questId, on -> viewModel.markDone(squire, questId, on) },
+                onForget = onForget,
+            )
+        }
+    }
 }
