@@ -40,7 +40,7 @@ pub mod pg {
         conn.batch_execute(
             "SELECT 1 FROM users LIMIT 0; SELECT 1 FROM quests LIMIT 0; \
              SELECT 1 FROM items LIMIT 0; SELECT 1 FROM achievements LIMIT 0; \
-             SELECT 1 FROM events LIMIT 0;",
+             SELECT 1 FROM events LIMIT 0; SELECT 1 FROM credentials LIMIT 0;",
         )?;
         Ok(())
     }
@@ -58,7 +58,7 @@ use domain_core::contract::{
 };
 
 use crate::rows::id_to_text;
-use crate::schema::{achievements, events, items, quests, users};
+use crate::schema::{achievements, credentials, events, items, quests, users};
 
 // ─── error mapping ───────────────────────────────────────────────────────────
 
@@ -100,6 +100,43 @@ impl From<RepoError> for TxnError {
     fn from(e: RepoError) -> Self {
         TxnError(e)
     }
+}
+
+// ─── upsert dispatch macro ─────────────────────────────────────────────────────
+//
+// Diesel's `MultiConnection` backend reports `OnConflictClause = DoesNotSupportOnConflictClause`
+// — i.e. the *erased* `AnyConnection` cannot type-check `on_conflict().do_update()`. So each
+// upsert dispatches on the enum and runs the typed query against the CONCRETE connection
+// (`SqliteConnection` / `PgConnection`), both of which support the Pg-style upsert in Diesel 2.
+// The `$set` tuple is identical per backend; the macro avoids hand-duplicating it.
+//
+// For the definition/identity upserts, `created_*` are NOT in `$set`, so an existing
+// (conflicting) row keeps its original `created_by`/`created_at`; only a brand-new INSERT picks
+// them up from the row values. `updated_*` are always in `$set`, so every write stamps the last
+// editor + time. (The `credentials` upsert has no audit columns at all.)
+//
+// Defined here (ahead of the first use in `Store::set_credential`) so it is in textual scope for
+// the whole module.
+macro_rules! run_upsert {
+    ($conn:expr, $table:path, $id:path, $row:expr, $set:expr) => {{
+        let row = $row;
+        match $conn {
+            AnyConnection::Sqlite(c) => diesel::insert_into($table)
+                .values(&row)
+                .on_conflict($id)
+                .do_update()
+                .set($set(&row))
+                .execute(c),
+            #[cfg(feature = "postgres")]
+            AnyConnection::Pg(c) => diesel::insert_into($table)
+                .values(&row)
+                .on_conflict($id)
+                .do_update()
+                .set($set(&row))
+                .execute(c),
+        }
+        .map_err(map_err)?;
+    }};
 }
 
 // ─── the generic store ───────────────────────────────────────────────────────
@@ -206,6 +243,51 @@ impl<C: Clock> Store<C> {
             .collect::<Result<Vec<_>, _>>()
             .expect("raw_log_for_quest: decode failed (corrupt store)")
     }
+
+    /// Upsert a member's hashed secret into THIS tenant's `credentials` table (REQ-1.6).
+    ///
+    /// Credentials live inside the tenant schema, isolated exactly like the rest of the
+    /// household's data. This is NOT a domain [`Change`] — it bypasses `apply` (no audit
+    /// stamping, no event) and writes the row directly. `secret_hash` is an Argon2id PHC
+    /// string; the plaintext is never stored. Upsert by `user_id` so re-setting a secret
+    /// replaces the existing hash.
+    pub fn set_credential(&self, user: UserId, secret_hash: &str) -> Result<(), RepoError> {
+        let mut conn = self.conn.borrow_mut();
+        let row = CredentialRow {
+            user_id: id_to_text(user.0),
+            secret_hash: secret_hash.to_string(),
+        };
+        run_upsert!(
+            &mut *conn,
+            credentials::table,
+            credentials::user_id,
+            row,
+            |row: &CredentialRow| (credentials::secret_hash.eq(row.secret_hash.clone()),)
+        );
+        Ok(())
+    }
+
+    /// Read a member's stored secret hash from this tenant's `credentials` table, or `None`
+    /// if no credential is set for `user`.
+    pub fn credential(&self, user: UserId) -> Option<String> {
+        let mut conn = self.conn.borrow_mut();
+        credentials::table
+            .filter(credentials::user_id.eq(id_to_text(user.0)))
+            .select(credentials::secret_hash)
+            .first::<String>(&mut *conn)
+            .optional()
+            .expect("credential: query failed (corrupt store)")
+    }
+}
+
+/// A `credentials` row: a member's hashed secret keyed by `UserId` (no audit columns — this
+/// table is written directly by the identity layer, not through `apply`).
+#[derive(Debug, Clone, Insertable, Queryable, Selectable)]
+#[diesel(table_name = credentials)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+struct CredentialRow {
+    user_id: String,
+    secret_hash: String,
 }
 
 impl<C: Clock> Repository for Store<C> {
@@ -345,37 +427,6 @@ fn append_event(conn: &mut AnyConnection, seq: i64, ev: &Event) -> Result<(), Re
 // in the set, so a conflicting (existing) row keeps whatever it was first inserted with;
 // only a brand-new row gets `created_* = (by, now)` from the inserted row values. This is
 // portable across SQLite and Postgres in Diesel 2 (`on_conflict(id).do_update()`).
-
-// Diesel's `MultiConnection` backend reports `OnConflictClause = DoesNotSupportOnConflictClause`
-// — i.e. the *erased* `AnyConnection` cannot type-check `on_conflict().do_update()`. So each
-// upsert dispatches on the enum and runs the typed query against the CONCRETE connection
-// (`SqliteConnection` / `PgConnection`), both of which support the Pg-style upsert in Diesel 2.
-// The `$set` tuple is identical per backend; the macro avoids hand-duplicating it.
-//
-// `created_*` are NOT in `$set`, so an existing (conflicting) row keeps its original
-// `created_by`/`created_at`; only a brand-new INSERT picks them up from the row values.
-// `updated_*` are always in `$set`, so every write stamps the last editor + time.
-macro_rules! run_upsert {
-    ($conn:expr, $table:path, $id:path, $row:expr, $set:expr) => {{
-        let row = $row;
-        match $conn {
-            AnyConnection::Sqlite(c) => diesel::insert_into($table)
-                .values(&row)
-                .on_conflict($id)
-                .do_update()
-                .set($set(&row))
-                .execute(c),
-            #[cfg(feature = "postgres")]
-            AnyConnection::Pg(c) => diesel::insert_into($table)
-                .values(&row)
-                .on_conflict($id)
-                .do_update()
-                .set($set(&row))
-                .execute(c),
-        }
-        .map_err(map_err)?;
-    }};
-}
 
 fn upsert_user(
     conn: &mut AnyConnection,

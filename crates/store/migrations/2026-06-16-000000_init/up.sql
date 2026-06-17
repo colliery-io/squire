@@ -138,6 +138,20 @@ CREATE TABLE events (
     achievement_id TEXT
 );
 
+-- ─── CREDENTIALS (per-tenant auth secrets, SQUIRE-S-0007 / REQ-1.6) ──────────
+--
+-- Member secrets live INSIDE the tenant schema (never a global/shared directory),
+-- so a household's credentials are isolated exactly like the rest of its data.
+-- This is NOT a domain table: the `Identity` impl writes/reads it directly
+-- (bypassing Repository::apply), so it carries no audit columns — just the hashed
+-- secret keyed by UserId. `secret_hash` holds an Argon2id PHC string; the plaintext
+-- secret is never stored. Portable subset (TEXT only), so it migrates on both
+-- SQLite and Postgres.
+CREATE TABLE credentials (
+    user_id     TEXT NOT NULL PRIMARY KEY,  -- UserId (u128 as decimal string)
+    secret_hash TEXT NOT NULL               -- Argon2id PHC string
+);
+
 -- Order index (primary read path is the whole ordered log).
 CREATE INDEX idx_events_seq ON events (seq);
 -- Per-quest / per-item raw queries.
