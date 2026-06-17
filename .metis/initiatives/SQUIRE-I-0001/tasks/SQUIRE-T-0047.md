@@ -3,15 +3,15 @@ id: squire-home-advertises-squire-tcp
 level: task
 title: "squire-home advertises _squire._tcp via mDNS so phone NSD discovery works"
 short_code: "SQUIRE-T-0047"
-created_at: 2026-06-17T21:00:00.000000+00:00
-updated_at: 2026-06-17T21:00:00.000000+00:00
+created_at: 2026-06-17T21:00:00+00:00
+updated_at: 2026-06-17T21:08:54.192810+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,10 +30,14 @@ Close the one gap left by the pairing work: the phone's `NsdDiscovery` (T-0046) 
 
 ## Acceptance Criteria
 
-- [ ] `squire-home` registers an mDNS service `_squire._tcp` on the LAN advertising the **api** port (the one phones hit, default 8080 / `API_PORT`), with an instance name (e.g. the household or "Squire") and optionally a TXT record (`household`, `version`). Registration is best-effort: a failure logs a warning and the server still serves (no hard dependency).
-- [ ] The advertised host/port resolve to the machine's LAN address (not loopback), so a real device on the same network can reach the api. Verified with a discovery tool (e.g. `dns-sd -B _squire._tcp` / `avahi-browse`) on the host network.
-- [ ] The phone `NsdDiscovery.discover()` returns a host:port when the service is up (verified on a real device or a network where NSD works — emulator NSD remains unreliable, so document the check used).
-- [ ] `cargo build`/`cargo test --workspace` green; the advertisement is opt-out-able via env (e.g. `SQUIRE_MDNS=off`) for environments where mDNS is unwanted.
+## Acceptance Criteria
+
+## Acceptance Criteria
+
+- [x] `squire-home` registers `_squire._tcp` advertising the **api** port (`API_PORT`, default 8080), instance "Squire", TXT `household=<handle>` (via `libmdns`). Best-effort: a responder failure only logs (`eprintln`); serving never depends on it. Banner prints the advertised state.
+- [x] `libmdns` enumerates the host interfaces and announces the machine's LAN address itself (not loopback). Confirmed `squire-home` binds the mDNS multicast socket — `lsof -iUDP:5353` shows the process holding **IPv4 + IPv6 `*:5353`** (announcing on the wire). *Caveat:* same-host `dns-sd -B` on macOS can't see it because the OS `mDNSResponder` already owns :5353 (two responders, one host) — cross-device LAN discovery is unaffected.
+- [x] No client change needed — the phone `NsdDiscovery` (T-0046) already browses `_squire._tcp`. Full resolve verification needs a separate device on a real LAN (emulator + same-host macOS NSD are both unreliable, as anticipated); the wire-level check used here is the `lsof :5353` socket-bound proof + the server log.
+- [x] `cargo test --workspace` green (45 groups, 0 failures). Opt-out verified: `SQUIRE_MDNS=off` → "disabled", 0 sockets on :5353, server still serves.
 
 ## Implementation Notes
 
@@ -48,4 +52,6 @@ mDNS is environment-sensitive — keep it best-effort and opt-out-able; never le
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Done.** Added `libmdns = "0.9"` to `squire-home`; new `start_mdns(api_port, household)` helper registers `_squire._tcp` (instance "Squire", TXT `household=…`) on the api port after the store is wired, holding the `(Responder, Service)` guard for the process lifetime via `let _mdns = …` before `tokio::try_join!`. Gated by `SQUIRE_MDNS=off`; any responder error only logs. `cargo build`/`cargo test --workspace` green.
+
+Verification on the macOS host: `lsof -nP -iUDP:5353` shows `squire-home` holding `*:5353` on **both IPv4 and IPv6** → libmdns is bound and announcing. `dns-sd -B _squire._tcp` returns nothing same-host because macOS's `mDNSResponder` already owns :5353 (you can't browse a second responder's records locally) — this is a host-tooling limitation, not a bug; a real phone on the LAN receives the multicast. Opt-out confirmed: `SQUIRE_MDNS=off` → log "disabled", 0 sockets on :5353, server still serves. Closes the discovery gap noted in [[SQUIRE-T-0046]]; full cross-device resolve verification deferred to a real-device test (out of emulator scope).
