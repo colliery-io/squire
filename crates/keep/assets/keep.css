@@ -87,9 +87,30 @@ button {
 }
 button:hover { background: var(--royal-deep); }
 
-nav { margin-top: .25rem; }
-nav a { color: var(--royal); font-weight: 600; text-decoration: none; }
-nav a:hover { color: var(--gold); text-decoration: underline; }
+/* Tab bar (T-0061): the shell's nav switches one panel at a time. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin-top: .75rem;
+  border-bottom: 2px solid var(--line);
+}
+.tabs .tab {
+  color: var(--royal);
+  font-weight: 600;
+  text-decoration: none;
+  padding: .5rem .9rem;
+  border-radius: 10px 10px 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
+  margin-bottom: -2px;
+}
+.tabs .tab:hover { background: var(--gold-soft); }
+.tabs .tab.active {
+  color: #fff;
+  background: var(--royal);
+  border-color: var(--royal);
+}
 
 details summary { cursor: pointer; color: var(--royal); margin-top: .5rem; }
 
