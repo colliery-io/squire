@@ -9,9 +9,9 @@
 use std::path::Path;
 
 use domain_core::contract::{
-    Achievement, AchievementId, AddMemberReq, Assignment, Availability, Cadence, Change, Completion,
-    Criterion, HouseholdHandle, ItemId, Quest, QuestId, RedeemableItem, RegisterHouseholdReq,
-    Repository, Role, Schedule, Scope, StreakBasis, UserId,
+    Achievement, AchievementId, AddMemberReq, Assignment, Availability, Cadence, Change, ClaimId,
+    Clock, Completion, Criterion, Event, HouseholdHandle, ItemId, Quest, QuestId, RedeemableItem,
+    RegisterHouseholdReq, Repository, Role, Schedule, Scope, StreakBasis, UserId,
 };
 use identity::Principal;
 
@@ -96,6 +96,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         active: true,
         icon: None,
     };
+    // A seeded pending claim so the Review tab always has something to triage in the demo
+    // (Gawain claimed "Tidy your room" today, awaiting the Knight's seal) — SQUIRE-T-0080.
+    let (today, now) = {
+        let g = store.lock().unwrap();
+        (g.clock().today(), g.clock().now())
+    };
     store
         .lock()
         .unwrap()
@@ -104,12 +110,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             &[
                 Change::PutQuest(daily(100, "Make your bed", 5, true)),
                 Change::PutQuest(daily(101, "Tidy your room", 10, false)),
+                Change::PutQuest(daily(102, "Walk the dog", 8, false)),
                 Change::PutAchievement(streak),
                 Change::PutItem(ice_cream),
                 Change::PutItem(movie_night),
+                // Two pending claims so the Review tab demo shows triage (and the E2E can reject one
+                // and approve another independently) — SQUIRE-T-0080.
+                Change::Append(Event::CompletionClaimed {
+                    claim_id: ClaimId(9001),
+                    squire: UserId(2),
+                    quest_id: QuestId(101),
+                    on: today,
+                    at: now,
+                }),
+                Change::Append(Event::CompletionClaimed {
+                    claim_id: ClaimId(9002),
+                    squire: UserId(2),
+                    quest_id: QuestId(102),
+                    on: today,
+                    at: now,
+                }),
             ],
         )
-        .expect("seed quests + achievement + rewards");
+        .expect("seed quests + achievement + rewards + a pending claim");
 
     // Onboarding (ADR A-0011): seed the household timezone (SQUIRE_TZ or the detected host zone).
     let timezone = ensure_timezone(&store);

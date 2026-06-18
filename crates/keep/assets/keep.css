@@ -152,3 +152,21 @@ pre {
 .error { color: var(--crimson); font-weight: 600; }
 .sub { color: var(--muted); font-size: .85rem; }
 strong { color: var(--royal-deep); }
+
+/* Inline reject/adjust editors in the Review queue (SQUIRE-T-0080) — replaces browser prompt(). */
+.inline-editor {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+  margin-left: .5rem;
+}
+.inline-editor input {
+  padding: .3rem .5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.inline-editor input.reject-reason,
+.inline-editor input.adjust-reason { min-width: 16rem; }
+.inline-editor input.adjust-amount { width: 6rem; }
+.confirm-reject, .apply-adjust { background: var(--crimson); color: #fff; }
