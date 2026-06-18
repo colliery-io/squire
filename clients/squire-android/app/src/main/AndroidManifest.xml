@@ -3,6 +3,9 @@
 
     <!-- The Squire talks to the Local API over the home LAN (plain HTTP; NFR-6). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- In-app update install (SQUIRE-T-0059): download the LAN APK and hand it to the system
+         installer without bouncing through the browser. First use prompts a one-time per-app grant. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:icon="@mipmap/ic_launcher"
@@ -17,6 +20,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Receives PackageInstaller session callbacks for the in-app update (SQUIRE-T-0059):
+             raises the system "update Squire?" dialog. Internal — fired only by our own PendingIntent. -->
+        <receiver
+            android:name="com.squire.pairing.InstallReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>
