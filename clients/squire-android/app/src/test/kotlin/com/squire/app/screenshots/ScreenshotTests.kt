@@ -18,6 +18,7 @@ import com.squire.knight.app.ui.RejectReasonDialog
 import com.squire.knight.app.ui.RewardAdminScreen
 import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.AchievementSummaryDto
+import com.squire.sdk.model.BadgeView
 import com.squire.sdk.model.ClaimState
 import com.squire.sdk.model.ClaimStateKind
 import com.squire.sdk.model.ClaimStatus
@@ -103,6 +104,7 @@ class ScreenshotTests {
             myClaims = emptyList(),
             myRequests = emptyList(),
             streaks = listOf(StreakView(name = "Room Master", current = 3, best = 5, alive = true, nextMilestone = 7)),
+            badges = emptyList(),
         )
         paparazzi.snapshot {
             SquireTheme {
@@ -236,7 +238,11 @@ class ScreenshotTests {
                 RedemptionStatus(cost = 25, itemName = "Movie night", requestId = 20L,
                     state = RedemptionState(state = RedemptionStateKind.Rejected, reason = "After homework")),
             ),
-            streaks = emptyList(),
+            streaks = listOf(StreakView(name = "Room Master", current = 3, best = 5, alive = true, nextMilestone = 7)),
+            badges = listOf(
+                BadgeView(at = 0L, bonus = 25, id = 1L, name = "Century Club"),
+                BadgeView(at = 0L, bonus = 50, id = 2L, name = "Chore Champion"),
+            ),
         )
         paparazzi.snapshot {
             SquireTheme {

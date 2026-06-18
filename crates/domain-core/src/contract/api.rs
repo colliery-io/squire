@@ -14,6 +14,10 @@ pub struct StateView {
     pub balance: Points,
     pub quests_today: Vec<QuestCard>,
     pub streaks: Vec<StreakView>,
+    /// Achievements the Squire has already earned (SQUIRE-T-0079). `#[serde(default)]` so a payload
+    /// from an older server without the field still deserializes.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub badges: Vec<BadgeView>,
     pub rewards: Vec<RewardCard>,
     pub my_claims: Vec<ClaimStatus>,
     pub my_requests: Vec<RedemptionStatus>,
@@ -45,6 +49,20 @@ pub struct StreakView {
     pub best: u32,
     pub alive: bool,                 // false once an occurrence has lapsed
     pub next_milestone: Option<u32>, // next achievement length in this scope
+}
+
+/// An achievement the Squire has already **earned** (an `AchievementUnlocked` event exists), shown
+/// as a badge on the child home (SQUIRE-T-0079) — distinct from a [`StreakView`] (still in progress).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct BadgeView {
+    pub id: AchievementId,
+    pub name: String,
+    /// The bonus points this unlock awarded.
+    pub bonus: Points,
+    /// When it was earned (newest first in the list).
+    pub at: Timestamp,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -13,9 +13,10 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 
 use domain_core::contract::{
-    Assignment, AuthToken, Cadence, Change, Completion, Date, HouseholdHandle, ItemId, Quest,
-    QuestId, RedeemableItem, Availability, Role, Schedule, StateView, SubmitClaimResp,
-    RequestRedemptionResp, ClaimStateKind, RedemptionStateKind, User, UserId,
+    Achievement, AchievementId, Assignment, AuthToken, Cadence, Change, Completion, Criterion, Date,
+    Event, HouseholdHandle, ItemId, Quest, QuestId, RedeemableItem, Availability, Role, Schedule,
+    Scope, StateView, SubmitClaimResp, RequestRedemptionResp, ClaimStateKind, RedemptionStateKind,
+    Timestamp, User, UserId,
 };
 use domain_core::contract::{Clock, Repository};
 use store::tenant::{Backend, Provisioner};
@@ -38,6 +39,12 @@ const ITEM_ID: u128 = 200;
 /// seeded with a Squire token and a Knight token, both bound to `house1`. Returns the state, the
 /// `TempDir` (kept alive for the test), and `today` (the clock's date, for building claims).
 fn test_state() -> (Arc<AppState>, tempfile::TempDir, Date) {
+    test_state_with(&[])
+}
+
+/// Like [`test_state`] but applies `extra` changes after the default seed (used to seed e.g. an
+/// achievement + an unlock for the badge test).
+fn test_state_with(extra: &[Change]) -> (Arc<AppState>, tempfile::TempDir, Date) {
     let dir = tempfile::tempdir().expect("tempdir");
     let provisioner = Provisioner::new(Backend::Sqlite { dir: dir.path().to_path_buf() });
     let mut store = provisioner
@@ -77,17 +84,14 @@ fn test_state() -> (Arc<AppState>, tempfile::TempDir, Date) {
         icon: None,
     };
 
-    store
-        .apply(
-            None,
-            &[
-                Change::PutUser(knight),
-                Change::PutUser(squire),
-                Change::PutQuest(quest),
-                Change::PutItem(item),
-            ],
-        )
-        .expect("seed");
+    let mut changes = vec![
+        Change::PutUser(knight),
+        Change::PutUser(squire),
+        Change::PutQuest(quest),
+        Change::PutItem(item),
+    ];
+    changes.extend_from_slice(extra);
+    store.apply(None, &changes).expect("seed");
 
     // Share one store between the identity port and the request handlers.
     let store = Arc::new(std::sync::Mutex::new(store));
@@ -250,6 +254,36 @@ async fn knight_reject_with_reason_surfaces_to_child_then_reclaim_approves() {
     assert_eq!(view.balance, 5, "the approved re-claim credits the quest reward");
     let approved = view.my_claims.iter().find(|c| matches!(c.state.state, ClaimStateKind::Approved)).expect("an approved claim");
     assert_eq!(approved.state.points, Some(5));
+}
+
+/// A Squire who has earned an achievement sees it as a badge in `GET /state` (SQUIRE-T-0079); a
+/// fresh Squire's `badges` is empty.
+#[tokio::test]
+async fn earned_achievements_surface_as_badges() {
+    // No badges by default.
+    let (fresh, _dir, _t) = test_state();
+    let view: StateView = json_body(router(fresh).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap()).await;
+    assert!(view.badges.is_empty(), "a fresh squire has no badges");
+
+    // Seed an achievement definition + an unlock for the squire.
+    let ach = Achievement {
+        id: AchievementId(900),
+        name: "Century Club".into(),
+        description: None,
+        criterion: Criterion::PointsEarned { total: 100 },
+        bonus_points: 25,
+        active: true,
+    };
+    let (state, _dir, _t) = test_state_with(&[
+        Change::PutAchievement(ach),
+        Change::Append(Event::AchievementUnlocked { squire: UserId(SQUIRE_ID), id: AchievementId(900), bonus: 25, at: Timestamp(123) }),
+    ]);
+    let view: StateView = json_body(router(state).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap()).await;
+    assert_eq!(view.badges.len(), 1, "the earned achievement shows as a badge");
+    let b = &view.badges[0];
+    assert_eq!(b.id, AchievementId(900));
+    assert_eq!(b.name, "Century Club");
+    assert_eq!(b.bonus, 25);
 }
 
 #[tokio::test]

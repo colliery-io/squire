@@ -90,6 +90,7 @@ impl Modify for SecurityAddon {
         domain_core::contract::QuestCard,
         domain_core::contract::QuestStatus,
         domain_core::contract::StreakView,
+        domain_core::contract::BadgeView,
         domain_core::contract::RewardCard,
         domain_core::contract::LockReason,
         domain_core::contract::ClaimStatus,

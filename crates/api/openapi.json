@@ -1471,6 +1471,32 @@
           "Repeatable"
         ]
       },
+      "BadgeView": {
+        "type": "object",
+        "description": "An achievement the Squire has already **earned** (an `AchievementUnlocked` event exists), shown\nas a badge on the child home (SQUIRE-T-0079) — distinct from a [`StreakView`] (still in progress).",
+        "required": [
+          "id",
+          "name",
+          "bonus",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it was earned (newest first in the list)."
+          },
+          "bonus": {
+            "$ref": "#/components/schemas/u32",
+            "description": "The bonus points this unlock awarded."
+          },
+          "id": {
+            "$ref": "#/components/schemas/AchievementId"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "CadenceKind": {
         "type": "string",
         "description": "Quest cadence on the wire (flat). `weekdays` applies to `Weekly`; `due` (a `Date` day-count) to\n`OneOff`; `Daily` uses neither.",
@@ -2601,6 +2627,13 @@
           "my_requests"
         ],
         "properties": {
+          "badges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BadgeView"
+            },
+            "description": "Achievements the Squire has already earned (SQUIRE-T-0079). `#[serde(default)]` so a payload\nfrom an older server without the field still deserializes."
+          },
           "balance": {
             "$ref": "#/components/schemas/u32"
           },
