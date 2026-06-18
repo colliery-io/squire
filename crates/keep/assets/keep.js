@@ -52,6 +52,7 @@
     document.getElementById("shell").hidden = false;
     loadAchScopeQuests();
     loadCatalog("achievements", "achievement-list");
+    loadLibrary();
     showTab(currentTab());
   }
 
@@ -496,6 +497,87 @@
       syncQuestFields();
       loadQuests();
     });
+  }
+
+  // ── Starter quest library (T-0063) ───────────────────────────────────────────
+  // A shipped catalog (assets/library.json) of common chores the parent can one-tap import for
+  // all squires, then edit/archive. Rendered once, grouped by category.
+  let idSeq = 0;
+  function freshId() {
+    // Monotonic id so rapid imports don't collide on the same millisecond. Stays < 2^53.
+    return Date.now() * 1000 + (idSeq++ % 1000);
+  }
+
+  let libraryLoaded = false;
+  async function loadLibrary() {
+    if (libraryLoaded) return;
+    const res = await fetch("/static/library.json");
+    if (!res.ok) return;
+    const data = await res.json();
+    const quests = (data && data.quests) || [];
+    const container = document.getElementById("library-list");
+    if (!container) return;
+    container.innerHTML = "";
+    libraryLoaded = true;
+
+    const cats = [];
+    const byCat = {};
+    for (const q of quests) {
+      if (!byCat[q.category]) { byCat[q.category] = []; cats.push(q.category); }
+      byCat[q.category].push(q);
+    }
+    for (const cat of cats) {
+      const h = document.createElement("h3");
+      h.textContent = cat;
+      container.appendChild(h);
+      const ul = document.createElement("ul");
+      for (const q of byCat[cat]) {
+        const cadenceLabel = q.cadence === "weekly" ? (q.days || []).join("/") : "Daily";
+        const li = document.createElement("li");
+        const strong = document.createElement("strong");
+        strong.textContent = q.title;
+        li.append(strong, document.createTextNode(` — ${q.reward} ★ · ${cadenceLabel} `));
+        const btn = document.createElement("button");
+        btn.textContent = "Import";
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          const cadence = q.cadence === "weekly"
+            ? { Recurring: { Weekly: { days: q.days || [] } } }
+            : { Recurring: "Daily" };
+          const quest = {
+            id: freshId(),
+            title: q.title,
+            description: null,
+            category: q.category,
+            reward: Number(q.reward),
+            cadence,
+            assignment: "AllSquires",
+            completion: "EachAssignee",
+            auto_approve: false,
+            repeatable_within_day: false,
+            active: true,
+            icon: null,
+          };
+          const r = await fetch("/api/quests", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(quest),
+          });
+          if (r.ok) {
+            btn.textContent = "Imported ✓";
+            loadQuests();
+          } else {
+            btn.disabled = false;
+            const e = document.getElementById("library-error");
+            e.textContent = "Could not import that quest.";
+            e.hidden = false;
+          }
+        });
+        li.appendChild(btn);
+        ul.appendChild(li);
+      }
+      container.appendChild(ul);
+    }
   }
 
   // ── Item create (T-0027) ─────────────────────────────────────────────────────
