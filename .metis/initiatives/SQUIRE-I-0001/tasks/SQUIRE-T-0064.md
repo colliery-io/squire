@@ -4,14 +4,14 @@ level: task
 title: "LAN api: Knight quest-authoring endpoints (RequireKnight) + SDK"
 short_code: "SQUIRE-T-0064"
 created_at: 2026-06-18T12:14:12.691830+00:00
-updated_at: 2026-06-18T13:57:20.902741+00:00
+updated_at: 2026-06-18T14:04:05.280020+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Expose quest authoring on the **LAN api** (the phone's transport) gated by `RequireKnight`, mirroring the Keep's create/list/archive but with **flat, codegen-friendly DTOs** so the generated Kotlin SDK stays clean. Regenerate `openapi.json` + the SDK.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

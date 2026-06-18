@@ -4,14 +4,14 @@ level: task
 title: "Keep: refine + E2E-test the Achievement creation workflow (match the quest creator)"
 short_code: "SQUIRE-T-0071"
 created_at: 2026-06-18T16:45:11.918321+00:00
-updated_at: 2026-06-18T17:03:44.745644+00:00
+updated_at: 2026-06-18T17:15:53.808568+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -67,6 +67,8 @@ Define the Achievement-creation flows and their expected outcomes, verify what t
 
 - **Empty Category → reject.** `validate_achievement` rejects `Category("")` (`InvalidDefinition`/400); the Keep form requires a non-blank category when scope=Category.
 - **Starter library → yes**, and **built against the quest library** — category-scoped to the quest library's categories (Bedroom/Kitchen/Hygiene/Homework/Pets/Outdoor) plus a couple of Any/Points entries, so the achievements line up with quests imported from the quest library.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

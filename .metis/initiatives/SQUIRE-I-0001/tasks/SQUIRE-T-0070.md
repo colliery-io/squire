@@ -4,14 +4,14 @@ level: task
 title: "Android screenshot-test harness (Paparazzi) for the native screens"
 short_code: "SQUIRE-T-0070"
 created_at: 2026-06-18T16:25:49.728145+00:00
-updated_at: 2026-06-18T16:25:49.728145+00:00
+updated_at: 2026-06-18T16:36:37.334597+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Stand up **Paparazzi** screenshot tests for the app's Compose screens: render to PNGs in a plain `./gradlew test` (no emulator/adb/server), so any UI change is validated visually and regressions fail the build on a pixel diff.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -4,14 +4,14 @@ level: task
 title: "Playwright E2E for the Keep (self-driving, screenshots)"
 short_code: "SQUIRE-T-0069"
 created_at: 2026-06-18T14:56:51.657938+00:00
-updated_at: 2026-06-18T14:56:51.657938+00:00
+updated_at: 2026-06-18T14:57:33.234189+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Stand up a Playwright project that **boots a throwaway demo server itself**, drives the Keep web UI in a real browser (login, tabs, quest authoring, library import, timezone settings), asserts outcomes, and captures screenshots/video/trace — repeatable in seconds, no manual setup.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

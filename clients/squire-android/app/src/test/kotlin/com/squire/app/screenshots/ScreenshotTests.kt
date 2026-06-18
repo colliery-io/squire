@@ -7,10 +7,13 @@ import com.squire.app.ui.PlayerHomeScreen
 import com.squire.app.ui.theme.SquireTheme
 import com.squire.core.PlayerUiState
 import com.squire.knight.app.data.KnightApiAdapter
+import com.squire.knight.app.ui.AchievementAdminScreen
 import com.squire.knight.app.ui.KnightHomeScreen
+import com.squire.knight.app.ui.LibraryAch
 import com.squire.knight.app.ui.LibraryQuest
 import com.squire.knight.app.ui.QuestAdminScreen
 import com.squire.knight.core.KnightUiState
+import com.squire.sdk.model.AchievementSummaryDto
 import com.squire.sdk.model.CompletionDto
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.ItemOption
@@ -121,6 +124,31 @@ class ScreenshotTests {
                     squires = listOf(2L to "Gawain", 3L to "Percival"),
                     onBack = {},
                     initialQuests = quests,
+                    libraryOverride = library,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun knightManageAchievements() {
+        // A dummy adapter (no network — `initialAchievements` is injected so the live fetch is skipped).
+        val adapter = KnightApiAdapter(baseUrl = "http://localhost", household = "demo", token = "t")
+        val achievements = listOf(
+            AchievementSummaryDto(id = 1, name = "Century Club", summary = "100 points", bonus = 25, active = true),
+            AchievementSummaryDto(id = 2, name = "Tidy Streak", summary = "7-day streak · Bedroom", bonus = 25, active = true),
+            AchievementSummaryDto(id = 3, name = "Kitchen Helper", summary = "20 completions · Kitchen", bonus = 20, active = false),
+        )
+        val library = listOf(
+            LibraryAch(name = "Chore Champion", criterion = "total", scope = "any", count = 50, bonus = 50),
+            LibraryAch(name = "On a Roll", criterion = "streak", scope = "any", length = 7, basis = "CalendarDays", bonus = 30),
+        )
+        paparazzi.snapshot {
+            SquireTheme {
+                AchievementAdminScreen(
+                    adapter = adapter,
+                    onBack = {},
+                    initialAchievements = achievements,
                     libraryOverride = library,
                 )
             }

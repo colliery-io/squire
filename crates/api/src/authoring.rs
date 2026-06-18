@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use domain_core::contract::{
-    Assignment, Cadence, Clock, Command, Completion, Date, Quest, QuestId, Repository, Schedule,
-    Snapshot, Weekday,
+    Achievement, AchievementId, Assignment, Cadence, Category, Clock, Command, Completion,
+    Criterion, Date, Quest, QuestId, Repository, Schedule, Scope, Snapshot, StreakBasis, Weekday,
 };
 
 use crate::auth::RequireKnight;
@@ -301,5 +301,209 @@ fn assignment_label(snap: &Snapshot, a: &Assignment) -> String {
             })
             .collect::<Vec<_>>()
             .join(", "),
+    }
+}
+
+// ─── Achievement authoring (SQUIRE-T-0072) ───────────────────────────────────────────────────────
+// Same flat-DTO pattern as quests above: the domain `Criterion`/`Scope` are externally-tagged enums
+// that mangle in codegen, so the wire carries a discriminant + flat fields and the handler rebuilds
+// the domain shape. Validation (zero length/count/total, blank category, missing quest) is enforced
+// by the engine's `validate_achievement` and surfaced via `domain_status`.
+
+/// Achievement criterion kind on the wire (flat).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum AchCriterionKind {
+    Streak,
+    TotalCompletions,
+    PointsEarned,
+}
+
+/// Achievement scope kind on the wire (flat).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum AchScopeKind {
+    Any,
+    Quest,
+    Category,
+}
+
+/// Streak basis on the wire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum AchBasisKind {
+    ScheduledOccurrences,
+    CalendarDays,
+}
+
+/// `POST /admin/achievements` request — a flat achievement definition authored from the phone.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct CreateAchievementReq {
+    /// Existing id to edit (upsert), or null/absent to create (the server assigns).
+    pub id: Option<AchievementId>,
+    pub name: String,
+    pub criterion: AchCriterionKind,
+    /// Scope for Streak/TotalCompletions (ignored for PointsEarned).
+    pub scope: AchScopeKind,
+    /// Quest id when `scope = Quest`.
+    pub scope_quest: Option<QuestId>,
+    /// Category label when `scope = Category` (must be non-blank).
+    pub scope_category: Option<String>,
+    /// Streak length (≥1) when criterion = Streak.
+    pub length: Option<i64>,
+    /// Streak basis when criterion = Streak.
+    pub basis: Option<AchBasisKind>,
+    /// Count (≥1) when criterion = TotalCompletions.
+    pub count: Option<i64>,
+    /// Total points (≥1) when criterion = PointsEarned.
+    pub total: Option<i64>,
+    /// Bonus points awarded (may be 0 for a pure unlock).
+    pub bonus: i64,
+}
+
+/// The id of a created / edited achievement, echoed back.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct CreatedAchievement {
+    pub id: AchievementId,
+}
+
+/// An achievement in the authoring list — flat, with a server-computed summary.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AchievementSummaryDto {
+    pub id: AchievementId,
+    pub name: String,
+    /// e.g. "7-day streak · Bedroom", "20 completions · Kitchen", "100 points".
+    pub summary: String,
+    pub bonus: i64,
+    pub active: bool,
+}
+
+/// `POST /admin/achievements` (RequireKnight) — create or edit an achievement.
+#[utoipa::path(
+    post,
+    path = "/admin/achievements",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant")),
+    request_body = CreateAchievementReq,
+    responses(
+        (status = 200, description = "The created/edited achievement id", body = CreatedAchievement),
+        (status = 400, description = "Invalid achievement definition"),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "Scope quest not found"),
+    ),
+)]
+pub async fn create_achievement(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(principal): RequireKnight,
+    Json(req): Json<CreateAchievementReq>,
+) -> Result<Json<CreatedAchievement>, StatusCode> {
+    let scope = match req.scope {
+        AchScopeKind::Any => Scope::Any,
+        AchScopeKind::Quest => Scope::Quest(req.scope_quest.ok_or(StatusCode::BAD_REQUEST)?),
+        AchScopeKind::Category => Scope::Category(Category(req.scope_category.clone().unwrap_or_default())),
+    };
+    let criterion = match req.criterion {
+        AchCriterionKind::PointsEarned => Criterion::PointsEarned { total: req.total.unwrap_or(0).max(0) as u32 },
+        AchCriterionKind::TotalCompletions => {
+            Criterion::TotalCompletions { scope, count: req.count.unwrap_or(0).max(0) as u32 }
+        }
+        AchCriterionKind::Streak => Criterion::Streak {
+            scope,
+            length: req.length.unwrap_or(0).max(0) as u32,
+            basis: match req.basis.unwrap_or(AchBasisKind::CalendarDays) {
+                AchBasisKind::ScheduledOccurrences => StreakBasis::ScheduledOccurrences,
+                AchBasisKind::CalendarDays => StreakBasis::CalendarDays,
+            },
+        },
+    };
+    let id = req.id.unwrap_or_else(|| AchievementId(state.clock.now().0 as u128));
+    let achievement = Achievement {
+        id,
+        name: req.name,
+        description: None,
+        criterion,
+        bonus_points: req.bonus.max(0) as u32,
+        active: true,
+    };
+    handle_command(&state, Some(principal.user), Command::DefineAchievement(achievement)).map_err(domain_status)?;
+    Ok(Json(CreatedAchievement { id }))
+}
+
+/// `GET /admin/achievements` (RequireKnight) — all achievements as flat summaries.
+#[utoipa::path(
+    get,
+    path = "/admin/achievements",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant")),
+    responses(
+        (status = 200, description = "All achievements, flat", body = [AchievementSummaryDto]),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+    ),
+)]
+pub async fn list_achievements(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(_principal): RequireKnight,
+) -> Json<Vec<AchievementSummaryDto>> {
+    let snap = state.store.lock().expect("store mutex poisoned").snapshot();
+    let rows = snap
+        .achievements
+        .iter()
+        .map(|a| AchievementSummaryDto {
+            id: a.id,
+            name: a.name.clone(),
+            summary: achievement_summary(&snap, &a.criterion),
+            bonus: a.bonus_points as i64,
+            active: a.active,
+        })
+        .collect();
+    Json(rows)
+}
+
+/// `POST /admin/achievements/{id}/archive` (RequireKnight) — archive (never delete). 404 if absent.
+#[utoipa::path(
+    post,
+    path = "/admin/achievements/{id}/archive",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+        ("id" = i64, Path, description = "Achievement id"),
+    ),
+    responses(
+        (status = 204, description = "Archived"),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "Achievement not found"),
+    ),
+)]
+pub async fn archive_achievement(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(principal): RequireKnight,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, StatusCode> {
+    let aid = AchievementId(u128::from(id));
+    handle_command(&state, Some(principal.user), Command::ArchiveAchievement(aid)).map_err(domain_status)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// A short human summary of an achievement criterion (mirrors the Keep + library).
+fn achievement_summary(snap: &Snapshot, c: &Criterion) -> String {
+    let scope_label = |s: &Scope| -> String {
+        match s {
+            Scope::Any => "any".to_string(),
+            Scope::Category(cat) => cat.0.clone(),
+            Scope::Quest(qid) => snap
+                .quests
+                .iter()
+                .find(|q| q.id == *qid)
+                .map(|q| q.title.clone())
+                .unwrap_or_else(|| format!("quest #{}", qid.0)),
+        }
+    };
+    match c {
+        Criterion::PointsEarned { total } => format!("{total} points"),
+        Criterion::TotalCompletions { scope, count } => format!("{count} completions · {}", scope_label(scope)),
+        Criterion::Streak { scope, length, .. } => format!("{length}-day streak · {}", scope_label(scope)),
     }
 }

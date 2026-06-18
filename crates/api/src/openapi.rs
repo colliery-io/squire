@@ -72,6 +72,10 @@ impl Modify for SecurityAddon {
         crate::authoring::create_quest,
         crate::authoring::list_quests,
         crate::authoring::archive_quest,
+        // Knight achievement authoring (SQUIRE-T-0072)
+        crate::authoring::create_achievement,
+        crate::authoring::list_achievements,
+        crate::authoring::archive_achievement,
     ),
     components(schemas(
         // ── Squire state view + nested ──
@@ -138,6 +142,13 @@ impl Modify for SecurityAddon {
         crate::authoring::CadenceKind,
         crate::authoring::WeekdayDto,
         crate::authoring::CompletionDto,
+        // ── Knight achievement-authoring DTOs (SQUIRE-T-0072) ──
+        crate::authoring::CreateAchievementReq,
+        crate::authoring::CreatedAchievement,
+        crate::authoring::AchievementSummaryDto,
+        crate::authoring::AchCriterionKind,
+        crate::authoring::AchScopeKind,
+        crate::authoring::AchBasisKind,
     )),
     modifiers(&SecurityAddon),
     tags(

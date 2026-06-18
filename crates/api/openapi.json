@@ -10,6 +10,158 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/admin/achievements": {
+      "get": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`GET /admin/achievements` (RequireKnight) — all achievements as flat summaries.",
+        "operationId": "list_achievements",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All achievements, flat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AchievementSummaryDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/achievements` (RequireKnight) — create or edit an achievement.",
+        "operationId": "create_achievement",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAchievementReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The created/edited achievement id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedAchievement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid achievement definition"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "Scope quest not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/admin/achievements/{id}/archive": {
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/achievements/{id}/archive` (RequireKnight) — archive (never delete). 404 if absent.",
+        "operationId": "archive_achievement",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Achievement id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Archived"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "Achievement not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/admin/adjust": {
       "post": {
         "tags": [
@@ -919,9 +1071,65 @@
   },
   "components": {
     "schemas": {
+      "AchBasisKind": {
+        "type": "string",
+        "description": "Streak basis on the wire.",
+        "enum": [
+          "ScheduledOccurrences",
+          "CalendarDays"
+        ]
+      },
+      "AchCriterionKind": {
+        "type": "string",
+        "description": "Achievement criterion kind on the wire (flat).",
+        "enum": [
+          "Streak",
+          "TotalCompletions",
+          "PointsEarned"
+        ]
+      },
+      "AchScopeKind": {
+        "type": "string",
+        "description": "Achievement scope kind on the wire (flat).",
+        "enum": [
+          "Any",
+          "Quest",
+          "Category"
+        ]
+      },
       "AchievementId": {
         "type": "integer",
         "format": "int64"
+      },
+      "AchievementSummaryDto": {
+        "type": "object",
+        "description": "An achievement in the authoring list — flat, with a server-computed summary.",
+        "required": [
+          "id",
+          "name",
+          "summary",
+          "bonus",
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "bonus": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "$ref": "#/components/schemas/AchievementId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string",
+            "description": "e.g. \"7-day streak · Bedroom\", \"20 completions · Kitchen\", \"100 points\"."
+          }
+        }
       },
       "Ack": {
         "type": "object",
@@ -1085,6 +1293,97 @@
           "Race"
         ]
       },
+      "CreateAchievementReq": {
+        "type": "object",
+        "description": "`POST /admin/achievements` request — a flat achievement definition authored from the phone.",
+        "required": [
+          "name",
+          "criterion",
+          "scope",
+          "bonus"
+        ],
+        "properties": {
+          "basis": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AchBasisKind",
+                "description": "Streak basis when criterion = Streak."
+              }
+            ]
+          },
+          "bonus": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bonus points awarded (may be 0 for a pure unlock)."
+          },
+          "count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Count (≥1) when criterion = TotalCompletions."
+          },
+          "criterion": {
+            "$ref": "#/components/schemas/AchCriterionKind"
+          },
+          "id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AchievementId",
+                "description": "Existing id to edit (upsert), or null/absent to create (the server assigns)."
+              }
+            ]
+          },
+          "length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Streak length (≥1) when criterion = Streak."
+          },
+          "name": {
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/AchScopeKind",
+            "description": "Scope for Streak/TotalCompletions (ignored for PointsEarned)."
+          },
+          "scope_category": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Category label when `scope = Category` (must be non-blank)."
+          },
+          "scope_quest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuestId",
+                "description": "Quest id when `scope = Quest`."
+              }
+            ]
+          },
+          "total": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Total points (≥1) when criterion = PointsEarned."
+          }
+        }
+      },
       "CreateQuestReq": {
         "type": "object",
         "description": "`POST /admin/quests` request — a flat quest definition authored from the parent phone.",
@@ -1171,6 +1470,18 @@
               "$ref": "#/components/schemas/WeekdayDto"
             },
             "description": "Days for a `Weekly` cadence (≥1 required for `Weekly`). `null`/absent ⇒ none."
+          }
+        }
+      },
+      "CreatedAchievement": {
+        "type": "object",
+        "description": "The id of a created / edited achievement, echoed back.",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/AchievementId"
           }
         }
       },

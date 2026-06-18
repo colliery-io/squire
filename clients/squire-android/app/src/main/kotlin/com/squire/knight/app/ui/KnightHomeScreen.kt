@@ -17,8 +17,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -70,6 +73,7 @@ fun KnightHomeScreen(
     onForget: () -> Unit = {},
     onOpenSquire: (squire: Long, name: String) -> Unit = { _, _ -> },
     onManageQuests: () -> Unit = {},
+    onManageAchievements: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -82,18 +86,16 @@ fun KnightHomeScreen(
                     actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
                 actions = {
-                    TextButton(
-                        onClick = onManageQuests,
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
-                    ) { Text("Quests") }
-                    TextButton(
-                        onClick = onRefresh,
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
-                    ) { Text("Refresh") }
-                    TextButton(
-                        onClick = onForget,
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
-                    ) { Text("Forget") }
+                    var menuOpen by remember { mutableStateOf(false) }
+                    IconButton(onClick = { menuOpen = true }) {
+                        Text("⋮", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.titleLarge)
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("Manage quests") }, onClick = { menuOpen = false; onManageQuests() })
+                        DropdownMenuItem(text = { Text("Manage achievements") }, onClick = { menuOpen = false; onManageAchievements() })
+                        DropdownMenuItem(text = { Text("Refresh") }, onClick = { menuOpen = false; onRefresh() })
+                        DropdownMenuItem(text = { Text("Forget device") }, onClick = { menuOpen = false; onForget() })
+                    }
                 },
             )
         },

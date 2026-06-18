@@ -4,14 +4,14 @@ level: task
 title: "Knight app: native Quests tab (create / assign / schedule / import)"
 short_code: "SQUIRE-T-0065"
 created_at: 2026-06-18T12:14:13.850423+00:00
-updated_at: 2026-06-18T12:14:13.850423+00:00
+updated_at: 2026-06-18T14:32:41.782904+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 A native **Manage Quests** screen in the Knight app: create quests (assign all/specific squires, daily/weekly/one-time + due, completion, multiple-per-day, auto-approve), import from a bundled starter library, and archive — all over the LAN api's `RequireKnight` `/admin/quests`.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
