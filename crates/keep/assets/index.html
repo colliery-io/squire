@@ -47,6 +47,7 @@
         <a class="tab" data-tab="members" href="#members">Members</a>
         <a class="tab" data-tab="pair" href="#pair">Pair</a>
         <a class="tab" data-tab="log" href="#log">Log</a>
+        <a class="tab" data-tab="settings" href="#settings">Settings</a>
       </nav>
     </section>
 
@@ -256,6 +257,23 @@
         <button type="submit">View log</button>
       </form>
       <pre id="log-output"></pre>
+    </section>
+
+    <!-- Household settings (ADR SQUIRE-A-0011 / T-0068): the timezone that sets local midnight. -->
+    <section id="settings-panel" hidden>
+      <h2 id="settings">Settings</h2>
+      <form id="settings-form">
+        <label>Household timezone
+          <select name="timezone" id="settings-tz"></select>
+        </label>
+        <label>Or type any IANA zone
+          <input name="timezone_custom" id="settings-tz-custom" placeholder="e.g. America/Chicago" />
+        </label>
+        <button type="submit">Save</button>
+      </form>
+      <p id="settings-status" class="sub" hidden></p>
+      <p id="settings-error" class="error" hidden></p>
+      <p class="sub">Daily quests reset at midnight in this timezone. Changes take effect immediately — no restart.</p>
     </section>
   </main>
 

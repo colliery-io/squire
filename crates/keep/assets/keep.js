@@ -18,6 +18,7 @@
     { tab: "members", panel: "members-panel" },
     { tab: "pair", panel: "pair-panel" },
     { tab: "log", panel: "log-panel" },
+    { tab: "settings", panel: "settings-panel" },
   ];
   const TAB_LOADERS = {
     quests: () => { loadQuestSquires().then(() => loadQuests()); },
@@ -27,6 +28,7 @@
     members: () => loadMembers(),
     pair: () => loadPairMembers(),
     log: () => {},
+    settings: () => loadSettings(),
   };
 
   function currentTab() {
@@ -714,6 +716,60 @@
       const res = await fetch(`/api/log/${fd.get("scope")}/${fd.get("id")}`);
       const out = document.getElementById("log-output");
       out.textContent = res.ok ? JSON.stringify(await res.json(), null, 2) : `Error ${res.status}`;
+    });
+  }
+
+  // ── Household settings — timezone (T-0068) ───────────────────────────────────
+  // Common zones for the picker; any IANA zone can still be typed in the custom field.
+  const COMMON_ZONES = [
+    "America/New_York", "America/Detroit", "America/Chicago", "America/Denver",
+    "America/Phoenix", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu",
+    "America/Toronto", "Europe/London", "Europe/Paris", "UTC",
+  ];
+
+  async function loadSettings() {
+    const res = await fetch("/api/config");
+    if (!res.ok) return;
+    const cfg = await res.json();
+    const sel = document.getElementById("settings-tz");
+    if (!sel) return;
+    // Build the option list, including the current zone if it's not already one of the common ones.
+    const zones = COMMON_ZONES.includes(cfg.timezone) ? COMMON_ZONES : [cfg.timezone, ...COMMON_ZONES];
+    sel.innerHTML = "";
+    for (const z of zones) {
+      const opt = document.createElement("option");
+      opt.value = z;
+      opt.textContent = z;
+      if (z === cfg.timezone) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    document.getElementById("settings-tz-custom").value = "";
+  }
+
+  const settingsForm = document.getElementById("settings-form");
+  if (settingsForm) {
+    settingsForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const status = document.getElementById("settings-status");
+      const error = document.getElementById("settings-error");
+      status.hidden = true;
+      error.hidden = true;
+      const custom = document.getElementById("settings-tz-custom").value.trim();
+      const timezone = custom || document.getElementById("settings-tz").value;
+      const res = await fetch("/api/config", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ timezone }),
+      });
+      if (res.ok) {
+        const cfg = await res.json();
+        status.textContent = `Saved — daily quests now reset at midnight in ${cfg.timezone}.`;
+        status.hidden = false;
+        loadSettings();
+      } else {
+        error.textContent = res.status === 400 ? `"${timezone}" isn't a valid IANA timezone.` : "Could not save settings.";
+        error.hidden = false;
+      }
     });
   }
 })();
