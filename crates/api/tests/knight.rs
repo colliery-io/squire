@@ -587,3 +587,102 @@ async fn a_squire_token_cannot_administer_members() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
+
+// ─── Reward request/redeem loop hardening (SQUIRE-T-0077) ─────────────────────────────────────────
+
+/// Fund squire A by `amount` (Knight adjust). Panics unless 200.
+async fn fund(state: &Arc<AppState>, command_id: u128, amount: i64) {
+    let body = serde_json::json!({ "command_id": command_id, "squire": SQUIRE_A_ID, "amount": amount, "reason": "seed" }).to_string();
+    let resp = router(state.clone()).oneshot(req("POST", "/admin/adjust", Some(KNIGHT_TOKEN), Some(body))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+/// Squire A's `GET /state` as a JSON value (the child's view of its own requests/balance).
+async fn squire_state(state: &Arc<AppState>) -> serde_json::Value {
+    json_body(router(state.clone()).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap()).await
+}
+
+/// Full child→Knight cycle: request → approve debits the cost; the child's state shows it Approved.
+#[tokio::test]
+async fn redemption_request_approve_debits_and_shows_approved() {
+    let (state, _dir, _today) = test_state();
+    fund(&state, 6000, 10).await;
+    // Child requests the seeded item (cost 3).
+    let request = serde_json::json!({ "request_id": 6100u128, "item_id": ITEM_ID }).to_string();
+    let resp = router(state.clone()).oneshot(req("POST", "/redemption-requests", Some(SQUIRE_TOKEN), Some(request))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    // Knight approves.
+    let approve = serde_json::json!({ "request_id": 6100u128, "decision": { "verdict": "approve" } }).to_string();
+    let resp = router(state.clone()).oneshot(req("POST", "/admin/review-redemption", Some(KNIGHT_TOKEN), Some(approve))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let view = squire_state(&state).await;
+    assert_eq!(view["balance"], 7, "approval debits the item cost");
+    let r = &view["my_requests"][0];
+    assert_eq!(r["state"]["state"], "Approved");
+}
+
+/// A Knight reject with a reason reaches the child: `GET /state` `my_requests` shows it Rejected
+/// carrying the reason, and nothing is debited.
+#[tokio::test]
+async fn redemption_reject_with_reason_surfaces_to_child() {
+    let (state, _dir, _today) = test_state();
+    fund(&state, 6001, 10).await;
+    let request = serde_json::json!({ "request_id": 6200u128, "item_id": ITEM_ID }).to_string();
+    router(state.clone()).oneshot(req("POST", "/redemption-requests", Some(SQUIRE_TOKEN), Some(request))).await.unwrap();
+    let reject = serde_json::json!({ "request_id": 6200u128, "decision": { "verdict": "reject", "reason": "Maybe next week" } }).to_string();
+    let resp = router(state.clone()).oneshot(req("POST", "/admin/review-redemption", Some(KNIGHT_TOKEN), Some(reject))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let view = squire_state(&state).await;
+    assert_eq!(view["balance"], 10, "a rejected request debits nothing");
+    let r = &view["my_requests"][0];
+    assert_eq!(r["state"]["state"], "Rejected");
+    assert_eq!(r["state"]["reason"], "Maybe next week");
+}
+
+/// A direct redeem the Squire can't afford is a 409 (blocked at commit).
+#[tokio::test]
+async fn direct_redeem_insufficient_funds_is_409() {
+    let (state, _dir, _today) = test_state();
+    // Squire A has balance 0; the seeded item costs 3.
+    let body = serde_json::json!({ "command_id": 6300u128, "squire": SQUIRE_A_ID, "item_id": ITEM_ID }).to_string();
+    let resp = router(state).oneshot(req("POST", "/admin/redeem", Some(KNIGHT_TOKEN), Some(body))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CONFLICT);
+}
+
+/// A `Once` item redeemed a second time is out of stock → 409 (authored via `/admin/items`).
+#[tokio::test]
+async fn direct_redeem_once_item_out_of_stock_is_409() {
+    let (state, _dir, _today) = test_state();
+    fund(&state, 6002, 10).await;
+    // Author a Once item (cost 1) from the phone surface.
+    let item = serde_json::json!({ "id": 700u64, "name": "Sticker", "description": null, "cost": 1, "availability": "Once", "gate": null, "icon": null }).to_string();
+    let resp = router(state.clone()).oneshot(req("POST", "/admin/items", Some(KNIGHT_TOKEN), Some(item))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    // First redeem succeeds; the second (new command_id) is out of stock.
+    let r1 = serde_json::json!({ "command_id": 6310u128, "squire": SQUIRE_A_ID, "item_id": 700 }).to_string();
+    let resp = router(state.clone()).oneshot(req("POST", "/admin/redeem", Some(KNIGHT_TOKEN), Some(r1))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let r2 = serde_json::json!({ "command_id": 6311u128, "squire": SQUIRE_A_ID, "item_id": 700 }).to_string();
+    let resp = router(state).oneshot(req("POST", "/admin/redeem", Some(KNIGHT_TOKEN), Some(r2))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CONFLICT, "a redeemed Once item is out of stock");
+}
+
+/// A direct redeem of an achievement-gated item the Squire hasn't unlocked is a 409.
+#[tokio::test]
+async fn direct_redeem_gated_item_is_409() {
+    let (state, _dir, _today) = test_state();
+    fund(&state, 6003, 10).await;
+    // Author an achievement (5 total completions) and an item gated on it.
+    let ach = serde_json::json!({ "id": 800u64, "name": "Busy bee", "criterion": "TotalCompletions", "scope": "Any", "scope_quest": null, "scope_category": null, "length": null, "basis": null, "count": 5, "total": null, "bonus": 0 }).to_string();
+    let resp = router(state.clone()).oneshot(req("POST", "/admin/achievements", Some(KNIGHT_TOKEN), Some(ach))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let item = serde_json::json!({ "id": 801u64, "name": "Gated treat", "description": null, "cost": 1, "availability": "Repeatable", "gate": 800, "icon": null }).to_string();
+    let resp = router(state.clone()).oneshot(req("POST", "/admin/items", Some(KNIGHT_TOKEN), Some(item))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    // Squire A has 0 completions → the gate is locked → 409 (not insufficient: balance 10 ≥ cost 1).
+    let body = serde_json::json!({ "command_id": 6320u128, "squire": SQUIRE_A_ID, "item_id": 801 }).to_string();
+    let resp = router(state).oneshot(req("POST", "/admin/redeem", Some(KNIGHT_TOKEN), Some(body))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CONFLICT, "a locked gate blocks the redeem");
+}

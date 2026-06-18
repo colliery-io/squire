@@ -191,3 +191,44 @@ fn balance_can_go_negative_only_via_adjustment() {
     run(&mut r, adjust(1, 1, -100)).unwrap();
     assert_eq!(bal(&r, 1), -100, "explicit adjustment may go negative");
 }
+
+// ── Hardening (SQUIRE-T-0077) ──────────────────────────────────────────────────────────────────
+
+fn reject(req: u128, reason: &str) -> Command {
+    Command::ReviewRedemption { actor: UserId(2), request_id: RequestId(req), decision: Decision::Reject { reason: Some(reason.into()) } }
+}
+fn approve(req: u128) -> Command {
+    Command::ReviewRedemption { actor: UserId(2), request_id: RequestId(req), decision: Decision::Approve }
+}
+
+/// A second review of an already-rejected request is `AlreadyReviewed` (a resolved request, reject
+/// or approve, can't be re-decided).
+#[test]
+fn double_reject_is_already_reviewed() {
+    let mut r = repo();
+    r.seed(&[Change::PutItem(item(1, 30, Availability::Repeatable, None))]);
+    seed_points(&mut r, 1, 100, 1);
+    run(&mut r, request(7, 1, 1)).unwrap();
+    run(&mut r, reject(7, "not today")).unwrap();
+    assert_eq!(bal(&r, 1), 100, "reject spends nothing");
+    assert!(matches!(run(&mut r, reject(7, "again")), Err(DomainError::AlreadyReviewed)));
+    assert!(matches!(run(&mut r, approve(7)), Err(DomainError::AlreadyReviewed)), "can't approve a rejected request either");
+}
+
+/// A request for a gated item is allowed while locked (no gate check at request time); approving it
+/// while still locked fails, but once the gate unlocks the same request approves and debits.
+#[test]
+fn gated_request_unlocks_before_approval_then_debits() {
+    let mut r = repo();
+    r.seed(&[Change::PutItem(item(1, 30, Availability::Repeatable, Some(AchievementId(9))))]);
+    seed_points(&mut r, 1, 100, 1);
+    // Requesting is allowed even though the gate is locked.
+    run(&mut r, request(7, 1, 1)).unwrap();
+    // Approving while still locked fails (re-checked at commit), leaving the request pending.
+    assert!(matches!(run(&mut r, approve(7)), Err(DomainError::Redeem(Blocked::AchievementLocked { .. }))));
+    assert_eq!(bal(&r, 1), 100, "a blocked approval debits nothing");
+    // Unlock the gate for this Squire, then the same request approves and debits.
+    r.seed(&[Change::Append(Event::AchievementUnlocked { squire: UserId(1), id: AchievementId(9), bonus: 0, at: Timestamp(0) })]);
+    run(&mut r, approve(7)).unwrap();
+    assert_eq!(bal(&r, 1), 70, "the now-unlocked request debits the cost");
+}

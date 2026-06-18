@@ -32,6 +32,9 @@ import com.squire.sdk.model.QuestCard
 import com.squire.sdk.model.QuestOption
 import com.squire.sdk.model.QuestStatus
 import com.squire.sdk.model.QuestSummaryDto
+import com.squire.sdk.model.RedemptionState
+import com.squire.sdk.model.RedemptionStateKind
+import com.squire.sdk.model.RedemptionStatus
 import com.squire.sdk.model.RewardCard
 import com.squire.sdk.model.StateView
 import com.squire.sdk.model.StreakView
@@ -211,7 +214,11 @@ class ScreenshotTests {
                 ClaimStatus(claimId = 12L, on = 1, questTitle = "Take out the trash",
                     state = ClaimState(state = ClaimStateKind.Pending)),
             ),
-            myRequests = emptyList(),
+            myRequests = listOf(
+                // A rejected reward request must also show the child WHY (SQUIRE-T-0077).
+                RedemptionStatus(cost = 25, itemName = "Movie night", requestId = 20L,
+                    state = RedemptionState(state = RedemptionStateKind.Rejected, reason = "After homework")),
+            ),
             streaks = emptyList(),
         )
         paparazzi.snapshot {

@@ -4,14 +4,14 @@ level: task
 title: "Harden the reward request/redeem loop (reject + blocked paths, reasons-to-child, edge-case tests)"
 short_code: "SQUIRE-T-0077"
 created_at: 2026-06-18T22:32:10.505382+00:00
-updated_at: 2026-06-18T22:32:10.505382+00:00
+updated_at: 2026-06-18T22:43:54.959295+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -46,11 +46,11 @@ A child requests a reward → a pending **redemption request** → a Knight appr
 
 ## Acceptance Criteria
 
-- [ ] Domain (`tests/redemption.rs`): double-reject of a request → `AlreadyReviewed`; a request for a gated item that unlocks before approval then approves and debits.
-- [ ] API (`tests/knight.rs`): request → approve debits balance (and the request leaves `my_requests` pending); request → reject with reason → child `GET /state` `my_requests` shows `Rejected {reason}`; direct-redeem blocked by insufficient funds → 409, by Once-out-of-stock → 409, by an unmet gate → 409.
-- [ ] Keep (`tests/review.rs`): rejecting a redemption request over `/api/review/redemption` spends nothing and resolves the request.
-- [ ] Paparazzi: the child "Recent" shows a rejected request (with reason) — extend the T-0076 `squirePlayerHomeHistory` seed (or a dedicated snapshot) to include `myRequests`.
-- [ ] All touched suites green (`cargo test -p domain-core`, `-p api`, `-p keep`; `:app:verifyPaparazziDebug`).
+- [x] Domain (`tests/redemption.rs`, +2): double-reject of a request → `AlreadyReviewed`; a request for a gated item that unlocks before approval then approves and debits (a blocked approval debits nothing). 12 pass.
+- [x] API (`tests/knight.rs`, +5): request → approve debits balance and `my_requests` shows Approved; request → reject with reason → child `GET /state` `my_requests` shows `Rejected {reason}` (balance unchanged); direct-redeem blocked by insufficient funds → 409, by Once-out-of-stock → 409, by an unmet gate → 409 (the last two authored via `/admin/items` + `/admin/achievements`). 25 pass.
+- [x] Keep (`tests/review.rs`, +1): rejecting a redemption request over `/api/review/redemption` spends nothing and resolves the request. 8 pass.
+- [x] Paparazzi: extended `squirePlayerHomeHistory` to include a rejected request — the child "Recent" shows "Movie night · 25★ · Rejected: After homework".
+- [x] All touched suites green (`cargo test -p domain-core`, `-p api`, `-p keep`; `:app:verifyPaparazziDebug`).
 
 ## Implementation Notes
 
@@ -61,4 +61,9 @@ A child requests a reward → a pending **redemption request** → a Knight appr
 
 ## Status Updates
 
-*To be added during implementation.*
+**2026-06-18 — Done.**
+- Domain (`tests/redemption.rs`, +2): `double_reject_is_already_reviewed`; `gated_request_unlocks_before_approval_then_debits` (request allowed while locked, approval blocked → `AchievementLocked` debits nothing, then unlock → approve debits). 12 pass.
+- API (`tests/knight.rs`, +5): `redemption_request_approve_debits_and_shows_approved`; `redemption_reject_with_reason_surfaces_to_child` (child `GET /state` `my_requests` → `Rejected{reason="Maybe next week"}`, balance unchanged); `direct_redeem_insufficient_funds_is_409`; `direct_redeem_once_item_out_of_stock_is_409`; `direct_redeem_gated_item_is_409`. The Once/gated cases author their fixtures via the T-0074/0072 `/admin/items` + `/admin/achievements` endpoints (nice cross-feature integration). 25 pass.
+- Keep (`tests/review.rs`, +1): `reject_redemption_with_reason_does_not_credit_and_resolves`. 8 pass.
+- Paparazzi: extended `squirePlayerHomeHistory` with a rejected `myRequests` entry → "Movie night · 25★ · Rejected: After homework" renders in the child "Recent". `verifyPaparazziDebug` green.
+- **No production code changed** — like T-0076, the reject/blocked paths were already wired domain→api→UI; this locks them against regression. Confirmed `redemption_state`/`my_requests` keep resolved requests with their computed `Rejected{reason}`/`Approved` state.
