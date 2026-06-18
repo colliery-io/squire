@@ -1,10 +1,10 @@
 ---
 id: household-timezone-onboarding
 level: task
-title: "Household timezone (onboarding) + local-midnight daily reset"
+title: "A-0011 #1 — config KV store + HouseholdConfig + ArcSwap cell + LocalClock"
 short_code: "SQUIRE-T-0060"
-created_at: 2026-06-18T12:14:07.537254+00:00
-updated_at: 2026-06-18T12:14:07.537254+00:00
+created_at: 2026-06-18T11:35:15.846742+00:00
+updated_at: 2026-06-18T12:14:00.000000+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
@@ -18,119 +18,34 @@ exit_criteria_met: false
 initiative_id: SQUIRE-I-0001
 ---
 
-# Household timezone (onboarding) + local-midnight daily reset
+# A-0011 #1 — config KV store + HouseholdConfig + ArcSwap cell + LocalClock
 
-*This template includes sections for various types of tasks. Delete sections that don't apply to your specific use case.*
+## Parent Initiative
 
-## Parent Initiative **[CONDITIONAL: Assigned Task]**
+[[SQUIRE-I-0001]] · Implements **[[SQUIRE-A-0011]]** (household configuration + tz-aware clock), sub-task **#1 of 4**. Foundation for #2 wiring ([[SQUIRE-T-0066]]), #3 onboarding ([[SQUIRE-T-0067]]), #4 Keep Settings ([[SQUIRE-T-0068]]).
 
-[[SQUIRE-I-0001]]
+## Objective
 
-## Objective **[REQUIRED]**
+Build the storage + runtime + clock layer for household configuration, **additively** (keep `SystemClock` so the tree still compiles until #2 swaps usages): a key/value `config` table, a typed `HouseholdConfig` view, the `Arc<ArcSwap<ConfigView>>` hot cell, and `LocalClock` that derives the local `today()` from the live timezone.
 
-{Clear statement of what this task accomplishes}
+## Acceptance Criteria
 
-## Backlog Item Details **[CONDITIONAL: Backlog Item]**
+- [ ] **Migration** `config(key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_by TEXT, updated_at BIGINT NOT NULL)` (new dir; PK is the lookup index) + `down.sql`. `schema.rs` table def added; existing-DB open still runs clean.
+- [ ] **`domain_core::HouseholdConfig { timezone: String }`** (serde-gated, `Default` → `"UTC"`). **`store`**: `get_setting(key)`, `set_setting(key, value, by)` (upsert, audit-stamped via `now()`), `load_config() -> HouseholdConfig` (assembles from known keys, defaults absent).
+- [ ] **Hot cell**: `ConfigView { config: HouseholdConfig, tz: jiff::tz::TimeZone }` + `LiveConfig = Arc<ArcSwap<ConfigView>>`; a resolver parsing the zone with **UTC fallback** on an unknown string (no panic). Pure `date_in_zone(millis, &tz) -> Date` (Monday-aligned day-count) factored out + unit-tested (a 23:00 PST instant resolves to the PST calendar day, not the UTC next-day).
+- [ ] **`LocalClock { live: LiveConfig }`** impl `Clock`: `now()` = system millis (unchanged); `today()` = `date_in_zone(now, &live.load().tz)` (lock-free). `SystemClock`/`FixedClock` untouched; `cargo test -p store` + `-p domain-core` green; new deps `jiff` + `arc-swap` added to `store`.
 
-{Delete this section when task is assigned to an initiative}
-
-### Type
-- [ ] Bug - Production issue that needs fixing
-- [ ] Feature - New functionality or enhancement  
-- [ ] Tech Debt - Code improvement or refactoring
-- [ ] Chore - Maintenance or setup work
-
-### Priority
-- [ ] P0 - Critical (blocks users/revenue)
-- [ ] P1 - High (important for user experience)
-- [ ] P2 - Medium (nice to have)
-- [ ] P3 - Low (when time permits)
-
-### Impact Assessment **[CONDITIONAL: Bug]**
-- **Affected Users**: {Number/percentage of users affected}
-- **Reproduction Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected vs Actual**: {What should happen vs what happens}
-
-### Business Justification **[CONDITIONAL: Feature]**
-- **User Value**: {Why users need this}
-- **Business Value**: {Impact on metrics/revenue}
-- **Effort Estimate**: {Rough size - S/M/L/XL}
-
-### Technical Debt Impact **[CONDITIONAL: Tech Debt]**
-- **Current Problems**: {What's difficult/slow/buggy now}
-- **Benefits of Fixing**: {What improves after refactoring}
-- **Risk Assessment**: {Risks of not addressing this}
-
-## Acceptance Criteria **[REQUIRED]**
-
-- [ ] {Specific, testable requirement 1}
-- [ ] {Specific, testable requirement 2}
-- [ ] {Specific, testable requirement 3}
-
-## Test Cases **[CONDITIONAL: Testing Task]**
-
-{Delete unless this is a testing task}
-
-### Test Case 1: {Test Case Name}
-- **Test ID**: TC-001
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-### Test Case 2: {Test Case Name}
-- **Test ID**: TC-002
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-## Documentation Sections **[CONDITIONAL: Documentation Task]**
-
-{Delete unless this is a documentation task}
-
-### User Guide Content
-- **Feature Description**: {What this feature does and why it's useful}
-- **Prerequisites**: {What users need before using this feature}
-- **Step-by-Step Instructions**:
-  1. {Step 1 with screenshots/examples}
-  2. {Step 2 with screenshots/examples}
-  3. {Step 3 with screenshots/examples}
-
-### Troubleshooting Guide
-- **Common Issue 1**: {Problem description and solution}
-- **Common Issue 2**: {Problem description and solution}
-- **Error Messages**: {List of error messages and what they mean}
-
-### API Documentation **[CONDITIONAL: API Documentation]**
-- **Endpoint**: {API endpoint description}
-- **Parameters**: {Required and optional parameters}
-- **Example Request**: {Code example}
-- **Example Response**: {Expected response format}
-
-## Implementation Notes **[CONDITIONAL: Technical Task]**
-
-{Keep for technical tasks, delete for non-technical. Technical details, approach, or important considerations}
+## Implementation Notes
 
 ### Technical Approach
-{How this will be implemented}
+New migration under `crates/store/migrations/`. `domain-core/src/contract/` gets `HouseholdConfig` (serde feature). `store`: KV accessors on the repository; `ConfigView`/`LiveConfig`/resolver in a small `config` module; `date_in_zone` using `jiff::Timestamp::from_millisecond(...).to_zoned(tz).date()` → days-since-`1970-01-01` `+ UNIX_TO_MONDAY_EPOCH_OFFSET`. Keep `SystemClock` in place; add `LocalClock` alongside. Do NOT rewire callers yet (that's #2).
 
 ### Dependencies
-{Other tasks or systems this depends on}
+[[SQUIRE-A-0011]]. No contract break (additive). #2/#3/#4 depend on this.
 
 ### Risk Considerations
-{Technical risks and mitigation strategies}
+`jiff` date-math API: verify the days-since-epoch conversion against the existing `date_from_unix_millis` for UTC (must agree when tz==UTC). UTC fallback on bad zone strings (never panic). `arc-swap` `.load()` returns a `Guard`; use `.load_full()` where an owned `Arc` is needed. Keep the additive change compiling on its own.
 
-## Status Updates **[REQUIRED]**
+## Status Updates
 
 *To be added during implementation*
