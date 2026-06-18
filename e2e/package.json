@@ -1,0 +1,14 @@
+{
+  "name": "squire-keep-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Playwright end-to-end tests that drive the Keep web UI against a throwaway demo server, asserting outcomes and capturing screenshots (SQUIRE-T-0069).",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
