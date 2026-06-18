@@ -150,7 +150,10 @@ private fun ReadyContent(
         if (view.questsToday.isEmpty()) {
             item { EmptyHint("No quests today — well done, brave Squire! 🎉") }
         } else {
-            items(view.questsToday, key = { it.questId }) { QuestCardRow(it, onMarkDone) }
+            // Keys are namespaced ("q"/"i"/"s") because quest/item ids share one LazyColumn and a
+            // QuestId can numerically equal an ItemId — an un-namespaced key would collide (caught by
+            // the screenshot harness, SQUIRE-T-0070).
+            items(view.questsToday, key = { "q" + it.questId }) { QuestCardRow(it, onMarkDone) }
         }
 
         item { Spacer(Modifier.height(2.dp)) }
@@ -158,13 +161,13 @@ private fun ReadyContent(
         if (view.rewards.isEmpty()) {
             item { EmptyHint("No rewards yet.") }
         } else {
-            items(view.rewards, key = { it.itemId }) { RewardCardRow(it, onRedeem) }
+            items(view.rewards, key = { "i" + it.itemId }) { RewardCardRow(it, onRedeem) }
         }
 
         if (view.streaks.isNotEmpty()) {
             item { Spacer(Modifier.height(2.dp)) }
             item { SectionTitle("Badges & Streaks") }
-            items(view.streaks, key = { it.name }) { StreakCardRow(it) }
+            items(view.streaks, key = { "s" + it.name }) { StreakCardRow(it) }
         }
 
         item { Spacer(Modifier.height(2.dp)) }

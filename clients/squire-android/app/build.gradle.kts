@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.paparazzi)
 }
 
 // Release signing is read from a gitignored `keystore.properties` (see keystore.properties.example).
