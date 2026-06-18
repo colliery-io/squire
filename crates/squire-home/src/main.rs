@@ -15,7 +15,7 @@ use domain_core::contract::{
 };
 use identity::Principal;
 
-use squire_home::{env_u16, open_household, serve, TOKEN_TTL_MS};
+use squire_home::{ensure_timezone, env_u16, open_household, serve, TOKEN_TTL_MS};
 
 /// Fixed on-disk location for the demo tenant, recreated each run for a deterministic seed.
 const DIR: &str = "/tmp/squire-home";
@@ -111,8 +111,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         )
         .expect("seed quests + achievement + rewards");
 
+    // Onboarding (ADR A-0011): seed the household timezone (SQUIRE_TZ or the detected host zone).
+    let timezone = ensure_timezone(&store);
+
     println!("════════════════════════════════════════════════════════════════════");
     println!("  Squire DEMO server (squire-home) — wiped + re-seeded each run");
+    println!("  Timezone:                {timezone}");
     println!("  Keep (parent, loopback): http://127.0.0.1:{keep_port}   login: Knight 1 / demo");
     println!("  LAN api (phones):        http://0.0.0.0:{api_port}   (emulator: http://10.0.2.2:{api_port})");
     println!("  Squire (child) login:    household=demo, user=2, secret=demo");

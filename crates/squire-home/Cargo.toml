@@ -19,3 +19,6 @@ libmdns = "0.9"
 # Persistent server (squire-serve, SQUIRE-T-0048): OS data dir + a generated, persisted signing key.
 dirs = "5"
 getrandom = "0.2"
+# Onboarding (ADR SQUIRE-A-0011, SQUIRE-T-0067): detect the home computer's IANA timezone to seed
+# the household config on first run (validated via `store::valid_timezone`).
+iana-time-zone = "0.1"

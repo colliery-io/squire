@@ -16,7 +16,7 @@ pub mod settings;
 pub mod tenant;
 
 pub use conn::AnyConnection;
-pub use settings::{date_in_zone, live_config, ConfigView, LiveConfig, LocalClock};
+pub use settings::{date_in_zone, live_config, valid_timezone, ConfigView, LiveConfig, LocalClock};
 pub use migrations::{run_migrations, MIGRATIONS};
 pub use rows::{
     AchievementRow, Audit, EventRow, ItemRow, QuestRow, RowError, UserRow,
