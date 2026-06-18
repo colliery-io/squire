@@ -54,9 +54,10 @@ import kotlinx.serialization.json.Json
 
 private val WEEKDAYS = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
-/** One entry from the bundled starter library (`assets/library.json`). */
+/** One entry from the bundled starter library (`assets/library.json`). `internal` so the screenshot
+ * harness (SQUIRE-T-0070) can build sample library rows. */
 @Serializable
-private data class LibraryQuest(
+internal data class LibraryQuest(
     val category: String,
     val title: String,
     val reward: Long,
@@ -74,26 +75,30 @@ private data class QuestLibrary(val quests: List<LibraryQuest> = emptyList())
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun QuestAdminScreen(
+internal fun QuestAdminScreen(
     adapter: KnightApiAdapter,
     squires: List<Pair<Long, String>>,
     onBack: () -> Unit,
+    // Screenshot/test seams (SQUIRE-T-0070); both null in production → live fetch + bundled library.
+    initialQuests: List<QuestSummaryDto>? = null,
+    libraryOverride: List<LibraryQuest>? = null,
 ) {
     androidx.activity.compose.BackHandler { onBack() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    var quests by remember { mutableStateOf<List<QuestSummaryDto>>(emptyList()) }
+    var quests by remember { mutableStateOf(initialQuests ?: emptyList()) }
     var listError by remember { mutableStateOf<String?>(null) }
     var tick by remember { mutableStateOf(0) }
 
     androidx.compose.runtime.LaunchedEffect(tick) {
+        if (initialQuests != null) return@LaunchedEffect // injected (snapshot/test) — no network.
         runCatching { adapter.listQuests() }
             .onSuccess { quests = it; listError = null }
             .onFailure { listError = "Couldn't load quests — is the computer reachable?" }
     }
 
-    val library = remember {
+    val library = libraryOverride ?: remember {
         runCatching {
             val text = context.assets.open("library.json").bufferedReader().use { it.readText() }
             Json { ignoreUnknownKeys = true }.decodeFromString(QuestLibrary.serializer(), text).quests
