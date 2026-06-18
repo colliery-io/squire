@@ -6,6 +6,59 @@
   const errEl = document.getElementById("login-error");
   if (!form) return;
 
+  // ── Tabbed shell (T-0061) ────────────────────────────────────────────────────
+  // One panel visible at a time; the nav is a tab bar. Each tab maps to a panel and a loader
+  // that re-pulls its data on activation (so Review etc. stay fresh). Function declarations
+  // below are hoisted, so these loaders resolve even though they're defined later in the file.
+  const TABS = [
+    { tab: "quests", panel: "quests-panel" },
+    { tab: "review", panel: "review-panel" },
+    { tab: "rewards", panel: "items-panel" },
+    { tab: "achievements", panel: "achievements-panel" },
+    { tab: "members", panel: "members-panel" },
+    { tab: "pair", panel: "pair-panel" },
+    { tab: "log", panel: "log-panel" },
+  ];
+  const TAB_LOADERS = {
+    quests: () => loadQuests(),
+    review: () => loadReview(),
+    rewards: () => loadCatalog("items", "item-list"),
+    achievements: () => { loadAchScopeQuests(); loadCatalog("achievements", "achievement-list"); },
+    members: () => loadMembers(),
+    pair: () => loadPairMembers(),
+    log: () => {},
+  };
+
+  function currentTab() {
+    const name = (location.hash || "").replace("#", "");
+    return TABS.some((t) => t.tab === name) ? name : "quests";
+  }
+
+  function showTab(name) {
+    if (!TABS.some((t) => t.tab === name)) name = "quests";
+    for (const t of TABS) document.getElementById(t.panel).hidden = t.tab !== name;
+    for (const a of document.querySelectorAll("#tabs .tab")) {
+      a.classList.toggle("active", a.dataset.tab === name);
+    }
+    (TAB_LOADERS[name] || (() => {}))();
+  }
+
+  // Reveal the authenticated shell and land on the active tab. Shared by login + first-run
+  // register. Eager-loads only the catalogs that feed cross-tab dropdowns (item gate ←
+  // achievements, achievement scope ← quests); each tab loads its own data on activation.
+  function enterShell(who, fallbackName) {
+    document.getElementById("login").hidden = true;
+    document.getElementById("who").textContent = `${who.display_name || fallbackName} (#${who.user})`;
+    document.getElementById("shell").hidden = false;
+    loadAchScopeQuests();
+    loadCatalog("achievements", "achievement-list");
+    showTab(currentTab());
+  }
+
+  window.addEventListener("hashchange", () => {
+    if (!document.getElementById("shell").hidden) showTab(currentTab());
+  });
+
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     errEl.hidden = true;
@@ -21,19 +74,7 @@
       return;
     }
     const who = await res.json();
-    document.getElementById("login").hidden = true;
-    document.getElementById("who").textContent = `${who.display_name || "Knight"} (#${who.user})`;
-    document.getElementById("shell").hidden = false;
-    for (const id of ["review-panel", "quests-panel", "items-panel", "achievements-panel", "members-panel", "pair-panel", "log-panel"]) {
-      document.getElementById(id).hidden = false;
-    }
-    loadReview();
-    loadQuests();
-    loadAchScopeQuests();
-    loadCatalog("items", "item-list");
-    loadCatalog("achievements", "achievement-list");
-    loadMembers();
-    loadPairMembers();
+    enterShell(who, "Knight");
   });
 
   // ── Review queue (T-0029) ────────────────────────────────────────────────────
@@ -254,13 +295,7 @@
         return;
       }
       const who = await res.json();
-      document.getElementById("login").hidden = true;
-      document.getElementById("who").textContent = `${who.display_name || "Admin"} (#${who.user})`;
-      document.getElementById("shell").hidden = false;
-      for (const id of ["review-panel", "quests-panel", "items-panel", "achievements-panel", "members-panel", "pair-panel", "log-panel"]) {
-        document.getElementById(id).hidden = false;
-      }
-      loadReview(); loadQuests(); loadAchScopeQuests(); loadCatalog("items", "item-list"); loadCatalog("achievements", "achievement-list"); loadMembers(); loadPairMembers();
+      enterShell(who, "Admin");
     });
   }
 
