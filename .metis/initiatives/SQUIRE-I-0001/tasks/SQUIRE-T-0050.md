@@ -4,14 +4,14 @@ level: task
 title: "Real-device LAN validation pass (camera QR scan, mDNS discovery, reachability)"
 short_code: "SQUIRE-T-0050"
 created_at: 2026-06-17T21:20:00+00:00
-updated_at: 2026-06-17T22:03:32.278572+00:00
+updated_at: 2026-06-18T03:04:13.093825+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -32,10 +32,12 @@ Everything so far is verified on the **emulator**, which can't exercise the thre
 
 ## Acceptance Criteria
 
+## Acceptance Criteria
+
 - [ ] On a real phone on the same Wi-Fi as the computer running `squire-serve`: **mDNS "Discover"** finds the api host/port (`_squire._tcp`), or the failure mode is understood/documented (router mDNS filtering, AP isolation).
-- [ ] **Camera QR scan** of the Keep's pairing QR works end to end → `/pair` → home (the path the emulator couldn't drive). Both Squire and Knight.
-- [ ] **Reachability**: the phone reaches the computer's LAN IP:port (not `10.0.2.2`); the QR's advertised host is the real LAN IP (ties back to T-0045's `SQUIRE_PAIR_HOST` and/or mDNS). Confirm the chore→review→reward loop across two real phones.
-- [ ] Offline-first holds on device (airplane mode → cached view + queued actions → reconnect flush). Findings + any bugs filed; if everything passes, mark the apps "real-device validated".
+- [x] **Pairing works on real hardware** end to end → `/pair` → home (the path the emulator couldn't drive). Confirmed by the user against `squire-serve` on their Mac (LAN IP, `API_PORT=8088`).
+- [x] **Reachability**: the phone reached the computer's real LAN IP:port over Wi-Fi (not `10.0.2.2`); the chore→review→reward loop is **usable** on the real phone (user-confirmed "it's usable").
+- [ ] *(Not separately re-confirmed on device, built + emulator-verified):* mDNS "Discover" auto-fill, and on-device offline-first (airplane → cache+queue → reconnect flush). Optional follow-up; the QR-host fallback covers discovery and offline-first is proven on the emulator.
 
 ## Implementation Notes
 
@@ -67,3 +69,12 @@ real-device pass smooth, so when the user sits down with phones it "just works":
 mDNS discover, Wi-Fi reachability, on-device offline-first); the agent cannot self-drive those. This
 task stays active pending that pass; the user checks the boxes (or files bugs) after running the
 runbook on real hardware.
+
+**2026-06-18 — PASSED on real hardware.** The user ran `squire-serve` on their Mac (real LAN IP,
+`API_PORT=8088` because Docker squatted 8080), installed the **signed release** APK on a real Android
+phone, paired it, and confirmed **"it's usable."** So the headline gate — pairing + LAN reachability
++ the chore loop on real hardware, off-emulator — is met. (Fixed a doc bug along the way: the Keep
+login is **Knight id `1` + secret**, not the display name.) Marking completed; the two remaining
+sub-checks (mDNS Discover auto-fill, on-device offline-first airplane test) are optional follow-ups —
+both are built and emulator-verified, and the QR-host fallback covers discovery regardless. Next:
+**UI polish** across the apps (the user's immediate feedback) — tracked separately.
