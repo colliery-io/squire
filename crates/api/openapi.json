@@ -128,6 +128,155 @@
         ]
       }
     },
+    "/admin/quests": {
+      "get": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`GET /admin/quests` (RequireKnight) — every quest (active + archived) as flat summaries with\ncadence/assignment labels resolved against current members.",
+        "operationId": "list_quests",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All quests, flat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QuestSummaryDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/quests` (RequireKnight) — create or edit a quest. A bad definition (empty Weekly\ndays, empty/inactive assignees) is a 400.",
+        "operationId": "create_quest",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuestReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The created/edited quest id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedQuest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid quest definition"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/admin/quests/{id}/archive": {
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/quests/{id}/archive` (RequireKnight) — archive a quest (never deletes). 404 if the\nquest does not exist.",
+        "operationId": "archive_quest",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Quest id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Archived"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "Quest not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/admin/redeem": {
       "post": {
         "tags": [
@@ -846,6 +995,15 @@
         "type": "string",
         "description": "A tenant-scoped bearer token proving (household, user, role). Presented on every call."
       },
+      "CadenceKind": {
+        "type": "string",
+        "description": "Quest cadence on the wire (flat). `weekdays` applies to `Weekly`; `due` (a `Date` day-count) to\n`OneOff`; `Daily` uses neither.",
+        "enum": [
+          "Daily",
+          "Weekly",
+          "OneOff"
+        ]
+      },
       "Category": {
         "type": "string",
         "description": "Free-form text labels — the parent types whatever grouping they like."
@@ -918,6 +1076,109 @@
         "type": "integer",
         "format": "int64",
         "description": "Client-minted idempotency key for privileged commands that lack a natural one\n(`RedeemItem` direct, `AdjustPoints`). The parent phone's offline outbox mints it\nonce and reuses it on every retry; the engine dedupes by finding an emitted event\nthat already carries it, so retry-safety stays *derived from the append-only log*\n— the same mechanism as `claim_id` / `request_id`. See ADR SQUIRE-A-0001."
+      },
+      "CompletionDto": {
+        "type": "string",
+        "description": "How an assigned occurrence is satisfied, on the wire.",
+        "enum": [
+          "EachAssignee",
+          "Race"
+        ]
+      },
+      "CreateQuestReq": {
+        "type": "object",
+        "description": "`POST /admin/quests` request — a flat quest definition authored from the parent phone.",
+        "required": [
+          "title",
+          "reward",
+          "cadence",
+          "completion",
+          "assign_all",
+          "repeatable_within_day",
+          "auto_approve"
+        ],
+        "properties": {
+          "assign_all": {
+            "type": "boolean",
+            "description": "True = all squires (auto-includes ones added later); false = the explicit `squires` list."
+          },
+          "auto_approve": {
+            "type": "boolean"
+          },
+          "cadence": {
+            "$ref": "#/components/schemas/CadenceKind"
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional free-text grouping (e.g. \"Bedroom\")."
+          },
+          "completion": {
+            "$ref": "#/components/schemas/CompletionDto"
+          },
+          "due": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Date",
+                "description": "Optional due date (a `Date` day-count) for a `OneOff` cadence."
+              }
+            ]
+          },
+          "id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuestId",
+                "description": "Existing quest id to edit (upsert), or null/absent to create a new one (the server assigns)."
+              }
+            ]
+          },
+          "repeatable_within_day": {
+            "type": "boolean"
+          },
+          "reward": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "squires": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "description": "Explicit assignees when `assign_all` is false (≥1 active Squire required)."
+          },
+          "title": {
+            "type": "string"
+          },
+          "weekdays": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeekdayDto"
+            },
+            "description": "Days for a `Weekly` cadence (≥1 required for `Weekly`)."
+          }
+        }
+      },
+      "CreatedQuest": {
+        "type": "object",
+        "description": "The id of a created / edited quest, echoed back.",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/QuestId"
+          }
+        }
       },
       "Date": {
         "type": "integer",
@@ -1302,6 +1563,59 @@
           "TakenByOther"
         ]
       },
+      "QuestSummaryDto": {
+        "type": "object",
+        "description": "A quest in the authoring list — flat, with cadence/assignment **labels computed server-side**\n(so the phone list needs no enum decoding).",
+        "required": [
+          "id",
+          "title",
+          "reward",
+          "cadence_label",
+          "assignment_label",
+          "completion",
+          "repeatable_within_day",
+          "auto_approve",
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "assignment_label": {
+            "type": "string",
+            "description": "e.g. \"All squires\", \"Gawain, Percival\"."
+          },
+          "auto_approve": {
+            "type": "boolean"
+          },
+          "cadence_label": {
+            "type": "string",
+            "description": "e.g. \"Daily\", \"Mon/Wed/Fri\", \"One-time\"."
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completion": {
+            "$ref": "#/components/schemas/CompletionDto"
+          },
+          "id": {
+            "$ref": "#/components/schemas/QuestId"
+          },
+          "repeatable_within_day": {
+            "type": "boolean"
+          },
+          "reward": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "RedeemReq": {
         "type": "object",
         "description": "`POST /admin/redeem` body — a direct Knight redeem on a target `squire`. Deduped on\n`command_id`.",
@@ -1685,6 +1999,19 @@
         "type": "integer",
         "format": "int64",
         "description": "Identifies a household member. A household has one-or-more Knights (adult/parent) and\nSquires (child/player) — counts are fixed nowhere. Player activity is attributed to a\nSquire via this id. See ADR SQUIRE-A-0004. (Tenancy is schema-level and absent from\nthese types — ADR SQUIRE-A-0002.)"
+      },
+      "WeekdayDto": {
+        "type": "string",
+        "description": "A weekday on the wire (mirrors the domain `Weekday`, flat string enum).",
+        "enum": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat",
+          "Sun"
+        ]
       },
       "u32": {
         "type": "integer",

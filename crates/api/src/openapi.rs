@@ -68,6 +68,10 @@ impl Modify for SecurityAddon {
         crate::knight::mark_done,
         crate::knight::household_review,
         crate::knight::squire_state,
+        // Knight quest authoring (SQUIRE-T-0064)
+        crate::authoring::create_quest,
+        crate::authoring::list_quests,
+        crate::authoring::archive_quest,
     ),
     components(schemas(
         // ── Squire state view + nested ──
@@ -127,6 +131,13 @@ impl Modify for SecurityAddon {
         crate::knight::Ack,
         crate::knight::DecisionDto,
         crate::knight::DecisionKind,
+        // ── Knight quest-authoring DTOs (SQUIRE-T-0064) ──
+        crate::authoring::CreateQuestReq,
+        crate::authoring::CreatedQuest,
+        crate::authoring::QuestSummaryDto,
+        crate::authoring::CadenceKind,
+        crate::authoring::WeekdayDto,
+        crate::authoring::CompletionDto,
     )),
     modifiers(&SecurityAddon),
     tags(

@@ -15,6 +15,7 @@
 //! `tower::ServiceExt::oneshot`, so the whole request path is exercised in-process.
 
 pub mod app_dist;
+pub mod authoring;
 pub mod auth;
 pub mod control;
 pub mod knight;
@@ -61,6 +62,9 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/admin/mark-done", post(knight::mark_done))
         .route("/household-review", get(knight::household_review))
         .route("/admin/squire/{id}/state", get(knight::squire_state))
+        // Knight quest authoring from the phone (SQUIRE-T-0064): create / list / archive quests.
+        .route("/admin/quests", get(authoring::list_quests).post(authoring::create_quest))
+        .route("/admin/quests/{id}/archive", post(authoring::archive_quest))
         // App-update distribution (SQUIRE-T-0051): version manifest + APK download, unauthenticated.
         .route("/app/manifest", get(app_dist::manifest))
         .route("/app/{file}", get(app_dist::download))
