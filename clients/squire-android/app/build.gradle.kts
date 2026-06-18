@@ -69,6 +69,7 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":knight-core"))
     implementation(project(":sdk"))
     implementation(project(":pairing"))
 
