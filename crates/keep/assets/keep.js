@@ -24,7 +24,7 @@
     quests: () => { loadQuestSquires().then(() => loadQuests()); },
     review: () => loadReview(),
     rewards: () => loadCatalog("items", "item-list"),
-    achievements: () => { loadAchScopeQuests(); loadCatalog("achievements", "achievement-list"); },
+    achievements: () => { loadAchScopeQuests(); loadCatalog("achievements", "achievement-list"); loadAchLibrary(); },
     members: () => loadMembers(),
     pair: () => loadPairMembers(),
     log: () => {},
@@ -157,6 +157,7 @@
           body: JSON.stringify({ active: !m.active }),
         });
         loadMembers();
+        loadPairMembers();
       });
       li.appendChild(btn);
       ul.appendChild(li);
@@ -191,6 +192,8 @@
       memberTok.hidden = false;
       memberForm.reset();
       loadMembers();
+      // A new member is immediately pairable — refresh the Pair tab's member dropdown (T-0071).
+      loadPairMembers();
     });
   }
 
@@ -428,6 +431,7 @@
         btn.addEventListener("click", async () => {
           await fetch(`/api/quests/${q.id}/archive`, { method: "POST" });
           loadQuests();
+          loadAchScopeQuests();
         });
         li.appendChild(btn);
       }
@@ -498,6 +502,9 @@
       questForm.reset();
       syncQuestFields();
       loadQuests();
+      // A new quest must immediately appear in the achievement composer's Quest-scope dropdown,
+      // even without switching tabs (SQUIRE-T-0071).
+      loadAchScopeQuests();
     });
   }
 
@@ -568,6 +575,7 @@
           if (r.ok) {
             btn.textContent = "Imported ✓";
             loadQuests();
+            loadAchScopeQuests();
           } else {
             btn.disabled = false;
             const e = document.getElementById("library-error");
@@ -661,7 +669,7 @@
   function buildScope(fd) {
     const scope = fd.get("scope");
     if (scope === "Quest") return { Quest: Number(fd.get("scope_quest")) };
-    if (scope === "Category") return { Category: fd.get("scope_category") || "" };
+    if (scope === "Category") return { Category: (fd.get("scope_category") || "").trim() };
     return "Any";
   }
 
@@ -675,6 +683,12 @@
       achErr.hidden = true;
       const fd = new FormData(achForm);
       const kind = fd.get("criterion");
+      // A Category scope must be non-blank (the domain rejects an empty one — SQUIRE-T-0071).
+      if (kind !== "PointsEarned" && fd.get("scope") === "Category" && !(fd.get("scope_category") || "").trim()) {
+        achErr.textContent = "Enter a category for the scope.";
+        achErr.hidden = false;
+        return;
+      }
       let criterion;
       if (kind === "PointsEarned") {
         criterion = { PointsEarned: { total: Number(fd.get("total")) } };
@@ -705,6 +719,68 @@
       syncAchFields();
       loadCatalog("achievements", "achievement-list");
     });
+  }
+
+  // ── Starter achievement library (T-0071) ─────────────────────────────────────
+  // Common milestones scoped to the quest-library categories (plus Any/points), one-tap import —
+  // mirrors the quest library. Reuses freshId() from the quest section.
+  let achLibraryLoaded = false;
+  async function loadAchLibrary() {
+    if (achLibraryLoaded) return;
+    const res = await fetch("/static/achievements-library.json");
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = (data && data.achievements) || [];
+    const container = document.getElementById("ach-library-list");
+    if (!container) return;
+    container.innerHTML = "";
+    achLibraryLoaded = true;
+    const ul = document.createElement("ul");
+    for (const a of list) {
+      const li = document.createElement("li");
+      const strong = document.createElement("strong");
+      strong.textContent = a.name;
+      li.append(strong, document.createTextNode(` — ${achLibSummary(a)} · +${a.bonus} ★ `));
+      const btn = document.createElement("button");
+      btn.textContent = "Import";
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        const r = await fetch("/api/achievements", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(achLibToWire(a)),
+        });
+        if (r.ok) {
+          btn.textContent = "Imported ✓";
+          loadCatalog("achievements", "achievement-list");
+        } else {
+          btn.disabled = false;
+          const e = document.getElementById("ach-library-error");
+          e.textContent = "Could not import that achievement.";
+          e.hidden = false;
+        }
+      });
+      li.appendChild(btn);
+      ul.appendChild(li);
+    }
+    container.appendChild(ul);
+  }
+
+  function achLibScope(a) {
+    return a.scope === "category" ? { Category: a.category } : "Any";
+  }
+  function achLibToWire(a) {
+    let criterion;
+    if (a.criterion === "points") criterion = { PointsEarned: { total: a.total } };
+    else if (a.criterion === "total") criterion = { TotalCompletions: { scope: achLibScope(a), count: a.count } };
+    else criterion = { Streak: { scope: achLibScope(a), length: a.length, basis: a.basis } };
+    return { id: freshId(), name: a.name, description: null, criterion, bonus_points: a.bonus, active: true };
+  }
+  function achLibSummary(a) {
+    const scope = a.scope === "category" ? a.category : "any";
+    if (a.criterion === "points") return `${a.total} points`;
+    if (a.criterion === "total") return `${a.count} completions · ${scope}`;
+    return `${a.length}-day streak · ${scope}`;
   }
 
   // ── Event-log inspector (T-0030) ─────────────────────────────────────────────

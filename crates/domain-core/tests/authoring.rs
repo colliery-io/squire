@@ -200,6 +200,23 @@ fn define_achievement_scope_and_criterion_validation() {
         Err(DomainError::InvalidDefinition)
     ));
 
+    // A blank Category scope is meaningless → rejected (SQUIRE-T-0071).
+    let empty_cat = Achievement {
+        id: AchievementId(4),
+        name: "A".into(),
+        description: None,
+        criterion: Criterion::TotalCompletions { scope: Scope::Category(Category("  ".into())), count: 5 },
+        bonus_points: 5,
+        active: true,
+    };
+    assert!(
+        matches!(
+            eng().handle(&snap, Command::DefineAchievement(empty_cat), &clk()),
+            Err(DomainError::InvalidDefinition)
+        ),
+        "a blank Category scope must be rejected",
+    );
+
     let ok = Achievement {
         id: AchievementId(3),
         name: "A".into(),

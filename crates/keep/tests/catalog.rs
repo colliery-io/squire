@@ -10,8 +10,8 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 
 use domain_core::contract::{
-    Achievement, AchievementId, AddMemberReq, Availability, Command, CommandId, Criterion,
-    HouseholdHandle, ItemId, RedeemableItem, RegisterHouseholdReq, Role, UserId,
+    Achievement, AchievementId, AddMemberReq, Availability, Category, Command, CommandId, Criterion,
+    HouseholdHandle, ItemId, RedeemableItem, RegisterHouseholdReq, Role, Scope, StreakBasis, UserId,
 };
 use identity::{Principal, TokenSigner};
 use store::tenant::Backend;
@@ -183,6 +183,54 @@ async fn invalid_achievement_is_400() {
     // PointsEarned { total: 0 } is an invalid definition → 400.
     let (st, _) = send(&state, "POST", "/api/achievements", Some(&token), Some(to_value(points_achievement(401, 0)).unwrap())).await;
     assert_eq!(st, StatusCode::BAD_REQUEST);
+}
+
+/// A category-scoped `TotalCompletions` achievement (SQUIRE-T-0071).
+fn category_total_achievement(id: u128, category: &str, count: u32) -> Achievement {
+    Achievement {
+        id: AchievementId(id),
+        name: "Cat".into(),
+        description: None,
+        criterion: Criterion::TotalCompletions { scope: Scope::Category(Category(category.into())), count },
+        bonus_points: 10,
+        active: true,
+    }
+}
+
+/// An `Any`-scoped `Streak` achievement.
+fn streak_achievement(id: u128, length: u32) -> Achievement {
+    Achievement {
+        id: AchievementId(id),
+        name: "Streaky".into(),
+        description: None,
+        criterion: Criterion::Streak { scope: Scope::Any, length, basis: StreakBasis::CalendarDays },
+        bonus_points: 10,
+        active: true,
+    }
+}
+
+// Streak + TotalCompletions + Category scope create + list (only PointsEarned was covered before).
+#[tokio::test]
+async fn streak_and_category_achievements_create_and_list() {
+    let (state, _admin, token, _dir) = keep();
+    let (st, _) = send(&state, "POST", "/api/achievements", Some(&token), Some(to_value(category_total_achievement(700, "Bedroom", 20)).unwrap())).await;
+    assert_eq!(st, StatusCode::OK, "category-scoped total-completions is valid");
+    let (st, _) = send(&state, "POST", "/api/achievements", Some(&token), Some(to_value(streak_achievement(701, 7)).unwrap())).await;
+    assert_eq!(st, StatusCode::OK, "any-scoped streak is valid");
+
+    let (_st, list) = send(&state, "GET", "/api/achievements", Some(&token), None).await;
+    let ids: Vec<_> = list.as_array().unwrap().iter().map(|r| r["achievement"]["id"].clone()).collect();
+    assert!(ids.contains(&serde_json::json!(700)) && ids.contains(&serde_json::json!(701)), "both new achievements are listed");
+}
+
+// A blank Category scope is rejected (SQUIRE-T-0071 decision); a zero-length streak too.
+#[tokio::test]
+async fn invalid_scoped_achievements_are_400() {
+    let (state, _admin, token, _dir) = keep();
+    let (st, _) = send(&state, "POST", "/api/achievements", Some(&token), Some(to_value(category_total_achievement(702, "   ", 5)).unwrap())).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "a blank category scope is rejected");
+    let (st, _) = send(&state, "POST", "/api/achievements", Some(&token), Some(to_value(streak_achievement(703, 0)).unwrap())).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "a zero-length streak is rejected");
 }
 
 #[tokio::test]
