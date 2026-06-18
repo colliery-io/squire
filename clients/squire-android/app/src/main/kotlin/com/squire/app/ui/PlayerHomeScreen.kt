@@ -2,30 +2,41 @@ package com.squire.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.squire.app.ui.components.Banner
+import com.squire.app.ui.components.GoldPill
+import com.squire.app.ui.components.ProgressDots
+import com.squire.app.ui.components.SectionTitle
+import com.squire.app.ui.components.StatusChip
+import com.squire.app.ui.theme.SquireGold
+import com.squire.app.ui.theme.SquireTheme
 import com.squire.core.PlayerUiState
 import com.squire.sdk.model.ClaimStateKind
 import com.squire.sdk.model.ClaimStatus
@@ -38,11 +49,11 @@ import com.squire.sdk.model.StateView
 import com.squire.sdk.model.StreakView
 
 /**
- * Stateless player-home screen: renders the whole [PlayerUiState] and reports user
- * intents back through callbacks. All logic lives in `:core`'s `PlayerStore`.
+ * The child's quest home — "playful quest" themed (SQUIRE-T-0056). Stateless: renders the whole
+ * [PlayerUiState] and reports intents via callbacks; all logic lives in `:core`'s `PlayerStore`.
  *
- * @param onMarkDone invoked with a quest's id when the child taps "Mark done".
- * @param onRedeem invoked with a reward's id when the child taps "Redeem".
+ * @param headerLabel overrides the title (the Knight's "Acting as <name>" assume view, T-0055).
+ * @param onBack when non-null, the top bar shows Back instead of Forget (assume mode).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,42 +69,44 @@ fun PlayerHomeScreen(
     val balance = (state as? PlayerUiState.Ready)?.view?.balance
     val name = headerLabel ?: "Squire"
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
                 title = {
-                    Text(
-                        if (balance != null) "$name — $balance pts" else name,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("⚔  $name", fontWeight = FontWeight.Bold, maxLines = 1)
+                        if (balance != null) {
+                            Spacer(Modifier.width(12.dp))
+                            GoldPill(balance)
+                        }
+                    }
                 },
                 actions = {
-                    TextButton(onClick = onRefresh) { Text("Refresh") }
-                    // In "assume Squire" mode (onBack set) the action is Back, not Forget.
+                    TextButton(onClick = onRefresh) {
+                        Text("Refresh", color = MaterialTheme.colorScheme.onPrimary)
+                    }
                     if (onBack != null) {
-                        TextButton(onClick = onBack) { Text("Back") }
+                        TextButton(onClick = onBack) { Text("Back", color = MaterialTheme.colorScheme.onPrimary) }
                     } else {
-                        TextButton(onClick = onForget) { Text("Forget") }
+                        TextButton(onClick = onForget) { Text("Forget", color = MaterialTheme.colorScheme.onPrimary) }
                     }
                 },
             )
         },
     ) { padding ->
         when (state) {
-            is PlayerUiState.Loading -> Column(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
+            is PlayerUiState.Loading -> Centered(Modifier.fillMaxSize().padding(padding)) {
                 CircularProgressIndicator()
                 Spacer(Modifier.height(8.dp))
                 Text("Loading…")
             }
 
-            is PlayerUiState.Error -> Column(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
+            is PlayerUiState.Error -> Centered(Modifier.fillMaxSize().padding(padding)) {
                 Text(state.message, color = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = onRefresh) { Text("Retry") }
@@ -120,219 +133,238 @@ private fun ReadyContent(
 ) {
     LazyColumn(
         modifier = modifier,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (fromCache) {
-            item { OfflineBanner() }
+            item {
+                Banner(
+                    text = "⚠  Offline — showing your last saved quests",
+                    container = MaterialTheme.colorScheme.errorContainer,
+                    content = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
         }
 
-        item { SectionHeader("Today's quests") }
+        item { SectionTitle("Today's Quests") }
         if (view.questsToday.isEmpty()) {
-            item { Text("No quests today.") }
+            item { EmptyHint("No quests today — well done, brave Squire! 🎉") }
         } else {
-            items(view.questsToday, key = { it.questId }) { quest ->
-                QuestRow(quest = quest, onMarkDone = onMarkDone)
-            }
+            items(view.questsToday, key = { it.questId }) { QuestCardRow(it, onMarkDone) }
         }
 
-        item { SectionHeader("Rewards") }
+        item { Spacer(Modifier.height(2.dp)) }
+        item { SectionTitle("Rewards") }
         if (view.rewards.isEmpty()) {
-            item { Text("No rewards available.") }
+            item { EmptyHint("No rewards yet.") }
         } else {
-            items(view.rewards, key = { it.itemId }) { reward ->
-                RewardRow(reward = reward, onRedeem = onRedeem)
-            }
+            items(view.rewards, key = { it.itemId }) { RewardCardRow(it, onRedeem) }
         }
 
-        item { SectionHeader("Streaks") }
-        if (view.streaks.isEmpty()) {
-            item { Text("No streaks yet.") }
+        if (view.streaks.isNotEmpty()) {
+            item { Spacer(Modifier.height(2.dp)) }
+            item { SectionTitle("Badges & Streaks") }
+            items(view.streaks, key = { it.name }) { StreakCardRow(it) }
+        }
+
+        item { Spacer(Modifier.height(2.dp)) }
+        item { SectionTitle("Recent") }
+        if (view.myClaims.isEmpty() && view.myRequests.isEmpty()) {
+            item { EmptyHint("Nothing yet — go finish a quest!") }
         } else {
-            items(view.streaks, key = { it.name }) { streak ->
-                StreakRow(streak)
-            }
+            items(view.myClaims, key = { "c" + it.claimId }) { ClaimRow(it) }
+            items(view.myRequests, key = { "r" + it.requestId }) { RequestRow(it) }
         }
+    }
+}
 
-        item { SectionHeader("Recent claims") }
-        if (view.myClaims.isEmpty()) {
-            item { Text("No recent claims.") }
-        } else {
-            items(view.myClaims, key = { it.claimId }) { claim ->
-                ClaimRow(claim)
+@Composable
+private fun QuestCardRow(quest: QuestCard, onMarkDone: (Long) -> Unit) {
+    QuestCard {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(quest.icon ?: "📜", modifier = Modifier.padding(end = 12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(quest.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "+${quest.reward} ★",
+                    color = SquireGold,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
-        }
-
-        item { SectionHeader("Recent requests") }
-        if (view.myRequests.isEmpty()) {
-            item { Text("No recent requests.") }
-        } else {
-            items(view.myRequests, key = { it.requestId }) { request ->
-                RequestRow(request)
+            when (quest.status) {
+                QuestStatus.Available -> Button(
+                    onClick = { onMarkDone(quest.questId) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                        contentColor = MaterialTheme.colorScheme.onSecondary,
+                    ),
+                ) { Text("Do it!", fontWeight = FontWeight.Bold) }
+                QuestStatus.Pending -> StatusChip(
+                    "⏳ Pending",
+                    MaterialTheme.colorScheme.secondaryContainer,
+                    MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+                QuestStatus.CompletedToday -> StatusChip(
+                    "✓ Done",
+                    MaterialTheme.colorScheme.tertiaryContainer,
+                    MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+                QuestStatus.TakenByOther -> StatusChip(
+                    "Taken",
+                    MaterialTheme.colorScheme.surfaceVariant,
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun OfflineBanner() {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            "Offline — showing last saved view",
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.padding(12.dp),
-        )
-    }
-}
-
-@Composable
-private fun SectionHeader(text: String) {
-    Column {
-        HorizontalDivider()
-        Text(
-            text,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-    }
-}
-
-@Composable
-private fun QuestRow(quest: QuestCard, onMarkDone: (Long) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(quest.title, fontWeight = FontWeight.Medium)
-            Text("+${quest.reward} pts", style = MaterialTheme.typography.bodySmall)
-        }
-        when (quest.status) {
-            QuestStatus.Available -> Button(onClick = { onMarkDone(quest.questId) }) {
-                Text("Mark done")
+private fun RewardCardRow(reward: RewardCard, onRedeem: (Long) -> Unit) {
+    QuestCard {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(reward.icon ?: "🎁", modifier = Modifier.padding(end = 12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(reward.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "${reward.cost} ★",
+                    color = SquireGold,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
-            QuestStatus.Pending -> StatusLabel("Pending review")
-            QuestStatus.CompletedToday -> StatusLabel("Done today")
-            QuestStatus.TakenByOther -> StatusLabel("Taken")
-        }
-    }
-}
-
-@Composable
-private fun RewardRow(reward: RewardCard, onRedeem: (Long) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(reward.name, fontWeight = FontWeight.Medium)
-            Text("${reward.cost} pts", style = MaterialTheme.typography.bodySmall)
-        }
-        val lock = reward.lock
-        when {
-            lock != null -> when (lock.kind) {
-                LockReasonKind.OutOfStock -> StatusLabel("Out of stock")
-                LockReasonKind.NeedsAchievement ->
-                    StatusLabel("Locked: ${lock.name ?: "achievement"}")
+            val lock = reward.lock
+            when {
+                lock != null -> when (lock.kind) {
+                    LockReasonKind.OutOfStock -> StatusChip(
+                        "Out of stock",
+                        MaterialTheme.colorScheme.surfaceVariant,
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    LockReasonKind.NeedsAchievement -> StatusChip(
+                        "🔒 ${lock.name ?: "Locked"}",
+                        MaterialTheme.colorScheme.surfaceVariant,
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                reward.affordable -> Button(onClick = { onRedeem(reward.itemId) }) { Text("Redeem") }
+                else -> StatusChip(
+                    "Need more ★",
+                    MaterialTheme.colorScheme.surfaceVariant,
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            reward.affordable -> Button(onClick = { onRedeem(reward.itemId) }) { Text("Redeem") }
-            else -> StatusLabel("Can't afford")
         }
     }
 }
 
 @Composable
-private fun StreakRow(streak: StreakView) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(streak.name, fontWeight = FontWeight.Medium)
-        val milestone = streak.nextMilestone?.let { " · next $it" } ?: ""
-        val alive = if (streak.alive) "" else " · broken"
-        Text(
-            "current ${streak.current} / best ${streak.best}$milestone$alive",
-            style = MaterialTheme.typography.bodySmall,
-        )
+private fun StreakCardRow(streak: StreakView) {
+    QuestCard {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("🏅 ${streak.name}", style = MaterialTheme.typography.titleMedium)
+                Text("best ${streak.best}", style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ProgressDots(current = streak.current, target = streak.nextMilestone ?: streak.current.coerceAtLeast(1))
+                Spacer(Modifier.width(10.dp))
+                val goal = streak.nextMilestone?.let { " / $it" } ?: ""
+                Text(
+                    "${streak.current}$goal" + if (!streak.alive) "  · broken" else "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun ClaimRow(claim: ClaimStatus) {
-    val state = claim.state
-    val label = when (state.state) {
-        ClaimStateKind.Pending -> "Pending"
-        ClaimStateKind.Approved -> "Approved" + (state.points?.let { " (+$it)" } ?: "")
-        ClaimStateKind.Rejected -> "Rejected" + (state.reason?.let { ": $it" } ?: "")
+    val st = claim.state
+    val label = when (st.state) {
+        ClaimStateKind.Pending -> "⏳ Pending"
+        ClaimStateKind.Approved -> "✓ Approved" + (st.points?.let { " (+$it ★)" } ?: "")
+        ClaimStateKind.Rejected -> "✗ Rejected" + (st.reason?.let { ": $it" } ?: "")
     }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(claim.questTitle, modifier = Modifier.weight(1f))
-        Text(label, style = MaterialTheme.typography.bodySmall)
-    }
+    RecentRow(claim.questTitle, label)
 }
 
 @Composable
 private fun RequestRow(request: RedemptionStatus) {
-    val state = request.state
-    val label = state.state.value + (state.reason?.let { ": $it" } ?: "")
+    val st = request.state
+    val label = "${request.cost} ★ · " + st.state.value + (st.reason?.let { ": $it" } ?: "")
+    RecentRow(request.itemName, label)
+}
+
+@Composable
+private fun RecentRow(title: String, label: String) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(request.itemName, modifier = Modifier.weight(1f))
-        Text("${request.cost} pts · $label", style = MaterialTheme.typography.bodySmall)
+        Text(title, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** A parchment card wrapper for quests/rewards/streaks. */
+@Composable
+private fun QuestCard(content: @Composable () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) { content() }
     }
 }
 
 @Composable
-private fun StatusLabel(text: String) {
+private fun EmptyHint(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = 4.dp),
     )
+}
+
+@Composable
+private fun Centered(modifier: Modifier, content: @Composable () -> Unit) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) { content() }
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun PlayerHomePreview() {
     val sample = StateView(
-        balance = 120,
+        balance = 12,
         generatedAt = 0L,
         squire = 1L,
         questsToday = listOf(
-            QuestCard(on = 1, questId = 1L, reward = 10, status = QuestStatus.Available, title = "Make bed"),
-            QuestCard(on = 1, questId = 2L, reward = 15, status = QuestStatus.TakenByOther, title = "Dishes"),
+            QuestCard(on = 1, questId = 1L, reward = 5, status = QuestStatus.Available, title = "Make your bed", icon = "🛏"),
+            QuestCard(on = 1, questId = 2L, reward = 10, status = QuestStatus.Pending, title = "Tidy your room", icon = "🧹"),
         ),
         rewards = listOf(
-            RewardCard(affordable = true, cost = 50, itemId = 1L, name = "Ice cream"),
-            RewardCard(affordable = false, cost = 500, itemId = 2L, name = "New game"),
+            RewardCard(affordable = true, cost = 3, itemId = 1L, name = "Ice cream", icon = "🍦"),
+            RewardCard(affordable = false, cost = 15, itemId = 2L, name = "Movie night", icon = "🎬"),
         ),
-        myClaims = listOf(
-            ClaimStatus(
-                claimId = 9L,
-                on = 1,
-                questTitle = "Make bed",
-                state = com.squire.sdk.model.ClaimState(state = ClaimStateKind.Pending),
-            ),
-        ),
+        myClaims = emptyList(),
         myRequests = emptyList(),
-        streaks = listOf(
-            StreakView(alive = true, best = 9, current = 3, name = "Chores", nextMilestone = 5),
-        ),
+        streaks = listOf(StreakView(name = "Room Master", current = 3, best = 5, alive = true, nextMilestone = 7)),
     )
-    MaterialTheme {
+    SquireTheme {
         PlayerHomeScreen(
-            state = PlayerUiState.Ready(sample, fromCache = true),
-            onRefresh = {},
-            onMarkDone = {},
-            onRedeem = {},
+            state = PlayerUiState.Ready(sample, fromCache = false),
+            onRefresh = {}, onMarkDone = {}, onRedeem = {},
         )
     }
 }

@@ -8,7 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,6 +25,7 @@ import com.squire.app.data.RoomStateCache
 import com.squire.app.data.SquireApiAdapter
 import com.squire.app.data.db.SquireDb
 import com.squire.app.ui.PlayerHomeScreen
+import com.squire.app.ui.theme.SquireTheme
 import com.squire.core.PlayerStore
 import com.squire.core.PlayerUiState
 import com.squire.core.SyncEngine
@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
         val discovery = NsdDiscovery(this)
 
         setContent {
-            MaterialTheme {
+            SquireTheme {
                 var session by remember { mutableStateOf(sessionStore.load()) }
                 val current = session
                 val onSessionChanged: (Session) -> Unit = { s -> sessionStore.save(s); session = s }
