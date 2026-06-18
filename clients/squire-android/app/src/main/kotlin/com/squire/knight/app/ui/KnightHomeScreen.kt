@@ -64,9 +64,9 @@ fun KnightHomeScreen(
     state: KnightUiState,
     onRefresh: () -> Unit,
     onApproveClaim: (claimId: Long) -> Unit,
-    onRejectClaim: (claimId: Long) -> Unit,
+    onRejectClaim: (claimId: Long, reason: String?) -> Unit,
     onApproveRequest: (requestId: Long) -> Unit,
-    onRejectRequest: (requestId: Long) -> Unit,
+    onRejectRequest: (requestId: Long, reason: String?) -> Unit,
     onAddFunds: (squire: Long, amount: Long, reason: String) -> Unit,
     onRedeem: (squire: Long, itemId: Long) -> Unit,
     onMarkDone: (squire: Long, questId: Long, on: Int) -> Unit,
@@ -139,9 +139,9 @@ private fun ReadyContent(
     review: HouseholdReview,
     fromCache: Boolean,
     onApproveClaim: (Long) -> Unit,
-    onRejectClaim: (Long) -> Unit,
+    onRejectClaim: (Long, String?) -> Unit,
     onApproveRequest: (Long) -> Unit,
-    onRejectRequest: (Long) -> Unit,
+    onRejectRequest: (Long, String?) -> Unit,
     onAddFunds: (Long, Long, String) -> Unit,
     onRedeem: (Long, Long) -> Unit,
     onMarkDone: (Long, Long, Int) -> Unit,
@@ -154,6 +154,9 @@ private fun ReadyContent(
     var fundsFor by remember { mutableStateOf<SquireSummary?>(null) }
     var redeemFor by remember { mutableStateOf<SquireSummary?>(null) }
     var markDoneFor by remember { mutableStateOf<SquireSummary?>(null) }
+    // Pending reject awaiting a reason (SQUIRE-T-0078): the claim / request the Knight tapped Reject on.
+    var rejectClaimFor by remember { mutableStateOf<PendingClaim?>(null) }
+    var rejectRequestFor by remember { mutableStateOf<PendingRequest?>(null) }
 
     val pendingCount = review.pendingClaims.size + review.pendingRequests.size
 
@@ -192,7 +195,7 @@ private fun ReadyContent(
                     claim = claim,
                     squireName = names[claim.squire] ?: "Squire ${claim.squire}",
                     onApprove = { onApproveClaim(claim.claimId) },
-                    onReject = { onRejectClaim(claim.claimId) },
+                    onReject = { rejectClaimFor = claim },
                 )
             }
         }
@@ -206,7 +209,7 @@ private fun ReadyContent(
                     request = req,
                     squireName = names[req.squire] ?: "Squire ${req.squire}",
                     onApprove = { onApproveRequest(req.requestId) },
-                    onReject = { onRejectRequest(req.requestId) },
+                    onReject = { rejectRequestFor = req },
                 )
             }
         }
@@ -248,6 +251,72 @@ private fun ReadyContent(
             onDismiss = { markDoneFor = null },
         )
     }
+
+    rejectClaimFor?.let { claim ->
+        RejectReasonDialog(
+            title = "Reject quest",
+            subject = "${claim.questTitle} · ${names[claim.squire] ?: "Squire ${claim.squire}"}",
+            onDismiss = { rejectClaimFor = null },
+            onConfirm = { reason ->
+                onRejectClaim(claim.claimId, reason)
+                rejectClaimFor = null
+            },
+        )
+    }
+
+    rejectRequestFor?.let { req ->
+        RejectReasonDialog(
+            title = "Reject reward",
+            subject = "${req.itemName} · ${names[req.squire] ?: "Squire ${req.squire}"}",
+            onDismiss = { rejectRequestFor = null },
+            onConfirm = { reason ->
+                onRejectRequest(req.requestId, reason)
+                rejectRequestFor = null
+            },
+        )
+    }
+}
+
+/**
+ * Collect an **optional** rejection reason (SQUIRE-T-0078). A blank reason rejects with no note (the
+ * engine treats the reason as optional); a typed reason reaches the child's "Recent" as
+ * "Rejected: <reason>". `internal` so the screenshot harness can render it.
+ */
+@Composable
+internal fun RejectReasonDialog(
+    title: String,
+    subject: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String?) -> Unit,
+) {
+    var reason by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(subject, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    label = { Text("Reason (the child will see this)") },
+                    placeholder = { Text("Optional") },
+                    singleLine = false,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(reason.trim().ifBlank { null }) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) { Text("Reject") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -467,8 +536,8 @@ private fun KnightHomePreview() {
     SquireTheme {
         KnightHomeScreen(
             state = KnightUiState.Ready(sample, fromCache = false),
-            onRefresh = {}, onApproveClaim = {}, onRejectClaim = {},
-            onApproveRequest = {}, onRejectRequest = {}, onAddFunds = { _, _, _ -> },
+            onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
+            onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
             onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
         )
     }

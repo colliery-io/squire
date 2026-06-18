@@ -14,6 +14,7 @@ import com.squire.knight.app.ui.LibraryQuest
 import com.squire.knight.app.ui.LibraryReward
 import com.squire.knight.app.ui.MemberAdminScreen
 import com.squire.knight.app.ui.QuestAdminScreen
+import com.squire.knight.app.ui.RejectReasonDialog
 import com.squire.knight.app.ui.RewardAdminScreen
 import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.AchievementSummaryDto
@@ -77,8 +78,8 @@ class ScreenshotTests {
             SquireTheme {
                 KnightHomeScreen(
                     state = KnightUiState.Ready(review, fromCache = false),
-                    onRefresh = {}, onApproveClaim = {}, onRejectClaim = {},
-                    onApproveRequest = {}, onRejectRequest = {}, onAddFunds = { _, _, _ -> },
+                    onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
+                    onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
                     onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
                 )
             }
@@ -189,6 +190,22 @@ class ScreenshotTests {
                     initialItems = items,
                     libraryOverride = library,
                     gateOverride = gates,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun knightRejectReasonDialog() {
+        // The parent can attach a reason when rejecting from the phone (SQUIRE-T-0078) — the dialog
+        // the child's rejection note comes from.
+        paparazzi.snapshot {
+            SquireTheme {
+                RejectReasonDialog(
+                    title = "Reject quest",
+                    subject = "Walk the dog · Gawain",
+                    onDismiss = {},
+                    onConfirm = {},
                 )
             }
         }
