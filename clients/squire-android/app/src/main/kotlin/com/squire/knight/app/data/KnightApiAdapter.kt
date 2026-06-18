@@ -4,10 +4,13 @@ import com.squire.knight.core.KnightCommand
 import com.squire.knight.core.KnightSubmit
 import com.squire.knight.core.ReviewFetcher
 import com.squire.knight.core.SubmitResult
+import com.squire.sdk.api.ControlApi
 import com.squire.sdk.api.KnightApi
 import com.squire.sdk.infrastructure.ClientException
 import com.squire.sdk.infrastructure.ServerException
 import com.squire.sdk.model.AchievementSummaryDto
+import com.squire.sdk.model.AddMemberReq
+import com.squire.sdk.model.AddMemberResp
 import com.squire.sdk.model.CreateAchievementReq
 import com.squire.sdk.model.CreateItemReq
 import com.squire.sdk.model.CreateQuestReq
@@ -16,7 +19,12 @@ import com.squire.sdk.model.CreatedItem
 import com.squire.sdk.model.CreatedQuest
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.ItemSummaryDto
+import com.squire.sdk.model.MemberSummaryDto
+import com.squire.sdk.model.MintPairCodeReq
+import com.squire.sdk.model.MintPairCodeResp
 import com.squire.sdk.model.QuestSummaryDto
+import com.squire.sdk.model.Role
+import com.squire.sdk.model.SetActiveReq
 import com.squire.sdk.model.StateView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -54,6 +62,9 @@ class KnightApiAdapter(
         .build()
 
     private val api = KnightApi(basePath = baseUrl, client = client)
+    // Control-plane (add member, mint pairing code) — both RequireKnight, so they ride the same
+    // bearer-injecting client as the Knight surface (SQUIRE-T-0075).
+    private val control = ControlApi(basePath = baseUrl, client = client)
 
     override suspend fun fetch(): HouseholdReview = withContext(Dispatchers.IO) {
         api.householdReview(xHousehold = household)
@@ -110,6 +121,27 @@ class KnightApiAdapter(
     /** Archive a reward (never deletes). */
     suspend fun archiveItem(id: Long) = withContext(Dispatchers.IO) {
         api.archiveItem(xHousehold = household, id = id)
+    }
+
+    // ── Member administration from the phone (SQUIRE-T-0075) ─────────────────────────────────────
+    /** Every household member (Knights + Squires) with role + active flag. */
+    suspend fun listMembers(): List<MemberSummaryDto> = withContext(Dispatchers.IO) {
+        api.listMembers(xHousehold = household)
+    }
+
+    /** Add a Knight or Squire (control-plane, Knight-gated); returns the new member's id. */
+    suspend fun addMember(displayName: String, role: Role, secret: String): AddMemberResp = withContext(Dispatchers.IO) {
+        control.addMember(xHousehold = household, addMemberReq = AddMemberReq(displayName = displayName, initialSecret = secret, role = role))
+    }
+
+    /** De/reactivate a member (archive-not-delete). */
+    suspend fun setMemberActive(id: Long, active: Boolean) = withContext(Dispatchers.IO) {
+        api.setMemberActive(xHousehold = household, id = id, setActiveReq = SetActiveReq(active = active))
+    }
+
+    /** Mint a one-time pairing code for a member (control-plane, Knight-gated). */
+    suspend fun mintPairCode(user: Long): MintPairCodeResp = withContext(Dispatchers.IO) {
+        control.mintPairCode(xHousehold = household, mintPairCodeReq = MintPairCodeReq(user = user))
     }
 
     override suspend fun submit(command: KnightCommand): SubmitResult = withContext(Dispatchers.IO) {

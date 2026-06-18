@@ -432,6 +432,114 @@
         ]
       }
     },
+    "/admin/members": {
+      "get": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`GET /admin/members` (RequireKnight) — every household member (Knights + Squires) with role and\nactive flag.",
+        "operationId": "list_members",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All members, flat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberSummaryDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/admin/members/{id}/active": {
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/members/{id}/active` (RequireKnight) — de/reactivate a member via `SetUserActive`\n(archive-not-delete), audited to the acting Knight. A missing member is a 404; a Knight cannot\ndeactivate **their own** account (no self-lockout) → 400.",
+        "operationId": "set_member_active",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Member user id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetActiveReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Updated"
+          },
+          "400": {
+            "description": "A Knight may not deactivate their own account"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "Member not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/admin/quests": {
       "get": {
         "tags": [
@@ -1954,6 +2062,30 @@
           }
         }
       },
+      "MemberSummaryDto": {
+        "type": "object",
+        "description": "A household member in the authoring list — flat (id as an i64 wire number, role as a plain string).",
+        "required": [
+          "user",
+          "display_name",
+          "role",
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
       "MintPairCodeReq": {
         "type": "object",
         "description": "POST /pair/codes (Knight-only) — mint a one-time device-pairing code for member `user`\n(ADR SQUIRE-A-0010). The plaintext `code` is returned once for the Keep to render as a QR.",
@@ -2423,6 +2555,18 @@
           "Knight",
           "Squire"
         ]
+      },
+      "SetActiveReq": {
+        "type": "object",
+        "description": "`POST /admin/members/{id}/active` body.",
+        "required": [
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          }
+        }
       },
       "SquireSummary": {
         "type": "object",

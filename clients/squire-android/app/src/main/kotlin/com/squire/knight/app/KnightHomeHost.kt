@@ -123,6 +123,8 @@ internal fun KnightHomeHost(
     var managingAchievements by remember(session) { mutableStateOf(false) }
     // Whether the native reward-authoring surface (SQUIRE-T-0074) is open.
     var managingRewards by remember(session) { mutableStateOf(false) }
+    // Whether the native member-administration surface (SQUIRE-T-0075) is open.
+    var managingMembers by remember(session) { mutableStateOf(false) }
 
     val current = assumed
     if (current != null) {
@@ -168,6 +170,18 @@ internal fun KnightHomeHost(
         return
     }
 
+    if (managingMembers) {
+        com.squire.knight.app.ui.MemberAdminScreen(
+            adapter = adapter,
+            selfUser = session.user,
+            host = session.host,
+            port = session.port,
+            household = session.household,
+            onBack = { managingMembers = false },
+        )
+        return
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         update?.let { info -> UpdateBanner(info) }
         Box(modifier = Modifier.weight(1f)) {
@@ -186,6 +200,7 @@ internal fun KnightHomeHost(
                 onManageQuests = { managingQuests = true },
                 onManageAchievements = { managingAchievements = true },
                 onManageRewards = { managingRewards = true },
+                onManageMembers = { managingMembers = true },
             )
         }
     }
