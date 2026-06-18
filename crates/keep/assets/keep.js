@@ -86,6 +86,31 @@
     loadReview();
   }
 
+  // An inline "Reject — type a reason" editor (T-0080): replaces the old browser prompt(). Reveals a
+  // reason field + Confirm/Cancel in place; Confirm posts the reject with the typed reason (optional).
+  function attachRejectEditor(li, rejectBtn, onConfirm) {
+    rejectBtn.addEventListener("click", () => {
+      rejectBtn.hidden = true;
+      const editor = document.createElement("span");
+      editor.className = "inline-editor";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "Reason (optional — the child sees this)";
+      input.className = "reject-reason";
+      const confirm = document.createElement("button");
+      confirm.textContent = "Confirm reject";
+      confirm.className = "confirm-reject";
+      const cancel = document.createElement("button");
+      cancel.textContent = "Cancel";
+      const close = () => { editor.remove(); rejectBtn.hidden = false; };
+      confirm.addEventListener("click", () => { onConfirm(input.value.trim() || null); });
+      cancel.addEventListener("click", close);
+      editor.append(input, confirm, cancel);
+      li.appendChild(editor);
+      input.focus();
+    });
+  }
+
   async function loadReview() {
     const res = await fetch("/api/review");
     if (!res.ok) return;
@@ -106,7 +131,9 @@
       ok.addEventListener("click", () => reviewAction("/api/review/claim", { claim_id: c.claim_id, decision: "approve" }));
       const no = document.createElement("button");
       no.textContent = "Reject";
-      no.addEventListener("click", () => reviewAction("/api/review/claim", { claim_id: c.claim_id, decision: { reject: { reason: prompt("Reason?") || null } } }));
+      no.className = "reject";
+      attachRejectEditor(li, no, (reason) =>
+        reviewAction("/api/review/claim", { claim_id: c.claim_id, decision: { reject: { reason } } }));
       li.append(ok, no);
       claims.appendChild(li);
     }
@@ -118,7 +145,9 @@
       ok.addEventListener("click", () => reviewAction("/api/review/redemption", { request_id: q.request_id, decision: "approve" }));
       const no = document.createElement("button");
       no.textContent = "Reject";
-      no.addEventListener("click", () => reviewAction("/api/review/redemption", { request_id: q.request_id, decision: { reject: { reason: prompt("Reason?") || null } } }));
+      no.className = "reject";
+      attachRejectEditor(li, no, (reason) =>
+        reviewAction("/api/review/redemption", { request_id: q.request_id, decision: { reject: { reason } } }));
       li.append(ok, no);
       reqs.appendChild(li);
     }
@@ -127,11 +156,38 @@
       li.textContent = `${s.display_name}: ${s.balance} pts `;
       const adj = document.createElement("button");
       adj.textContent = "Adjust";
+      adj.className = "adjust";
+      // Inline adjust editor (T-0080): amount (±) + a required reason; Apply stays disabled until the
+      // reason is non-blank (the engine 400s an empty reason).
       adj.addEventListener("click", () => {
-        const amount = Number(prompt("Adjust by (+/-):"));
-        const reason = prompt("Reason (required):");
-        if (!reason) return;
-        reviewAction("/api/adjust", { command_id: Date.now(), squire: s.squire, amount, reason });
+        adj.hidden = true;
+        const editor = document.createElement("span");
+        editor.className = "inline-editor";
+        const amount = document.createElement("input");
+        amount.type = "number";
+        amount.placeholder = "± points";
+        amount.className = "adjust-amount";
+        amount.value = "5";
+        const reason = document.createElement("input");
+        reason.type = "text";
+        reason.placeholder = "Reason (required)";
+        reason.className = "adjust-reason";
+        const apply = document.createElement("button");
+        apply.textContent = "Apply";
+        apply.className = "apply-adjust";
+        apply.disabled = true;
+        const cancel = document.createElement("button");
+        cancel.textContent = "Cancel";
+        reason.addEventListener("input", () => { apply.disabled = reason.value.trim() === ""; });
+        apply.addEventListener("click", () => {
+          const amt = Number(amount.value);
+          if (!Number.isFinite(amt) || amt === 0 || reason.value.trim() === "") return;
+          reviewAction("/api/adjust", { command_id: Date.now(), squire: s.squire, amount: amt, reason: reason.value.trim() });
+        });
+        cancel.addEventListener("click", () => { editor.remove(); adj.hidden = false; });
+        editor.append(amount, reason, apply, cancel);
+        li.appendChild(editor);
+        reason.focus();
       });
       li.appendChild(adj);
       sqs.appendChild(li);
