@@ -70,8 +70,15 @@ pub async fn serve(
     api_port: u16,
     keep_port: u16,
 ) -> Result<(), BoxErr> {
-    let app = AppState::new(store.clone(), identity.clone());
-    let keep_state = KeepState::from_parts(store.clone(), identity.clone(), handle.clone());
+    // One shared household-local clock (ADR A-0011) seeded from the store's config, so the api and
+    // the Keep read — and the Keep hot-swaps — the SAME live timezone cell (a Settings change
+    // applies to both surfaces without a restart).
+    let clock = {
+        let cfg = store.lock().expect("store mutex poisoned").load_config();
+        store::LocalClock::new(store::live_config(cfg))
+    };
+    let app = AppState::with_clock(store.clone(), identity.clone(), clock.clone());
+    let keep_state = KeepState::from_parts_with_clock(store.clone(), identity.clone(), handle.clone(), clock);
 
     // Held for the process lifetime so the advertisement persists.
     let _mdns = start_mdns(api_port, &handle.0);

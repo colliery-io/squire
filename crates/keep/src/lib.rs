@@ -39,9 +39,16 @@ use domain_core::contract::{
 };
 use domain_core::DomainEngine;
 use store::tenant::{Backend, ProvisionError, Provisioner};
-use store::SystemClock;
+use store::{live_config, LocalClock, SystemClock};
 
 use identity::{Identity, Principal, ProdIdentity, SharedStore, TokenSigner};
+
+/// Build a household-local clock seeded from the store's persisted config (ADR SQUIRE-A-0011) —
+/// the handler-facing clock whose `today()` honours the household timezone.
+pub(crate) fn clock_from_store(store: &SharedStore) -> LocalClock {
+    let cfg = store.lock().expect("store mutex poisoned").load_config();
+    LocalClock::new(live_config(cfg))
+}
 
 pub mod achievements;
 pub mod inspector;
@@ -68,8 +75,10 @@ pub struct KeepState {
     pub store: SharedStore,
     /// The pure, stateless domain engine (the one validated entry point).
     pub engine: DomainEngine,
-    /// Wall clock, passed to [`Engine::handle`] and used for audit timestamps.
-    pub clock: SystemClock,
+    /// Household-local wall clock (ADR A-0011): `today()` honours the household timezone, read
+    /// lock-free from the live config cell. Passed to [`Engine::handle`]. `.live()` is the cell the
+    /// Settings handler hot-swaps on a timezone change.
+    pub clock: LocalClock,
     /// The authentication / membership seam — used for operator login and token verification.
     pub identity: Arc<dyn Identity>,
     /// The local single-tenant household the operator signs into.
@@ -93,22 +102,37 @@ impl KeepState {
         let store = provisioner.open(&handle.0, SystemClock)?;
         let store: SharedStore = Arc::new(Mutex::new(store));
         let identity = ProdIdentity::shared_local(store.clone(), signer, handle.clone(), token_ttl_ms);
+        let clock = clock_from_store(&store);
         Ok(Arc::new(Self {
             store,
             engine: DomainEngine,
-            clock: SystemClock,
+            clock,
             identity: Arc::new(identity),
             household: handle,
         }))
     }
 
-    /// Assemble a Keep from already-wired parts (used by tests that build their own identity).
+    /// Assemble a Keep from already-wired parts (used by tests that build their own identity), with
+    /// a clock seeded from the store's persisted config.
     pub fn from_parts(
         store: SharedStore,
         identity: Arc<dyn Identity>,
         household: HouseholdHandle,
     ) -> Arc<Self> {
-        Arc::new(Self { store, engine: DomainEngine, clock: SystemClock, identity, household })
+        let clock = clock_from_store(&store);
+        Self::from_parts_with_clock(store, identity, household, clock)
+    }
+
+    /// Like [`KeepState::from_parts`] but with an explicit, **shared** [`LocalClock`] — used by the
+    /// home server so the Keep and the api read (and hot-swap) the SAME live-config cell, so a
+    /// timezone change in the Keep applies to both surfaces without a restart.
+    pub fn from_parts_with_clock(
+        store: SharedStore,
+        identity: Arc<dyn Identity>,
+        household: HouseholdHandle,
+        clock: LocalClock,
+    ) -> Arc<Self> {
+        Arc::new(Self { store, engine: DomainEngine, clock, identity, household })
     }
 
     /// **The engine-direct command seam.** Lock the store, snapshot, run `cmd` through the engine,
