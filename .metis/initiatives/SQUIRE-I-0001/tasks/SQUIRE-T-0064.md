@@ -4,14 +4,14 @@ level: task
 title: "LAN api: Knight quest-authoring endpoints (RequireKnight) + SDK"
 short_code: "SQUIRE-T-0064"
 created_at: 2026-06-18T12:14:12.691830+00:00
-updated_at: 2026-06-18T12:14:12.691830+00:00
+updated_at: 2026-06-18T13:57:20.902741+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -20,117 +20,32 @@ initiative_id: SQUIRE-I-0001
 
 # LAN api: Knight quest-authoring endpoints (RequireKnight) + SDK
 
-*This template includes sections for various types of tasks. Delete sections that don't apply to your specific use case.*
+## Parent Initiative
 
-## Parent Initiative **[CONDITIONAL: Assigned Task]**
+[[SQUIRE-I-0001]] · The phone-side of "the Keep should be usable from the app for Knights" (native, per the user's choice). Backend half; the native UI is [[SQUIRE-T-0065]].
 
-[[SQUIRE-I-0001]]
+## Objective
 
-## Objective **[REQUIRED]**
+Expose quest authoring on the **LAN api** (the phone's transport) gated by `RequireKnight`, mirroring the Keep's create/list/archive but with **flat, codegen-friendly DTOs** so the generated Kotlin SDK stays clean. Regenerate `openapi.json` + the SDK.
 
-{Clear statement of what this task accomplishes}
+## Acceptance Criteria
 
-## Backlog Item Details **[CONDITIONAL: Backlog Item]**
+- [x] `crate::authoring` (RequireKnight): `POST /admin/quests` (create/edit via `DefineQuest`, audited to the Knight), `GET /admin/quests` (flat `QuestSummaryDto` list with server-computed cadence/assignment labels), `POST /admin/quests/{id}/archive` (`ArchiveQuest`, 404 if absent). Routes registered.
+- [x] **Flat DTOs** (no externally-tagged enums → no openapi-generator mangling): `CreateQuestReq { id?, title, reward, category?, cadence: CadenceKind, weekdays[], due?, completion: CompletionDto, assign_all, squires[], repeatable_within_day, auto_approve }` + `CadenceKind`/`WeekdayDto`/`CompletionDto` string enums + `CreatedQuest`/`QuestSummaryDto`. Handler reconstructs the domain `Cadence`/`Assignment`/`Completion`. New quests get a time-based id; edits keep theirs.
+- [x] `openapi.json` regenerated (paths + 6 schemas) and the **conformance test passes**; `cargo test -p api` green. SDK regenerated: `CadenceKind` etc. are clean Kotlin string enums; `createQuest`/`listQuests`/`archiveQuest` methods generated.
+- [x] Verified live on a throwaway server (Knight token): create daily(all)/weekly(MWF, squire 2, race) → 200; weekly-no-days → 400; `GET` labels render "Daily"/"Mon/Wed/Fri" + "All squires"/"Gawain".
 
-{Delete this section when task is assigned to an initiative}
-
-### Type
-- [ ] Bug - Production issue that needs fixing
-- [ ] Feature - New functionality or enhancement  
-- [ ] Tech Debt - Code improvement or refactoring
-- [ ] Chore - Maintenance or setup work
-
-### Priority
-- [ ] P0 - Critical (blocks users/revenue)
-- [ ] P1 - High (important for user experience)
-- [ ] P2 - Medium (nice to have)
-- [ ] P3 - Low (when time permits)
-
-### Impact Assessment **[CONDITIONAL: Bug]**
-- **Affected Users**: {Number/percentage of users affected}
-- **Reproduction Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected vs Actual**: {What should happen vs what happens}
-
-### Business Justification **[CONDITIONAL: Feature]**
-- **User Value**: {Why users need this}
-- **Business Value**: {Impact on metrics/revenue}
-- **Effort Estimate**: {Rough size - S/M/L/XL}
-
-### Technical Debt Impact **[CONDITIONAL: Tech Debt]**
-- **Current Problems**: {What's difficult/slow/buggy now}
-- **Benefits of Fixing**: {What improves after refactoring}
-- **Risk Assessment**: {Risks of not addressing this}
-
-## Acceptance Criteria **[REQUIRED]**
-
-- [ ] {Specific, testable requirement 1}
-- [ ] {Specific, testable requirement 2}
-- [ ] {Specific, testable requirement 3}
-
-## Test Cases **[CONDITIONAL: Testing Task]**
-
-{Delete unless this is a testing task}
-
-### Test Case 1: {Test Case Name}
-- **Test ID**: TC-001
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-### Test Case 2: {Test Case Name}
-- **Test ID**: TC-002
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-## Documentation Sections **[CONDITIONAL: Documentation Task]**
-
-{Delete unless this is a documentation task}
-
-### User Guide Content
-- **Feature Description**: {What this feature does and why it's useful}
-- **Prerequisites**: {What users need before using this feature}
-- **Step-by-Step Instructions**:
-  1. {Step 1 with screenshots/examples}
-  2. {Step 2 with screenshots/examples}
-  3. {Step 3 with screenshots/examples}
-
-### Troubleshooting Guide
-- **Common Issue 1**: {Problem description and solution}
-- **Common Issue 2**: {Problem description and solution}
-- **Error Messages**: {List of error messages and what they mean}
-
-### API Documentation **[CONDITIONAL: API Documentation]**
-- **Endpoint**: {API endpoint description}
-- **Parameters**: {Required and optional parameters}
-- **Example Request**: {Code example}
-- **Example Response**: {Expected response format}
-
-## Implementation Notes **[CONDITIONAL: Technical Task]**
-
-{Keep for technical tasks, delete for non-technical. Technical details, approach, or important considerations}
+## Implementation Notes
 
 ### Technical Approach
-{How this will be implemented}
+New `crates/api/src/authoring.rs` reusing `handle_command(by, cmd)` / `domain_status` / `RequireKnight`. Flat DTOs map → domain `Quest`. `assignment_label` resolves squire ids → display names from the snapshot. Registered in `lib.rs` routes + `openapi.rs` paths/schemas. Regen: `cargo run -p api --example gen_openapi`, then `:sdk:openApiGenerate`. The assignment picker on the phone reuses the squires already in `HouseholdReview` (no new endpoint).
 
 ### Dependencies
-{Other tasks or systems this depends on}
+[[SQUIRE-T-0062]] (the authoring shape the Keep proved). Frozen-contract regen (openapi + SDK). Native UI: [[SQUIRE-T-0065]].
 
 ### Risk Considerations
-{Technical risks and mitigation strategies}
+Externally-tagged `Cadence`/`Assignment` would mangle in codegen — avoided via flat DTOs (the established DecisionDto pattern). `openapi.json` is frozen + conformance-tested, so it MUST be regenerated (done). int64 wire ids (QuestId/UserId schema `value_type=i64`).
 
-## Status Updates **[REQUIRED]**
+## Status Updates
 
-*To be added during implementation*
+**2026-06-18 — Done + verified.** Added `crate::authoring` with the three RequireKnight endpoints and flat DTOs; registered routes + openapi paths/schemas; regenerated `openapi.json` (conformance test green) and the Kotlin SDK (clean string enums, `createQuest`/`listQuests`/`archiveQuest` generated). Live-tested on a throwaway server: create daily/weekly → 200 with id; weekly-no-days → 400; `GET /admin/quests` returns correct labels (incl. squire id → "Gawain"). `cargo test -p api` fully green. Next: [[SQUIRE-T-0065]] native Quests tab in the Knight app.
