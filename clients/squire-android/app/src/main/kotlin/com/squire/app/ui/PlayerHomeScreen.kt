@@ -38,6 +38,7 @@ import com.squire.app.ui.components.StatusChip
 import com.squire.app.ui.theme.SquireGold
 import com.squire.app.ui.theme.SquireTheme
 import com.squire.core.PlayerUiState
+import com.squire.sdk.model.BadgeView
 import com.squire.sdk.model.ClaimStateKind
 import com.squire.sdk.model.ClaimStatus
 import com.squire.sdk.model.LockReasonKind
@@ -164,9 +165,17 @@ private fun ReadyContent(
             items(view.rewards, key = { "i" + it.itemId }) { RewardCardRow(it, onRedeem) }
         }
 
+        // Earned achievements — the payoff, distinct from in-progress streaks (SQUIRE-T-0079).
+        val badges = view.badges.orEmpty()
+        if (badges.isNotEmpty()) {
+            item { Spacer(Modifier.height(2.dp)) }
+            item { SectionTitle("🏅 Badges") }
+            items(badges, key = { "b" + it.id }) { BadgeCardRow(it) }
+        }
+
         if (view.streaks.isNotEmpty()) {
             item { Spacer(Modifier.height(2.dp)) }
-            item { SectionTitle("Badges & Streaks") }
+            item { SectionTitle("Streaks") }
             items(view.streaks, key = { "s" + it.name }) { StreakCardRow(it) }
         }
 
@@ -258,6 +267,22 @@ private fun RewardCardRow(reward: RewardCard, onRedeem: (Long) -> Unit) {
                     MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun BadgeCardRow(badge: BadgeView) {
+    QuestCard {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("🏅", modifier = Modifier.padding(end = 12.dp))
+            Text(badge.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(
+                "+${badge.bonus} ★",
+                color = SquireGold,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
     }
 }
@@ -363,6 +388,7 @@ private fun PlayerHomePreview() {
         myClaims = emptyList(),
         myRequests = emptyList(),
         streaks = listOf(StreakView(name = "Room Master", current = 3, best = 5, alive = true, nextMilestone = 7)),
+        badges = listOf(BadgeView(at = 0L, bonus = 25, id = 1L, name = "Century Club")),
     )
     SquireTheme {
         PlayerHomeScreen(

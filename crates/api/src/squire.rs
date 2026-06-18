@@ -210,6 +210,7 @@ pub(crate) fn assemble_state(
     let quests_today = quests_today(snap, squire, today);
     let balance = clamp_balance(Proj::balance(snap, squire));
     let streaks = streaks(snap, squire, today);
+    let badges = badges(snap, squire);
     let rewards = rewards(snap, squire);
     let my_claims = my_claims(snap, squire);
     let my_requests = my_requests(snap, squire);
@@ -220,10 +221,35 @@ pub(crate) fn assemble_state(
         balance,
         quests_today,
         streaks,
+        badges,
         rewards,
         my_claims,
         my_requests,
     }
+}
+
+/// The achievements this Squire has **earned** — one [`BadgeView`] per unlocked achievement, newest
+/// first (SQUIRE-T-0079). Built from `AchievementUnlocked` events (deduped by achievement id, keeping
+/// the most recent), with the name resolved from the current definitions.
+fn badges(snap: &Snapshot, squire: UserId) -> Vec<domain_core::contract::BadgeView> {
+    use domain_core::contract::{BadgeView, Event};
+    let mut seen: std::collections::BTreeSet<u128> = std::collections::BTreeSet::new();
+    let mut out: Vec<BadgeView> = Vec::new();
+    // Walk newest → oldest so the first sighting of an id is the latest unlock.
+    for e in snap.events.iter().rev() {
+        if let Event::AchievementUnlocked { squire: s, id, bonus, at } = e {
+            if *s == squire && seen.insert(id.0) {
+                let name = snap
+                    .achievements
+                    .iter()
+                    .find(|a| a.id == *id)
+                    .map(|a| a.name.clone())
+                    .unwrap_or_else(|| format!("#{}", id.0));
+                out.push(BadgeView { id: *id, name, bonus: *bonus, at: *at });
+            }
+        }
+    }
+    out
 }
 
 /// `Proj::balance` returns an `i64` (only `PointsAdjusted` can take it negative); the display
