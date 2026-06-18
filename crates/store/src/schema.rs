@@ -123,6 +123,16 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    // Household configuration KV (ADR SQUIRE-A-0011): long, not wide — one row per setting.
+    config (key) {
+        key -> Text,
+        value -> Text,
+        updated_by -> Nullable<Text>,
+        updated_at -> BigInt,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     users,
     quests,

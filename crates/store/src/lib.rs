@@ -12,9 +12,11 @@ pub mod conn;
 pub mod migrations;
 pub mod rows;
 pub mod schema;
+pub mod settings;
 pub mod tenant;
 
 pub use conn::AnyConnection;
+pub use settings::{date_in_zone, live_config, ConfigView, LiveConfig, LocalClock};
 pub use migrations::{run_migrations, MIGRATIONS};
 pub use rows::{
     AchievementRow, Audit, EventRow, ItemRow, QuestRow, RowError, UserRow,
@@ -53,12 +55,12 @@ use diesel::Connection;
 use diesel_migrations::MigrationHarness;
 
 use domain_core::contract::{
-    Achievement, AchievementId, Change, Clock, Date, Event, ItemId, Quest, QuestId,
-    RedeemableItem, RepoError, Repository, Role, Snapshot, Timestamp, User, UserId,
+    config_keys, Achievement, AchievementId, Change, Clock, Date, Event, HouseholdConfig, ItemId,
+    Quest, QuestId, RedeemableItem, RepoError, Repository, Role, Snapshot, Timestamp, User, UserId,
 };
 
 use crate::rows::id_to_text;
-use crate::schema::{achievements, credentials, events, items, pairing_codes, quests, users};
+use crate::schema::{achievements, config, credentials, events, items, pairing_codes, quests, users};
 
 // ─── error mapping ───────────────────────────────────────────────────────────
 
@@ -333,6 +335,56 @@ impl<C: Clock> Store<C> {
         };
         Some((user, role, row.expires_at))
     }
+
+    /// Read a single household-config setting (ADR SQUIRE-A-0011) from THIS tenant's `config`
+    /// table by `key`, or `None` if unset.
+    pub fn get_setting(&self, key: &str) -> Option<String> {
+        let mut conn = self.conn.borrow_mut();
+        config::table
+            .filter(config::key.eq(key))
+            .select(config::value)
+            .first::<String>(&mut *conn)
+            .optional()
+            .expect("get_setting: query failed (corrupt store)")
+    }
+
+    /// Upsert a household-config setting (ADR SQUIRE-A-0011): write `value` for `key`, stamping
+    /// `updated_by` (the acting Knight; `None` for system/seed writes) and `updated_at` from the
+    /// clock. Settings material written directly — NOT a domain [`Change`] (no event), but
+    /// audit-stamped per A-0007. Upsert by `key`, so re-setting replaces the value.
+    pub fn set_setting(&self, key: &str, value: &str, by: Option<UserId>) -> Result<(), RepoError> {
+        let mut conn = self.conn.borrow_mut();
+        let row = ConfigRow {
+            key: key.to_string(),
+            value: value.to_string(),
+            updated_by: by.map(|u| id_to_text(u.0)),
+            updated_at: self.clock.now().0,
+        };
+        run_upsert!(
+            &mut *conn,
+            config::table,
+            config::key,
+            row,
+            |row: &ConfigRow| (
+                config::value.eq(row.value.clone()),
+                config::updated_by.eq(row.updated_by.clone()),
+                config::updated_at.eq(row.updated_at),
+            )
+        );
+        Ok(())
+    }
+
+    /// Assemble the typed [`HouseholdConfig`] view from the `config` rows, defaulting any absent or
+    /// blank keys (ADR SQUIRE-A-0011). Never fails — a missing setting falls back to its default.
+    pub fn load_config(&self) -> HouseholdConfig {
+        let mut cfg = HouseholdConfig::default();
+        if let Some(tz) = self.get_setting(config_keys::TIMEZONE) {
+            if !tz.is_empty() {
+                cfg.timezone = tz;
+            }
+        }
+        cfg
+    }
 }
 
 /// A `credentials` row: a member's hashed secret keyed by `UserId` (no audit columns — this
@@ -356,6 +408,18 @@ struct PairingCodeRow {
     user_id: String,
     role: String,
     expires_at: i64,
+}
+
+/// A `config` row: one household setting (ADR SQUIRE-A-0011) keyed by `key`, with the acting Knight
+/// + time stamped on write (A-0007). Settings material written directly, not through `apply`.
+#[derive(Debug, Clone, Insertable, Queryable, Selectable)]
+#[diesel(table_name = config)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+struct ConfigRow {
+    key: String,
+    value: String,
+    updated_by: Option<String>,
+    updated_at: i64,
 }
 
 impl<C: Clock> Repository for Store<C> {
@@ -829,18 +893,27 @@ impl Repository for SqliteStore {
 /// `days_since_unix_epoch` would make `Date(0)` a **Thursday**, which breaks Weekly
 /// schedules. We instead count days since **Monday 1969-12-29**, i.e. add 3 to the unix
 /// day-count, so `Date(0)` is a Monday and `weekday_of` lines up with the real calendar.
-const UNIX_TO_MONDAY_EPOCH_OFFSET: i64 = 3;
+pub(crate) const UNIX_TO_MONDAY_EPOCH_OFFSET: i64 = 3;
 
 const MILLIS_PER_DAY: i64 = 86_400_000;
 
-/// Real wall-clock [`Clock`]. `now()` is unix time in **milliseconds**; `today()` is a
-/// Monday-aligned `Date` day-count (UTC for now — timezone config is a later refinement).
+/// Current unix time in **milliseconds** (UTC), clamped to 0 before the epoch on a misconfigured
+/// host. Shared by [`SystemClock`] and [`crate::settings::LocalClock`] so `now()` is defined once.
+pub(crate) fn now_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// Real wall-clock [`Clock`], **UTC**. `now()` is unix millis; `today()` is the Monday-aligned
+/// day-count in UTC. The household-local clock is [`crate::settings::LocalClock`] (ADR A-0011).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemClock;
 
 /// Convert unix millis to the domain's Monday-aligned `Date` (UTC). Shared by
 /// [`SystemClock`] and [`FixedClock`] so the alignment convention lives in one place.
-fn date_from_unix_millis(millis: i64) -> Date {
+pub(crate) fn date_from_unix_millis(millis: i64) -> Date {
     // Floor-divide so negative (pre-epoch) instants still land on the right calendar day.
     let days = millis.div_euclid(MILLIS_PER_DAY);
     Date((days + UNIX_TO_MONDAY_EPOCH_OFFSET) as i32)
@@ -852,12 +925,7 @@ impl Clock for SystemClock {
     }
 
     fn now(&self) -> Timestamp {
-        let millis = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as i64)
-            // Before the unix epoch on a misconfigured host: clamp to 0.
-            .unwrap_or(0);
-        Timestamp(millis)
+        Timestamp(now_millis())
     }
 }
 
