@@ -127,6 +127,7 @@
       <h2 id="items">Rewards</h2>
       <form id="item-form">
         <label>Name <input name="name" required /></label>
+        <label>Description (optional) <input name="description" placeholder="e.g. 30 extra minutes of games" /></label>
         <label>Cost (points) <input name="cost" type="number" min="0" value="3" required /></label>
         <label>Availability
           <select name="availability">
@@ -142,6 +143,14 @@
         <button type="submit">Add reward</button>
       </form>
       <p id="item-error" class="error" hidden></p>
+
+      <details id="rewards-library">
+        <summary>🎁 Add from the starter library</summary>
+        <p class="sub">Common household rewards, ready to import. Edit the cost or archive them afterwards.</p>
+        <p id="rewards-library-error" class="error" hidden></p>
+        <div id="rewards-library-list"></div>
+      </details>
+
       <ul id="item-list"></ul>
     </section>
 

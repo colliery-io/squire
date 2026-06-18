@@ -23,7 +23,7 @@
   const TAB_LOADERS = {
     quests: () => { loadQuestSquires().then(() => loadQuests()); },
     review: () => loadReview(),
-    rewards: () => loadCatalog("items", "item-list"),
+    rewards: () => { loadCatalog("items", "item-list"); loadRewardsLibrary(); },
     achievements: () => { loadAchScopeQuests(); loadCatalog("achievements", "achievement-list"); loadAchLibrary(); },
     members: () => loadMembers(),
     pair: () => loadPairMembers(),
@@ -598,12 +598,18 @@
       ev.preventDefault();
       itemErr.hidden = true;
       const fd = new FormData(itemForm);
+      const name = (fd.get("name") || "").trim();
+      const cost = Number(fd.get("cost"));
+      // Form-level guards (the engine validates the gate, not the cost/name).
+      if (!name) { itemErr.textContent = "Add a name."; itemErr.hidden = false; return; }
+      if (!Number.isFinite(cost) || cost < 1) { itemErr.textContent = "Cost must be at least 1 point."; itemErr.hidden = false; return; }
+      const desc = (fd.get("description") || "").trim();
       const gateRaw = fd.get("gate");
       const item = {
         id: Date.now(),
-        name: fd.get("name"),
-        description: null,
-        cost: Number(fd.get("cost")),
+        name,
+        description: desc || null,
+        cost,
         // gate is an achievement id number, or null for "None".
         gate: gateRaw ? Number(gateRaw) : null,
         availability: fd.get("availability"), // "Once" | "Repeatable"
@@ -616,13 +622,76 @@
         body: JSON.stringify(item),
       });
       if (!res.ok) {
-        itemErr.textContent = "Could not save reward.";
+        // 404 = the chosen gate achievement no longer exists (validate_item).
+        itemErr.textContent = res.status === 404 ? "That gate achievement no longer exists — pick another." : "Could not save reward.";
         itemErr.hidden = false;
         return;
       }
       itemForm.reset();
       loadCatalog("items", "item-list");
     });
+  }
+
+  // ── Starter reward library (T-0073) ──────────────────────────────────────────
+  // Common household rewards (assets/rewards-library.json), one-tap import — mirrors the quest +
+  // achievement libraries. Reuses freshId() so rapid imports don't collide.
+  let rewardsLibraryLoaded = false;
+  async function loadRewardsLibrary() {
+    if (rewardsLibraryLoaded) return;
+    const res = await fetch("/static/rewards-library.json");
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = (data && data.rewards) || [];
+    const container = document.getElementById("rewards-library-list");
+    if (!container) return;
+    container.innerHTML = "";
+    rewardsLibraryLoaded = true;
+    const ul = document.createElement("ul");
+    for (const r of list) {
+      const li = document.createElement("li");
+      const strong = document.createElement("strong");
+      strong.textContent = r.name;
+      li.append(strong, document.createTextNode(` — ${rewardLibSummary(r)} `));
+      const btn = document.createElement("button");
+      btn.textContent = "Import";
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        const resp = await fetch("/api/items", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(rewardLibToWire(r)),
+        });
+        if (resp.ok) {
+          btn.textContent = "Imported ✓";
+          loadCatalog("items", "item-list");
+        } else {
+          btn.disabled = false;
+          const e = document.getElementById("rewards-library-error");
+          e.textContent = "Could not import that reward.";
+          e.hidden = false;
+        }
+      });
+      li.appendChild(btn);
+      ul.appendChild(li);
+    }
+    container.appendChild(ul);
+  }
+
+  function rewardLibToWire(r) {
+    return {
+      id: freshId(),
+      name: r.name,
+      description: r.description || null,
+      cost: Number(r.cost),
+      gate: null,
+      availability: r.availability || "Repeatable",
+      active: true,
+      icon: null,
+    };
+  }
+  function rewardLibSummary(r) {
+    const avail = r.availability === "Once" ? "once" : "repeatable";
+    return `${r.cost} pts · ${avail}`;
   }
 
   // ── Achievement create (T-0027 / enriched T-0036) ────────────────────────────

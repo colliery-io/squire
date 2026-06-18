@@ -233,6 +233,33 @@ async fn invalid_scoped_achievements_are_400() {
     assert_eq!(st, StatusCode::BAD_REQUEST, "a zero-length streak is rejected");
 }
 
+// Every entry in the shipped starter reward library imports cleanly and lists (SQUIRE-T-0073).
+// Guards the rewards-library.json shape against the wire format the same way the UI imports it.
+#[tokio::test]
+async fn rewards_library_entries_all_import() {
+    let (state, _admin, token, _dir) = keep();
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/rewards-library.json"))
+        .expect("read rewards-library.json");
+    let doc: Value = serde_json::from_str(&text).expect("parse rewards-library.json");
+    let rewards = doc["rewards"].as_array().expect("rewards array");
+    assert!(rewards.len() >= 8, "a useful starter set");
+
+    for (i, r) in rewards.iter().enumerate() {
+        let avail = match r["availability"].as_str().unwrap() {
+            "Once" => Availability::Once,
+            _ => Availability::Repeatable,
+        };
+        let mut wire = to_value(item(800 + i as u128, r["cost"].as_u64().unwrap() as u32, avail, None)).unwrap();
+        wire["name"] = r["name"].clone();
+        wire["description"] = r["description"].clone();
+        let (st, _) = send(&state, "POST", "/api/items", Some(&token), Some(wire)).await;
+        assert_eq!(st, StatusCode::OK, "library reward '{}' imports", r["name"]);
+    }
+
+    let (_st, list) = send(&state, "GET", "/api/items", Some(&token), None).await;
+    assert_eq!(list.as_array().unwrap().len(), rewards.len(), "all library rewards are listed");
+}
+
 #[tokio::test]
 async fn item_gated_on_real_achievement_is_accepted_then_archived() {
     let (state, _admin, token, _dir) = keep();
