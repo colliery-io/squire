@@ -20,117 +20,32 @@ initiative_id: SQUIRE-I-0001
 
 # A-0011 #4 — Keep Settings tab: view/change household timezone (live)
 
-*This template includes sections for various types of tasks. Delete sections that don't apply to your specific use case.*
+## Parent Initiative
 
-## Parent Initiative **[CONDITIONAL: Assigned Task]**
+[[SQUIRE-I-0001]] · Implements **[[SQUIRE-A-0011]]** sub-task **#4 of 4** — the in-app surface for the household timezone. Depends on [[SQUIRE-T-0067]] (#3). Completes the timezone story (phone-side editing is deferred to the native work).
 
-[[SQUIRE-I-0001]]
+## Objective
 
-## Objective **[REQUIRED]**
+Let a parent view and change the household timezone from the Keep, applied **live** (no restart): a Settings tab backed by config read/write endpoints that update the row and hot-swap the live cell so the clock changes on the next `today()`.
 
-{Clear statement of what this task accomplishes}
+## Acceptance Criteria
 
-## Backlog Item Details **[CONDITIONAL: Backlog Item]**
+- [ ] Keep endpoints (Operator/Knight-gated, same as the other `/api/*`): `GET /api/config` → the current `HouseholdConfig` (+ available zones if practical); `PUT /api/config` (or `/api/config/timezone`) → validates the zone (`jiff`), `set_setting`s it (audit-stamped), and **hot-swaps the live cell**.
+- [ ] A new **Settings** tab in the Keep tabbed shell ([[SQUIRE-T-0061]]) with a timezone picker (a curated `<select>` of common IANA zones + free-text fallback) showing the current value; save → success toast; invalid zone → inline error.
+- [ ] Changing the zone takes effect with **no restart**: a subsequent `today()` (and the next phone refresh) reflects the new local date. Verified live on a throwaway server (set zone → `GET /api/config` echoes it → a boundary timestamp's `today()` shifts).
+- [ ] `cargo build -p keep` + `node --check` green; Settings tab rendered/screenshot.
 
-{Delete this section when task is assigned to an initiative}
-
-### Type
-- [ ] Bug - Production issue that needs fixing
-- [ ] Feature - New functionality or enhancement  
-- [ ] Tech Debt - Code improvement or refactoring
-- [ ] Chore - Maintenance or setup work
-
-### Priority
-- [ ] P0 - Critical (blocks users/revenue)
-- [ ] P1 - High (important for user experience)
-- [ ] P2 - Medium (nice to have)
-- [ ] P3 - Low (when time permits)
-
-### Impact Assessment **[CONDITIONAL: Bug]**
-- **Affected Users**: {Number/percentage of users affected}
-- **Reproduction Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected vs Actual**: {What should happen vs what happens}
-
-### Business Justification **[CONDITIONAL: Feature]**
-- **User Value**: {Why users need this}
-- **Business Value**: {Impact on metrics/revenue}
-- **Effort Estimate**: {Rough size - S/M/L/XL}
-
-### Technical Debt Impact **[CONDITIONAL: Tech Debt]**
-- **Current Problems**: {What's difficult/slow/buggy now}
-- **Benefits of Fixing**: {What improves after refactoring}
-- **Risk Assessment**: {Risks of not addressing this}
-
-## Acceptance Criteria **[REQUIRED]**
-
-- [ ] {Specific, testable requirement 1}
-- [ ] {Specific, testable requirement 2}
-- [ ] {Specific, testable requirement 3}
-
-## Test Cases **[CONDITIONAL: Testing Task]**
-
-{Delete unless this is a testing task}
-
-### Test Case 1: {Test Case Name}
-- **Test ID**: TC-001
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-### Test Case 2: {Test Case Name}
-- **Test ID**: TC-002
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-## Documentation Sections **[CONDITIONAL: Documentation Task]**
-
-{Delete unless this is a documentation task}
-
-### User Guide Content
-- **Feature Description**: {What this feature does and why it's useful}
-- **Prerequisites**: {What users need before using this feature}
-- **Step-by-Step Instructions**:
-  1. {Step 1 with screenshots/examples}
-  2. {Step 2 with screenshots/examples}
-  3. {Step 3 with screenshots/examples}
-
-### Troubleshooting Guide
-- **Common Issue 1**: {Problem description and solution}
-- **Common Issue 2**: {Problem description and solution}
-- **Error Messages**: {List of error messages and what they mean}
-
-### API Documentation **[CONDITIONAL: API Documentation]**
-- **Endpoint**: {API endpoint description}
-- **Parameters**: {Required and optional parameters}
-- **Example Request**: {Code example}
-- **Example Response**: {Expected response format}
-
-## Implementation Notes **[CONDITIONAL: Technical Task]**
-
-{Keep for technical tasks, delete for non-technical. Technical details, approach, or important considerations}
+## Implementation Notes
 
 ### Technical Approach
-{How this will be implemented}
+`keep`: add `config` handlers (read assembles `load_config()`; write validates + `set_setting` + `live.store(resolve(load_config()))`). Route `GET/PUT /api/config`. `keep.js`: a `settings` tab + `loadSettings()`/save; `index.html`: a Settings panel + nav tab; reuse the themed form styles. Curated zone list can be a small static array (US zones first) with an "other" text input.
 
 ### Dependencies
-{Other tasks or systems this depends on}
+[[SQUIRE-T-0067]] (#3 — seeded zone + live cell), [[SQUIRE-T-0061]] (tabbed shell). [[SQUIRE-A-0011]].
 
 ### Risk Considerations
-{Technical risks and mitigation strategies}
+Validate the zone before persisting (reject unknown → keep the old value). The hot-swap must use the SAME `Arc` the clock holds (don't rebuild a parallel cell). Keep the zone list short but escape-hatched (free text) so any IANA name works. Rebuild + restart the live Keep to deploy.
 
-## Status Updates **[REQUIRED]**
+## Status Updates
 
 *To be added during implementation*

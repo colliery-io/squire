@@ -20,117 +20,32 @@ initiative_id: SQUIRE-I-0001
 
 # A-0011 #2 — wire LocalClock through Store/AppState/KeepState/squire-serve
 
-*This template includes sections for various types of tasks. Delete sections that don't apply to your specific use case.*
+## Parent Initiative
 
-## Parent Initiative **[CONDITIONAL: Assigned Task]**
+[[SQUIRE-I-0001]] · Implements **[[SQUIRE-A-0011]]** sub-task **#2 of 4**. Depends on [[SQUIRE-T-0060]] (#1, which adds `LocalClock` + the `ConfigView` cell additively). Unblocks #3 ([[SQUIRE-T-0067]]) and #4 ([[SQUIRE-T-0068]]).
 
-[[SQUIRE-I-0001]]
+## Objective
 
-## Objective **[REQUIRED]**
+Make the running system actually use `LocalClock`: swap `SystemClock` → `LocalClock` at the composition roots and thread the shared `Arc<ArcSwap<ConfigView>>` cell so the clock and the Keep/api handlers read **one** live config. After this task, `today()` everywhere reflects the household timezone (still defaulting to UTC until #3 seeds a real zone).
 
-{Clear statement of what this task accomplishes}
+## Acceptance Criteria
 
-## Backlog Item Details **[CONDITIONAL: Backlog Item]**
+- [ ] A single `LiveConfig` (`Arc<ArcSwap<ConfigView>>`) is constructed once per server at startup (seeded from `Store::load_config()`), shared (clones of the `Arc`) into: the `Store` it opens with, `AppState`, and `KeepState`. No second source of truth.
+- [ ] `store::tenant`/`Store::open` (and `provisioner.open(handle, clock)`) accept/return a `LocalClock`; `AppState { clock: LocalClock }` and `KeepState { clock: LocalClock }` replace `SystemClock`. `Store<SystemClock>` aliases (e.g. `identity::prod`, any `serve_demo`) updated to `Store<LocalClock>` or made generic.
+- [ ] `squire-home`/`squire-serve` build the cell + clock before opening the store and pass them through. `engine.handle(&snap, cmd, &self.clock)` calls compile unchanged (clock is just a different `Clock` impl).
+- [ ] `cargo build` (workspace) + `cargo test` green; `FixedClock`-based tests untouched; a smoke check that `today()` matches the configured zone (UTC default ⇒ same as before). No behavioural change yet beyond the clock source.
 
-{Delete this section when task is assigned to an initiative}
-
-### Type
-- [ ] Bug - Production issue that needs fixing
-- [ ] Feature - New functionality or enhancement  
-- [ ] Tech Debt - Code improvement or refactoring
-- [ ] Chore - Maintenance or setup work
-
-### Priority
-- [ ] P0 - Critical (blocks users/revenue)
-- [ ] P1 - High (important for user experience)
-- [ ] P2 - Medium (nice to have)
-- [ ] P3 - Low (when time permits)
-
-### Impact Assessment **[CONDITIONAL: Bug]**
-- **Affected Users**: {Number/percentage of users affected}
-- **Reproduction Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected vs Actual**: {What should happen vs what happens}
-
-### Business Justification **[CONDITIONAL: Feature]**
-- **User Value**: {Why users need this}
-- **Business Value**: {Impact on metrics/revenue}
-- **Effort Estimate**: {Rough size - S/M/L/XL}
-
-### Technical Debt Impact **[CONDITIONAL: Tech Debt]**
-- **Current Problems**: {What's difficult/slow/buggy now}
-- **Benefits of Fixing**: {What improves after refactoring}
-- **Risk Assessment**: {Risks of not addressing this}
-
-## Acceptance Criteria **[REQUIRED]**
-
-- [ ] {Specific, testable requirement 1}
-- [ ] {Specific, testable requirement 2}
-- [ ] {Specific, testable requirement 3}
-
-## Test Cases **[CONDITIONAL: Testing Task]**
-
-{Delete unless this is a testing task}
-
-### Test Case 1: {Test Case Name}
-- **Test ID**: TC-001
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-### Test Case 2: {Test Case Name}
-- **Test ID**: TC-002
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-## Documentation Sections **[CONDITIONAL: Documentation Task]**
-
-{Delete unless this is a documentation task}
-
-### User Guide Content
-- **Feature Description**: {What this feature does and why it's useful}
-- **Prerequisites**: {What users need before using this feature}
-- **Step-by-Step Instructions**:
-  1. {Step 1 with screenshots/examples}
-  2. {Step 2 with screenshots/examples}
-  3. {Step 3 with screenshots/examples}
-
-### Troubleshooting Guide
-- **Common Issue 1**: {Problem description and solution}
-- **Common Issue 2**: {Problem description and solution}
-- **Error Messages**: {List of error messages and what they mean}
-
-### API Documentation **[CONDITIONAL: API Documentation]**
-- **Endpoint**: {API endpoint description}
-- **Parameters**: {Required and optional parameters}
-- **Example Request**: {Code example}
-- **Example Response**: {Expected response format}
-
-## Implementation Notes **[CONDITIONAL: Technical Task]**
-
-{Keep for technical tasks, delete for non-technical. Technical details, approach, or important considerations}
+## Implementation Notes
 
 ### Technical Approach
-{How this will be implemented}
+Construct `let live = LiveConfig::seed(UTC)` early; `let clock = LocalClock::new(live.clone())`. Open the store with that clock; after open, `live.store(load_config().resolve())`. Pass `clock` + `live` into `AppState`/`KeepState`. The `provisioner.open` clock generic already exists (`Store<C: Clock>`), so the main churn is the concrete type names at the roots + the `Store<SystemClock>` aliases. Keep `SystemClock` in the tree (other tools/tests may use it) but the servers use `LocalClock`.
 
 ### Dependencies
-{Other tasks or systems this depends on}
+[[SQUIRE-T-0060]] (LocalClock + ConfigView + LiveConfig exist). [[SQUIRE-A-0011]].
 
 ### Risk Considerations
-{Technical risks and mitigation strategies}
+The cross-crate type swap is the bulk of A-0011's "Negative" consequence — do it mechanically, lean on the compiler. Watch for `Copy` assumptions on the old unit-struct `SystemClock` (`LocalClock` is `Clone`, not `Copy`). Ensure exactly one cell is shared (don't accidentally build two). Rebuild + restart any linked binary before live testing (recurring gotcha).
 
-## Status Updates **[REQUIRED]**
+## Status Updates
 
 *To be added during implementation*
