@@ -60,6 +60,7 @@ fun KnightHomeScreen(
     onRedeem: (squire: Long, itemId: Long) -> Unit,
     onMarkDone: (squire: Long, questId: Long, on: Int) -> Unit,
     onForget: () -> Unit = {},
+    onOpenSquire: (squire: Long, name: String) -> Unit = { _, _ -> },
 ) {
     Scaffold(
         topBar = {
@@ -95,6 +96,7 @@ fun KnightHomeScreen(
                 onAddFunds = onAddFunds,
                 onRedeem = onRedeem,
                 onMarkDone = onMarkDone,
+                onOpenSquire = onOpenSquire,
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
         }
@@ -112,6 +114,7 @@ private fun ReadyContent(
     onAddFunds: (Long, Long, String) -> Unit,
     onRedeem: (Long, Long) -> Unit,
     onMarkDone: (Long, Long, Int) -> Unit,
+    onOpenSquire: (Long, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // The Squire a pending claim/request belongs to is labelled by display name from the summaries.
@@ -135,6 +138,7 @@ private fun ReadyContent(
             items(review.squires, key = { it.squire }) { s ->
                 SquireRow(
                     s = s,
+                    onOpen = { onOpenSquire(s.squire, s.displayName) },
                     onAddFunds = { fundsFor = s },
                     onRedeem = { redeemFor = s },
                     onMarkDone = { markDoneFor = s },
@@ -212,13 +216,24 @@ private fun ReadyContent(
 @Composable
 private fun SquireRow(
     s: SquireSummary,
+    onOpen: () -> Unit,
     onAddFunds: () -> Unit,
     onRedeem: () -> Unit,
     onMarkDone: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(s.displayName, fontWeight = FontWeight.Medium)
-        Text("${s.balance} pts", style = MaterialTheme.typography.bodySmall)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(s.displayName, fontWeight = FontWeight.Medium)
+                Text("${s.balance} pts", style = MaterialTheme.typography.bodySmall)
+            }
+            // Drop into this Squire's home and act on their behalf (SQUIRE-T-0055).
+            Button(onClick = onOpen) { Text("Open") }
+        }
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(top = 4.dp),
