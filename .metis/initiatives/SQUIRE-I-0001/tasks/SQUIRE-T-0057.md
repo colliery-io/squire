@@ -4,14 +4,14 @@ level: task
 title: "UI polish 2: parent (Knight) review + assume + pairing screens restyle"
 short_code: "SQUIRE-T-0057"
 created_at: 2026-06-18T03:10:00+00:00
-updated_at: 2026-06-18T03:21:22.448615+00:00
+updated_at: 2026-06-18T03:29:52.215746+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Propagate the "playful quest" theme/components (from T-0056) to the **parent** surfaces — keeping them clean and scannable (a management tool), just themed and tidied: the Knight review home, the per-Squire rows + Add-funds dialog, the "Open / Acting as" flow, and the first-run **pairing screen**.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

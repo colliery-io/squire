@@ -4,14 +4,14 @@ level: task
 title: "UI polish 3: app icon (medieval crest, adaptive) + the Keep web UI restyle"
 short_code: "SQUIRE-T-0058"
 created_at: 2026-06-18T03:10:00+00:00
-updated_at: 2026-06-18T03:30:05.545182+00:00
+updated_at: 2026-06-18T03:36:50.769711+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Two finishing pieces of the polish: (1) a real **app icon** (replace the default Android robot) — a medieval crest/shield in the brand palette, as an adaptive icon; (2) restyle the **Keep** web UI (the parent's computer admin) to match the apps' parchment/royal/gold theme.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
