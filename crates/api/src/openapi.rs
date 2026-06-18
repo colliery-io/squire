@@ -67,6 +67,7 @@ impl Modify for SecurityAddon {
         crate::knight::adjust,
         crate::knight::mark_done,
         crate::knight::household_review,
+        crate::knight::squire_state,
     ),
     components(schemas(
         // ── Squire state view + nested ──

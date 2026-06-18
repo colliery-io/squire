@@ -19,7 +19,7 @@
 
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -27,12 +27,12 @@ use serde::{Deserialize, Serialize};
 use domain_core::contract::{
     ClaimId, Clock, Command, CommandId, Date, Decision, Event, HouseholdReview, ItemId, ItemOption,
     PendingClaim, PendingRequest, Projections, QuestId, QuestOption, Repository, RequestId, Role,
-    Snapshot, SquireSummary, UserId,
+    Snapshot, SquireSummary, StateView, UserId,
 };
 use domain_core::Proj;
 
 use crate::auth::RequireKnight;
-use crate::squire::{domain_status, handle_command};
+use crate::squire::{assemble_state, domain_status, handle_command};
 use crate::state::AppState;
 
 // ─── wire request DTOs (the body never carries `actor` — it's token-derived) ─────────────
@@ -355,6 +355,48 @@ pub async fn household_review(
     let now = state.clock.now();
     let today = state.clock.today();
     Json(assemble_review(&snap, now, today))
+}
+
+/// `GET /admin/squire/{id}/state` — the **"assume Squire"** read (SQUIRE-T-0053): a Knight fetches
+/// any Squire's full [`StateView`] (the same assembly `GET /state` gives that Squire), so the parent
+/// can view + operate a child's home. Read-only — acting still goes through the Knight's privileged
+/// commands (mark-done / redeem / adjust), so the audit/single-writer model is untouched. An id that
+/// isn't an active Squire is a 404.
+#[utoipa::path(
+    get,
+    path = "/admin/squire/{id}/state",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+        ("id" = i64, Path, description = "The Squire's user id"),
+    ),
+    responses(
+        (status = 200, description = "The Squire's player state", body = StateView),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "No such active Squire"),
+    ),
+)]
+pub async fn squire_state(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(_principal): RequireKnight,
+    Path(id): Path<u64>,
+) -> Result<Json<StateView>, StatusCode> {
+    let squire = UserId(u128::from(id));
+    let (snap, today, now) = {
+        let store = state.store.lock().expect("store mutex poisoned");
+        (store.snapshot(), state.clock.today(), state.clock.now())
+    };
+    // Only an active Squire in this tenant can be assumed.
+    let is_squire = snap
+        .users
+        .iter()
+        .any(|u| u.id == squire && u.active && matches!(u.role, Role::Squire));
+    if !is_squire {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    Ok(Json(assemble_state(&snap, squire, today, now)))
 }
 
 /// Build the [`HouseholdReview`] from one snapshot — pure over `snap`; `now`/`today` from the clock.

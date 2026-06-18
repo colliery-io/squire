@@ -19,7 +19,7 @@ use axum::http::{Request, StatusCode};
 
 use domain_core::contract::{
     Assignment, AuthToken, Availability, Cadence, Change, Completion, Date, HouseholdHandle,
-    HouseholdReview, ItemId, Quest, QuestId, RedeemableItem, Role, Schedule, User, UserId,
+    HouseholdReview, ItemId, Quest, QuestId, RedeemableItem, Role, Schedule, StateView, User, UserId,
 };
 use domain_core::contract::{Clock, Repository};
 use store::tenant::{Backend, Provisioner};
@@ -370,4 +370,51 @@ async fn mark_done_submits_and_approves() {
     let b = review.squires.iter().find(|s| s.squire == UserId(SQUIRE_B_ID)).unwrap();
     assert_eq!(b.balance, 5);
     assert!(review.pending_claims.is_empty());
+}
+
+// ─── "assume Squire" read (SQUIRE-T-0053) ────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn knight_can_read_any_squires_state() {
+    let (state, _dir, _today) = test_state();
+    let resp = router(state)
+        .oneshot(req("GET", &format!("/admin/squire/{SQUIRE_A_ID}/state"), Some(KNIGHT_TOKEN), None))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let view: StateView = json_body(resp).await;
+    assert_eq!(view.squire, UserId(SQUIRE_A_ID));
+    // The seeded daily quest assigned to both squires is on this squire's "today" list.
+    assert!(!view.quests_today.is_empty(), "the daily quest shows on the assumed squire's home");
+}
+
+#[tokio::test]
+async fn assume_unknown_squire_is_404() {
+    let (state, _dir, _today) = test_state();
+    let resp = router(state)
+        .oneshot(req("GET", "/admin/squire/9999/state", Some(KNIGHT_TOKEN), None))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn assume_a_non_squire_id_is_404() {
+    let (state, _dir, _today) = test_state();
+    // The Knight's own id is not a Squire.
+    let resp = router(state)
+        .oneshot(req("GET", &format!("/admin/squire/{KNIGHT_ID}/state"), Some(KNIGHT_TOKEN), None))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_squire_token_cannot_assume_a_squire() {
+    let (state, _dir, _today) = test_state();
+    let resp = router(state)
+        .oneshot(req("GET", &format!("/admin/squire/{SQUIRE_B_ID}/state"), Some(SQUIRE_TOKEN), None))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
