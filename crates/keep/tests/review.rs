@@ -208,6 +208,23 @@ async fn redemption_approval_fails_when_drained_before_review() {
     assert_eq!(review["pending_requests"].as_array().unwrap().len(), 1, "still pending after failed approval");
 }
 
+/// Rejecting a redemption request over the HTTP surface spends nothing and resolves the request
+/// (it leaves the pending queue). Mirrors `reject_claim_with_reason_does_not_credit` (SQUIRE-T-0077).
+#[tokio::test]
+async fn reject_redemption_with_reason_does_not_credit_and_resolves() {
+    let (state, admin, token, _dir) = keep();
+    let a = add_squire(&state, admin, "Arthur Jr", "a");
+    send(&state, "POST", "/api/adjust", Some(&token), Some(json!({ "command_id": 1, "squire": a.0, "amount": 10, "reason": "seed" }))).await;
+    state.commit(None, Command::RequestRedemption { request_id: RequestId(7100), squire: a, item_id: ItemId(ITEM) }).expect("request");
+
+    let (st, _) = send(&state, "POST", "/api/review/redemption", Some(&token), Some(json!({ "request_id": 7100, "decision": { "reject": { "reason": "Maybe next week" } } }))).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(balance(&state, a), 10, "a rejected request spends nothing");
+
+    let (_st, review) = send(&state, "GET", "/api/review", Some(&token), None).await;
+    assert!(review["pending_requests"].as_array().unwrap().is_empty(), "rejected request leaves the queue");
+}
+
 // ─── trust boundary ──────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
