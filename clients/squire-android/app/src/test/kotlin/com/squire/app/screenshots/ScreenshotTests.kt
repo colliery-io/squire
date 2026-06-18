@@ -17,6 +17,9 @@ import com.squire.knight.app.ui.QuestAdminScreen
 import com.squire.knight.app.ui.RewardAdminScreen
 import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.AchievementSummaryDto
+import com.squire.sdk.model.ClaimState
+import com.squire.sdk.model.ClaimStateKind
+import com.squire.sdk.model.ClaimStatus
 import com.squire.sdk.model.CompletionDto
 import com.squire.sdk.model.ItemSummaryDto
 import com.squire.sdk.model.MemberSummaryDto
@@ -183,6 +186,39 @@ class ScreenshotTests {
                     initialItems = items,
                     libraryOverride = library,
                     gateOverride = gates,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun squirePlayerHomeHistory() {
+        // The "Recent" section must surface the outcome of each claim — especially WHY one was
+        // rejected (SQUIRE-T-0076). Seeds all three claim states incl. a rejection reason.
+        val view = StateView(
+            balance = 5,
+            generatedAt = 0L,
+            squire = 1L,
+            questsToday = listOf(
+                QuestCard(on = 1, questId = 1L, reward = 5, status = QuestStatus.Available, title = "Make your bed", icon = "🛏"),
+            ),
+            rewards = emptyList(),
+            myClaims = listOf(
+                ClaimStatus(claimId = 10L, on = 1, questTitle = "Tidy your room",
+                    state = ClaimState(state = ClaimStateKind.Approved, points = 10)),
+                ClaimStatus(claimId = 11L, on = 1, questTitle = "Walk the dog",
+                    state = ClaimState(state = ClaimStateKind.Rejected, reason = "Bowl wasn't refilled")),
+                ClaimStatus(claimId = 12L, on = 1, questTitle = "Take out the trash",
+                    state = ClaimState(state = ClaimStateKind.Pending)),
+            ),
+            myRequests = emptyList(),
+            streaks = emptyList(),
+        )
+        paparazzi.snapshot {
+            SquireTheme {
+                PlayerHomeScreen(
+                    state = PlayerUiState.Ready(view, fromCache = false),
+                    onRefresh = {}, onMarkDone = {}, onRedeem = {},
                 )
             }
         }

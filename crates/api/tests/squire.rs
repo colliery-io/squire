@@ -216,6 +216,42 @@ async fn redemption_request_is_pending_and_shows_in_state() {
     assert_eq!(view.my_requests[0].cost, 3);
 }
 
+/// Cross-surface hardening (SQUIRE-T-0076): a Knight reject with a reason reaches the child — the
+/// Squire's `GET /state` shows the claim `Rejected` carrying that reason (and credits nothing); a
+/// subsequent re-claim, once approved, shows `Approved {points}` and the credited balance.
+#[tokio::test]
+async fn knight_reject_with_reason_surfaces_to_child_then_reclaim_approves() {
+    let (state, _dir, today) = test_state();
+
+    // Child claims.
+    let claim = serde_json::json!({ "claim_id": 9100u128, "quest_id": QUEST_ID, "on": today.0 }).to_string();
+    let resp = router(state.clone()).oneshot(req("POST", "/claims", Some(SQUIRE_TOKEN), Some(claim))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Knight rejects with a reason.
+    let reject = serde_json::json!({ "claim_id": 9100u128, "decision": { "verdict": "reject", "reason": "Make the bed first" } }).to_string();
+    let resp = router(state.clone()).oneshot(req("POST", "/admin/review-claim", Some(KNIGHT_TOKEN), Some(reject))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // The child sees the rejection AND the reason; nothing credited.
+    let view: StateView = json_body(router(state.clone()).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap()).await;
+    let rejected = view.my_claims.iter().find(|c| matches!(c.state.state, ClaimStateKind::Rejected)).expect("a rejected claim");
+    assert_eq!(rejected.state.reason.as_deref(), Some("Make the bed first"));
+    assert_eq!(view.balance, 0, "a rejected claim credits nothing");
+
+    // The slot re-opened: a fresh claim, approved, credits the reward and shows Approved {points}.
+    let reclaim = serde_json::json!({ "claim_id": 9101u128, "quest_id": QUEST_ID, "on": today.0 }).to_string();
+    router(state.clone()).oneshot(req("POST", "/claims", Some(SQUIRE_TOKEN), Some(reclaim))).await.unwrap();
+    let approve = serde_json::json!({ "claim_id": 9101u128, "decision": { "verdict": "approve" } }).to_string();
+    let resp = router(state.clone()).oneshot(req("POST", "/admin/review-claim", Some(KNIGHT_TOKEN), Some(approve))).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let view: StateView = json_body(router(state).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap()).await;
+    assert_eq!(view.balance, 5, "the approved re-claim credits the quest reward");
+    let approved = view.my_claims.iter().find(|c| matches!(c.state.state, ClaimStateKind::Approved)).expect("an approved claim");
+    assert_eq!(approved.state.points, Some(5));
+}
+
 #[tokio::test]
 async fn state_without_token_is_401() {
     let (state, _dir, _today) = test_state();
