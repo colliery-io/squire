@@ -2,6 +2,7 @@ package com.squire.pairing
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,10 +11,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,9 +25,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.launch
@@ -35,9 +42,9 @@ import kotlinx.coroutines.launch
  *  - **Use demo creds** — a debug-only bypass ([demoLogin] non-null only in debug builds).
  *
  * "Discover" prefills host/port from NSD (best-effort). On success [onPaired] is called with the
- * stored-ready [Session]; the host app persists it and proceeds to its home screen.
- *
- * @param demoLogin debug-only shortcut producing a [Session] from baked demo creds; null in release.
+ * stored-ready [Session]; the host app persists it and proceeds to its home screen. Styled to the
+ * "playful quest" theme (SQUIRE-T-0057) — it inherits `SquireTheme` from the host, so it uses raw
+ * Material tokens here (the shared module can't depend on `:app`).
  */
 @Composable
 fun PairingScreen(
@@ -84,64 +91,101 @@ fun PairingScreen(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Pair this device", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text(
-            "On the computer, open the Keep → Pair a device, pick this member, and scan the QR — " +
-                "or type the code below.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        // Crest header.
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text("🛡", fontSize = 56.sp)
+            Text(
+                "Welcome, traveller",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                "Pair this device to join the household.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
 
         Button(
             onClick = { scanLauncher.launch(ScanOptions().setOrientationLocked(false).setBeepEnabled(false)) },
             enabled = !busy,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Scan QR") }
+        ) { Text("📷  Scan the QR") }
 
-        Text("Or enter it manually", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedTextField(
-                value = host, onValueChange = { host = it }, label = { Text("Host") },
-                singleLine = true, modifier = Modifier.weight(2f),
-            )
-            OutlinedTextField(
-                value = port, onValueChange = { port = it.filter(Char::isDigit) }, label = { Text("Port") },
-                singleLine = true, modifier = Modifier.weight(1f),
-            )
-        }
-        OutlinedTextField(
-            value = household, onValueChange = { household = it }, label = { Text("Household") },
-            singleLine = true, modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = code, onValueChange = { code = it }, label = { Text("Pairing code") },
-            singleLine = true, modifier = Modifier.fillMaxWidth(),
+        Text(
+            "On the computer, open the Keep → Pair a device, pick this member, and scan — or type the code below.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                        discovery.discover()?.let { (h, p) -> host = h; port = p.toString() }
-                            ?: run { error = "No computer found on the network — enter the host manually." }
-                    }
-                },
-                enabled = !busy,
-            ) { Text("Discover") }
-            Button(
-                onClick = {
-                    val p = port.toIntOrNull()
-                    if (host.isBlank() || p == null || household.isBlank() || code.isBlank()) {
-                        error = "Fill in host, port, household, and code."
-                    } else {
-                        pair(PairTarget(host.trim(), p, household.trim(), code.trim()))
-                    }
-                },
-                enabled = !busy,
-                modifier = Modifier.weight(1f),
-            ) { Text("Pair") }
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    "Enter it by hand",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = host, onValueChange = { host = it }, label = { Text("Host") },
+                        singleLine = true, modifier = Modifier.weight(2f),
+                    )
+                    OutlinedTextField(
+                        value = port, onValueChange = { port = it.filter(Char::isDigit) }, label = { Text("Port") },
+                        singleLine = true, modifier = Modifier.weight(1f),
+                    )
+                }
+                OutlinedTextField(
+                    value = household, onValueChange = { household = it }, label = { Text("Household") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = code, onValueChange = { code = it }, label = { Text("Pairing code") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(),
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                discovery.discover()?.let { (h, p) -> host = h; port = p.toString() }
+                                    ?: run { error = "No computer found on the network — enter the host manually." }
+                            }
+                        },
+                        enabled = !busy,
+                    ) { Text("Discover") }
+                    Button(
+                        onClick = {
+                            val p = port.toIntOrNull()
+                            if (host.isBlank() || p == null || household.isBlank() || code.isBlank()) {
+                                error = "Fill in host, port, household, and code."
+                            } else {
+                                pair(PairTarget(host.trim(), p, household.trim(), code.trim()))
+                            }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Pair") }
+                }
+            }
         }
 
         if (demoLogin != null) {
@@ -164,11 +208,21 @@ fun PairingScreen(
         }
 
         if (busy) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator()
                 Text("Pairing…")
             }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        error?.let {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Box(modifier = Modifier.padding(12.dp)) {
+                    Text(it, color = MaterialTheme.colorScheme.onErrorContainer, fontWeight = FontWeight.Medium)
+                }
+            }
+        }
     }
 }

@@ -13,17 +13,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +37,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.squire.app.ui.components.GoldPill
+import com.squire.app.ui.components.SectionTitle
+import com.squire.app.ui.components.StatusChip
+import com.squire.app.ui.theme.SquireTheme
 import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.ItemOption
@@ -45,7 +52,8 @@ import com.squire.sdk.model.SquireSummary
 /**
  * Stateless Knight review home: renders the whole [KnightUiState] (the cross-Squire
  * [HouseholdReview]) and reports the parent's quick-actions back through callbacks. All logic lives
- * in `:knight-core`'s `KnightStore`.
+ * in `:knight-core`'s `KnightStore`. Styled to the "playful quest" theme (SQUIRE-T-0057): parchment
+ * cards, royal serif headers, gold balance pills — kept scannable for a parent triaging the queue.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,12 +71,24 @@ fun KnightHomeScreen(
     onOpenSquire: (squire: Long, name: String) -> Unit = { _, _ -> },
 ) {
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Knight — review", fontWeight = FontWeight.Bold) },
+                title = { Text("🛡 The Round Table", style = MaterialTheme.typography.titleLarge) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
                 actions = {
-                    TextButton(onClick = onRefresh) { Text("Refresh") }
-                    TextButton(onClick = onForget) { Text("Forget") }
+                    TextButton(
+                        onClick = onRefresh,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
+                    ) { Text("Refresh") }
+                    TextButton(
+                        onClick = onForget,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
+                    ) { Text("Forget") }
                 },
             )
         },
@@ -124,6 +144,8 @@ private fun ReadyContent(
     var redeemFor by remember { mutableStateOf<SquireSummary?>(null) }
     var markDoneFor by remember { mutableStateOf<SquireSummary?>(null) }
 
+    val pendingCount = review.pendingClaims.size + review.pendingRequests.size
+
     LazyColumn(
         modifier = modifier,
         contentPadding = PaddingValues(16.dp),
@@ -131,9 +153,13 @@ private fun ReadyContent(
     ) {
         if (fromCache) item { OfflineBanner() }
 
-        item { SectionHeader("Squires") }
+        item {
+            SectionTitle(
+                if (pendingCount == 0) "Your Squires" else "Your Squires · $pendingCount awaiting your seal",
+            )
+        }
         if (review.squires.isEmpty()) {
-            item { Text("No Squires yet.") }
+            item { EmptyNote("No Squires yet. Pair a child device to add one.") }
         } else {
             items(review.squires, key = { it.squire }) { s ->
                 SquireRow(
@@ -146,9 +172,9 @@ private fun ReadyContent(
             }
         }
 
-        item { SectionHeader("Pending claims") }
+        item { SectionTitle("Quests to approve") }
         if (review.pendingClaims.isEmpty()) {
-            item { Text("Nothing to review.") }
+            item { EmptyNote("All caught up — no quests waiting.") }
         } else {
             items(review.pendingClaims, key = { it.claimId }) { claim ->
                 PendingClaimRow(
@@ -160,9 +186,9 @@ private fun ReadyContent(
             }
         }
 
-        item { SectionHeader("Pending redemption requests") }
+        item { SectionTitle("Rewards to grant") }
         if (review.pendingRequests.isEmpty()) {
-            item { Text("Nothing to review.") }
+            item { EmptyNote("No reward requests waiting.") }
         } else {
             items(review.pendingRequests, key = { it.requestId }) { req ->
                 PendingRequestRow(
@@ -190,7 +216,7 @@ private fun ReadyContent(
         PickDialog(
             title = "Redeem for ${target.displayName}",
             empty = "No items to redeem.",
-            options = review.items.map { it.itemId to "${it.name} · ${it.cost} pts" },
+            options = review.items.map { it.itemId to "${it.name} · ${it.cost} ★" },
             onPick = { itemId ->
                 onRedeem(target.squire, itemId)
                 redeemFor = null
@@ -221,26 +247,37 @@ private fun SquireRow(
     onRedeem: () -> Unit,
     onMarkDone: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(s.displayName, fontWeight = FontWeight.Medium)
-                Text("${s.balance} pts", style = MaterialTheme.typography.bodySmall)
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "⚔ ${s.displayName}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    GoldPill(amount = s.balance.toInt())
+                }
+                // Drop into this Squire's home and act on their behalf (SQUIRE-T-0055).
+                FilledTonalButton(onClick = onOpen) { Text("Open") }
             }
-            // Drop into this Squire's home and act on their behalf (SQUIRE-T-0055).
-            Button(onClick = onOpen) { Text("Open") }
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 4.dp),
-        ) {
-            OutlinedButton(onClick = onMarkDone) { Text("Mark done") }
-            OutlinedButton(onClick = onRedeem) { Text("Redeem") }
-            OutlinedButton(onClick = onAddFunds) { Text("Add funds") }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
+                OutlinedButton(onClick = onMarkDone) { Text("Mark done") }
+                OutlinedButton(onClick = onRedeem) { Text("Redeem") }
+                OutlinedButton(onClick = onAddFunds) { Text("Add ★") }
+            }
         }
     }
 }
@@ -280,24 +317,62 @@ private fun PickDialog(
 
 @Composable
 private fun PendingClaimRow(claim: PendingClaim, squireName: String, onApprove: () -> Unit, onReject: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(claim.questTitle, fontWeight = FontWeight.Medium)
-        Text("$squireName · day ${claim.on}", style = MaterialTheme.typography.bodySmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-            Button(onClick = onApprove) { Text("Approve") }
-            OutlinedButton(onClick = onReject) { Text("Reject") }
-        }
-    }
+    ReviewCard(
+        title = claim.questTitle,
+        subtitle = "$squireName · day ${claim.on}",
+        trailing = { StatusChip("Quest", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer) },
+        onApprove = onApprove,
+        onReject = onReject,
+    )
 }
 
 @Composable
 private fun PendingRequestRow(request: PendingRequest, squireName: String, onApprove: () -> Unit, onReject: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(request.itemName, fontWeight = FontWeight.Medium)
-        Text("$squireName · ${request.cost} pts", style = MaterialTheme.typography.bodySmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-            Button(onClick = onApprove) { Text("Approve") }
-            OutlinedButton(onClick = onReject) { Text("Reject") }
+    ReviewCard(
+        title = request.itemName,
+        subtitle = "$squireName · ${request.cost} ★",
+        trailing = { StatusChip("Reward", MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) },
+        onApprove = onApprove,
+        onReject = onReject,
+    )
+}
+
+/** A parchment card for one pending item: title + who/when, a kind chip, and Approve / Reject. */
+@Composable
+private fun ReviewCard(
+    title: String,
+    subtitle: String,
+    trailing: @Composable () -> Unit,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, fontWeight = FontWeight.SemiBold)
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                trailing()
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 12.dp)) {
+                Button(
+                    onClick = onApprove,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary,
+                        contentColor = MaterialTheme.colorScheme.onTertiary,
+                    ),
+                ) { Text("Approve ✓") }
+                OutlinedButton(onClick = onReject) { Text("Reject") }
+            }
         }
     }
 }
@@ -312,13 +387,13 @@ private fun AddFundsDialog(squireName: String, onDismiss: () -> Unit, onConfirm:
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add funds — $squireName") },
+        title = { Text("Add ★ — $squireName") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it.filter(Char::isDigit) },
-                    label = { Text("Amount (points)") },
+                    label = { Text("Amount (★)") },
                     singleLine = true,
                 )
                 OutlinedTextField(
@@ -340,26 +415,21 @@ private fun AddFundsDialog(squireName: String, onDismiss: () -> Unit, onConfirm:
 
 @Composable
 private fun OfflineBanner() {
-    Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            "Offline — showing last saved review",
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.padding(12.dp),
-        )
-    }
+    com.squire.app.ui.components.Banner(
+        text = "Offline — showing last saved review",
+        container = MaterialTheme.colorScheme.errorContainer,
+        content = MaterialTheme.colorScheme.onErrorContainer,
+    )
 }
 
 @Composable
-private fun SectionHeader(text: String) {
-    Column {
-        HorizontalDivider()
-        Text(
-            text,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-    }
+private fun EmptyNote(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = 4.dp),
+    )
 }
 
 @Composable
@@ -383,10 +453,12 @@ private fun KnightHomePreview() {
         quests = listOf(QuestOption(questId = 100, title = "Make your bed")),
         today = 20624,
     )
-    KnightHomeScreen(
-        state = KnightUiState.Ready(sample, fromCache = false),
-        onRefresh = {}, onApproveClaim = {}, onRejectClaim = {},
-        onApproveRequest = {}, onRejectRequest = {}, onAddFunds = { _, _, _ -> },
-        onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
-    )
+    SquireTheme {
+        KnightHomeScreen(
+            state = KnightUiState.Ready(sample, fromCache = false),
+            onRefresh = {}, onApproveClaim = {}, onRejectClaim = {},
+            onApproveRequest = {}, onRejectRequest = {}, onAddFunds = { _, _, _ -> },
+            onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
+        )
+    }
 }
