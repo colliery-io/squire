@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Monochrome crest for Android 13+ themed icons (SQUIRE-T-0058): a single shield silhouette with the
+  star punched out (evenOdd). The system tints it, so the fill color is a placeholder.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#000000"
+        android:fillType="evenOdd"
+        android:pathData="M32,34 L76,34 L76,54 C76,70 66,80 54,86 C42,80 32,70 32,54 Z M54,41 L57.06,49.79 L66.36,49.98 L58.95,55.61 L61.64,64.52 L54,59.2 L46.36,64.52 L49.05,55.61 L41.64,49.98 L50.94,49.79 Z" />
+</vector>

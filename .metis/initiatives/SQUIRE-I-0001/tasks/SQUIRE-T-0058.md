@@ -3,15 +3,15 @@ id: ui-polish-3-app-icon-medieval
 level: task
 title: "UI polish 3: app icon (medieval crest, adaptive) + the Keep web UI restyle"
 short_code: "SQUIRE-T-0058"
-created_at: 2026-06-18T03:10:00.000000+00:00
-updated_at: 2026-06-18T03:10:00.000000+00:00
+created_at: 2026-06-18T03:10:00+00:00
+updated_at: 2026-06-18T03:30:05.545182+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -30,9 +30,11 @@ Two finishing pieces of the polish: (1) a real **app icon** (replace the default
 
 ## Acceptance Criteria
 
-- [ ] Adaptive launcher icon (`mipmap`/`drawable` vector foreground + a brand background; `ic_launcher` + round + monochrome), a simple crest/shield/⚔ mark in the palette — replacing the default. Shows on the home screen + recents.
-- [ ] The Keep (`crates/keep/assets/keep.css` + light `index.html` structure tweaks) restyled to the brand: parchment background, royal headings (display serif), gold accents/buttons, carded sections, tidy forms — without changing the JS/behaviour. Still one self-contained embedded asset (rust-embed), no new build step.
-- [ ] `:app:assembleDebug` builds with the new icon; `cargo build -p keep` green (assets embed); screenshots captured (icon on launcher, Keep restyled).
+## Acceptance Criteria
+
+- [x] Adaptive launcher icon — vector `ic_launcher_foreground` (gold heraldic shield + cream star) on a royal `@color/ic_launcher_background`, wired via `mipmap-anydpi-v26/ic_launcher{,_round}.xml` (+ `monochrome` silhouette for Android 13 themed icons), referenced from the manifest (`android:icon`/`roundIcon`). minSdk 26 ⇒ adaptive-only, no PNG buckets needed. Verified on the launcher drawer (replaces the default robot).
+- [x] The Keep (`crates/keep/assets/keep.css`) restyled to the brand: parchment bg, royal serif headings, gold-ruled royal header, carded sections, royal pill buttons, gold nav, themed inputs/selects/fieldsets/lists/code/pre. CSS-only — no markup/JS/behaviour change, same rust-embed asset.
+- [x] `:app:assembleDebug` builds with the new icon; `cargo build -p keep` green; screenshots captured (icon in drawer, Keep rendered via headless Chrome).
 
 ## Implementation Notes
 
@@ -47,4 +49,4 @@ Adaptive-icon XML is fiddly (foreground safe-zone, density buckets) — a clean 
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Done (icon + Keep, both verified).** (1) **App icon**: new adaptive launcher icon — `res/drawable/ic_launcher_foreground.xml` (gold shield `#D7B43E` + cream five-point star) on royal `@color/ic_launcher_background`, plus a `monochrome` shield silhouette (star punched via evenOdd) for themed icons; wired through `mipmap-anydpi-v26/ic_launcher{,_round}.xml` and the manifest `android:icon`/`roundIcon`. minSdk 26 means adaptive-only suffices (no per-density PNGs). Confirmed on the emulator drawer — the default Android robot is gone, replaced by the royal-and-gold crest. (2) **Keep web UI**: rewrote `crates/keep/assets/keep.css` to the parchment/royal/gold theme (royal header with gold rule, serif royal section titles, cream carded sections, royal pill buttons, gold nav links, themed form controls/lists/code/pre) — CSS-only, no markup or `keep.js` change. `cargo build -p keep` green (rust-embed re-embeds). Rendered the Keep with headless Chrome to verify. Screenshots sent. Polish pass (T-0056/0057/0058) complete — next: bump versionCode and package one OTA update so the running server can hand these builds to the phone.
