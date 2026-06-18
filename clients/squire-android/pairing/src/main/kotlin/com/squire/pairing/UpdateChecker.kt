@@ -1,19 +1,29 @@
 package com.squire.pairing
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -33,8 +43,8 @@ data class UpdateInfo(val versionCode: Int, val versionName: String, val downloa
 
 /**
  * Checks the LAN server's `/app/manifest` for a newer build of this app (ADR-less LAN sideload,
- * SQUIRE-T-0051). The phone can't silently install a sideloaded APK, so the UI just surfaces an
- * "Update available" banner whose action opens the download URL in the browser.
+ * SQUIRE-T-0051). When one is offered, [UpdateBanner] downloads and installs it **in-app** via
+ * [AppUpdater] (SQUIRE-T-0059) — the system install prompt, no browser.
  */
 object UpdateChecker {
     private val json = Json { ignoreUnknownKeys = true }
@@ -64,22 +74,70 @@ object UpdateChecker {
         }
 }
 
-/** A thin "Update available" strip; the action ([onGetUpdate]) opens the APK URL in the browser. */
+/** Banner state for the in-app update (SQUIRE-T-0059). */
+private sealed interface BannerState {
+    data object Idle : BannerState
+    data class Downloading(val percent: Int) : BannerState
+    data class Failed(val message: String) : BannerState
+}
+
+/**
+ * An "Update available" strip that installs the new build **in-app** (SQUIRE-T-0059): tap "Get
+ * update" → the APK downloads here (progress shown) → the system install prompt appears. No browser.
+ * Self-contained — the host just renders it with the [info] from [UpdateChecker.check].
+ */
 @Composable
-fun UpdateBanner(info: UpdateInfo, onGetUpdate: () -> Unit) {
+fun UpdateBanner(info: UpdateInfo) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var state by remember(info.versionCode) { mutableStateOf<BannerState>(BannerState.Idle) }
+
     Surface(color = MaterialTheme.colorScheme.tertiaryContainer, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(
-                "Update available — v${info.versionName}",
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = onGetUpdate) { Text("Get update") }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Update available — v${info.versionName}",
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    fontWeight = FontWeight.Medium,
+                )
+                when (val s = state) {
+                    is BannerState.Downloading -> Text(
+                        if (s.percent >= 0) "Downloading… ${s.percent}%" else "Downloading…",
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    is BannerState.Failed -> Text(
+                        s.message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    BannerState.Idle -> Unit
+                }
+            }
+
+            if (state is BannerState.Downloading) {
+                CircularProgressIndicator(
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                TextButton(onClick = {
+                    state = BannerState.Downloading(0)
+                    scope.launch {
+                        val err = AppUpdater.downloadAndInstall(context, info.downloadUrl) { pct ->
+                            state = BannerState.Downloading(pct)
+                        }
+                        state = if (err == null) BannerState.Idle else BannerState.Failed(err)
+                    }
+                }) {
+                    Text(if (state is BannerState.Failed) "Retry" else "Get update")
+                }
+            }
         }
     }
 }

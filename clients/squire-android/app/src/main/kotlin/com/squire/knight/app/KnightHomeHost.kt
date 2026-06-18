@@ -1,7 +1,5 @@
 package com.squire.knight.app
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -134,11 +132,7 @@ internal fun KnightHomeHost(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        update?.let { info ->
-            UpdateBanner(info) {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl)))
-            }
-        }
+        update?.let { info -> UpdateBanner(info) }
         Box(modifier = Modifier.weight(1f)) {
             KnightHomeScreen(
                 state = state,

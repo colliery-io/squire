@@ -1,7 +1,5 @@
 package com.squire.app
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -187,11 +185,7 @@ internal fun PlayerHomeHost(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        update?.let { info ->
-            UpdateBanner(info) {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl)))
-            }
-        }
+        update?.let { info -> UpdateBanner(info) }
         Box(modifier = Modifier.weight(1f)) {
             PlayerHomeScreen(
                 state = state,
