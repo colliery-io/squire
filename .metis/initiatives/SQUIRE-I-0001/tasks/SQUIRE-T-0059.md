@@ -4,14 +4,14 @@ level: task
 title: "In-app update install (PackageInstaller) — no browser bounce"
 short_code: "SQUIRE-T-0059"
 created_at: 2026-06-18T11:35:15.846742+00:00
-updated_at: 2026-06-18T11:35:42.596677+00:00
+updated_at: 2026-06-18T11:55:10.958875+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Replace the browser-`ACTION_VIEW` update action with an **in-app download + install**: tap "Get update" → the app downloads the APK itself (with progress) → the system install confirmation appears directly (no browser, no Downloads app). Uses Android's `PackageInstaller` session API.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

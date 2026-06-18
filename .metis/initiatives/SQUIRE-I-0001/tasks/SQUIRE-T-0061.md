@@ -4,14 +4,14 @@ level: task
 title: "Keep: tabbed shell (Quests / Review / Rewards / Members / Pair / Log)"
 short_code: "SQUIRE-T-0061"
 created_at: 2026-06-18T12:14:08.926515+00:00
-updated_at: 2026-06-18T12:15:20.505916+00:00
+updated_at: 2026-06-18T12:19:39.779790+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Turn the Keep's "un-hide every panel at once" layout into a real **tabbed shell**: the nav switches which single panel is visible, so each area (Quests, Review, Rewards, Achievements, Members, Pair, Log) is its own tab. Quest management gets its own dedicated tab. Pure front-end (keep.js + index.html + keep.css) — no API/behaviour change.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -1,4 +1,7 @@
 target/
+# macOS Finder metadata — never useful in the repo.
+.DS_Store
+**/.DS_Store
 # Toolchain jars fetched on demand (openapi-generator-cli).
 tools/
 # Generated client SDKs — regenerated from crates/api/openapi.json via clients/generate-sdk.sh.

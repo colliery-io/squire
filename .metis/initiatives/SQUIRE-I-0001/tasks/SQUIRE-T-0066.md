@@ -4,14 +4,14 @@ level: task
 title: "A-0011 #2 — wire LocalClock through Store/AppState/KeepState/squire-serve"
 short_code: "SQUIRE-T-0066"
 created_at: 2026-06-18T12:48:54.962394+00:00
-updated_at: 2026-06-18T12:48:54.962394+00:00
+updated_at: 2026-06-18T13:08:21.361184+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,10 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Make the running system actually use `LocalClock`: swap `SystemClock` → `LocalClock` at the composition roots and thread the shared `Arc<ArcSwap<ConfigView>>` cell so the clock and the Keep/api handlers read **one** live config. After this task, `today()` everywhere reflects the household timezone (still defaulting to UTC until #3 seeds a real zone).
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -4,14 +4,14 @@ level: task
 title: "Keep: rich quest authoring (assign to squires, cadence, repeat, completion)"
 short_code: "SQUIRE-T-0062"
 created_at: 2026-06-18T12:14:10.343059+00:00
-updated_at: 2026-06-18T12:14:10.343059+00:00
+updated_at: 2026-06-18T12:27:17.946540+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Replace the Keep's minimal quest form (title/reward/auto-approve, everything else hardcoded) with the full authoring surface the domain already supports: **assignment** (All squires — default — or specific squires), **cadence** (Every day / Weekly pick-days / One-time + optional due date), **completion** (each-assignee vs race), **multiple-times-per-day**, and optional category. The quest list shows a cadence/assignment summary.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

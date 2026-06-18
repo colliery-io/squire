@@ -4,14 +4,14 @@ level: task
 title: "A-0011 #1 — config KV store + HouseholdConfig + ArcSwap cell + LocalClock"
 short_code: "SQUIRE-T-0060"
 created_at: 2026-06-18T11:35:15.846742+00:00
-updated_at: 2026-06-18T12:51:05.559291+00:00
+updated_at: 2026-06-18T12:59:35.603658+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Build the storage + runtime + clock layer for household configuration, **additively** (keep `SystemClock` so the tree still compiles until #2 swaps usages): a key/value `config` table, a typed `HouseholdConfig` view, the `Arc<ArcSwap<ConfigView>>` hot cell, and `LocalClock` that derives the local `today()` from the live timezone.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

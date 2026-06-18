@@ -4,14 +4,14 @@ level: task
 title: "A-0011 #3 — onboarding: host-zone detection + seed timezone on first run"
 short_code: "SQUIRE-T-0067"
 created_at: 2026-06-18T12:48:56.360694+00:00
-updated_at: 2026-06-18T12:48:56.360694+00:00
+updated_at: 2026-06-18T13:12:38.753975+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,10 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Capture the household timezone at onboarding so "midnight" is correct from day one with zero manual setup: on first run, seed the `timezone` setting from `SQUIRE_TZ` (if set) else the **auto-detected host zone**, persist it, and reflect it in the live cell + the server banner.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -4,14 +4,14 @@ level: task
 title: "Starter quest library + one-tap import"
 short_code: "SQUIRE-T-0063"
 created_at: 2026-06-18T12:14:11.748742+00:00
-updated_at: 2026-06-18T12:14:11.748742+00:00
+updated_at: 2026-06-18T12:32:09.375021+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Ship a curated, categorized starter quest library with the Keep, and a one-tap **Import** in the Quests tab that creates the chosen quest for all squires (parents then edit/archive). The library is a shipped asset every household gets.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

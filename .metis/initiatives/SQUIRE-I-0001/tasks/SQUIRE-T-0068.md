@@ -4,14 +4,14 @@ level: task
 title: "A-0011 #4 — Keep Settings tab: view/change household timezone (live)"
 short_code: "SQUIRE-T-0068"
 created_at: 2026-06-18T12:48:57.324527+00:00
-updated_at: 2026-06-18T12:48:57.324527+00:00
+updated_at: 2026-06-18T13:18:12.102856+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,10 @@ initiative_id: SQUIRE-I-0001
 ## Objective
 
 Let a parent view and change the household timezone from the Keep, applied **live** (no restart): a Settings tab backed by config read/write endpoints that update the row and hot-swap the live cell so the clock changes on the next `today()`.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
