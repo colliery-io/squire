@@ -20,7 +20,7 @@
     { tab: "log", panel: "log-panel" },
   ];
   const TAB_LOADERS = {
-    quests: () => loadQuests(),
+    quests: () => { loadQuestSquires().then(() => loadQuests()); },
     review: () => loadReview(),
     rewards: () => loadCatalog("items", "item-list"),
     achievements: () => { loadAchScopeQuests(); loadCatalog("achievements", "achievement-list"); },
@@ -345,11 +345,66 @@
     });
   }
 
-  // ── Quests (T-0026) ──────────────────────────────────────────────────────────
+  // ── Quests (T-0026 / rich authoring T-0062) ──────────────────────────────────
   // The session cookie is HttpOnly; same-origin fetch sends it automatically, so the Operator
   // extractor authenticates these calls without the page handling the token.
   const questForm = document.getElementById("quest-form");
   const questErr = document.getElementById("quest-error");
+
+  // Active squires, for the assignment picker + list labels.
+  let squiresById = {};
+  async function loadQuestSquires() {
+    const res = await fetch("/api/members");
+    if (!res.ok) return;
+    const rows = await res.json();
+    squiresById = {};
+    const box = document.getElementById("quest-squires");
+    if (box) box.innerHTML = "";
+    for (const m of rows.filter((m) => m.role === "Squire" && m.active)) {
+      squiresById[m.user] = m.display_name;
+      if (box) {
+        const lbl = document.createElement("label");
+        const cb = document.createElement("input");
+        cb.type = "checkbox"; cb.name = "squire"; cb.value = String(m.user);
+        lbl.append(cb, document.createTextNode(" " + m.display_name));
+        box.appendChild(lbl);
+      }
+    }
+  }
+
+  // yyyy-mm-dd → the domain's Monday-aligned Date day-count (floor(unixDays)+3, matching
+  // store::date_from_unix_millis). Returns null on a blank/invalid date.
+  function toDomainDate(str) {
+    const ms = Date.parse(str + "T00:00:00Z");
+    if (Number.isNaN(ms)) return null;
+    return Math.floor(ms / 86400000) + 3;
+  }
+
+  // Short human summary of a quest's cadence + assignment for the list view.
+  function questSummary(q) {
+    let cadence = "One-time";
+    const c = q.cadence || {};
+    if (c.Recurring === "Daily") cadence = "Daily";
+    else if (c.Recurring && c.Recurring.Weekly) cadence = c.Recurring.Weekly.days.join("/");
+    let who = "all squires";
+    if (q.assignment && q.assignment.Squires) {
+      who = q.assignment.Squires.map((id) => squiresById[id] || `#${id}`).join(", ");
+    }
+    const extras = [];
+    if (q.completion === "Race") extras.push("race");
+    if (q.repeatable_within_day) extras.push("repeatable/day");
+    if (q.auto_approve) extras.push("auto-approve");
+    return `${cadence} · ${who}${extras.length ? " · " + extras.join(", ") : ""}`;
+  }
+
+  // Progressive disclosure: weekday picker for Weekly, due field for One-time, squire list for "some".
+  function syncQuestFields() {
+    const cadence = document.getElementById("quest-cadence").value;
+    document.getElementById("quest-weekly-fields").hidden = cadence !== "Weekly";
+    document.getElementById("quest-due-label").hidden = cadence !== "OneOff";
+    const checked = questForm.querySelector('input[name="assign"]:checked');
+    document.getElementById("quest-squires").hidden = !(checked && checked.value === "some");
+  }
 
   async function loadQuests() {
     const res = await fetch("/api/quests");
@@ -361,7 +416,9 @@
       const q = row.quest;
       const li = document.createElement("li");
       const tag = q.active ? "" : " (archived)";
-      li.textContent = `${q.title} — ${q.reward} pts${tag} `;
+      const strong = document.createElement("strong");
+      strong.textContent = q.title;
+      li.append(strong, document.createTextNode(` — ${q.reward} ★ · ${questSummary(q)}${tag} `));
       if (q.active) {
         const btn = document.createElement("button");
         btn.textContent = "Archive";
@@ -376,24 +433,52 @@
   }
 
   if (questForm) {
+    document.getElementById("quest-cadence").addEventListener("change", syncQuestFields);
+    for (const r of questForm.querySelectorAll('input[name="assign"]')) {
+      r.addEventListener("change", syncQuestFields);
+    }
+    syncQuestFields();
+
     questForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       questErr.hidden = true;
       const fd = new FormData(questForm);
-      // A daily quest for all squires; each assignee does their own. The full
-      // cadence/assignment/completion shape is available via the API for richer editors later.
+
+      // Cadence — externally-tagged enum JSON (Daily | {Weekly:{days}} | {OneOff:{due}}).
+      let cadence;
+      const cad = fd.get("cadence");
+      if (cad === "Daily") {
+        cadence = { Recurring: "Daily" };
+      } else if (cad === "Weekly") {
+        const days = fd.getAll("wd");
+        if (days.length === 0) { questErr.textContent = "Pick at least one weekday."; questErr.hidden = false; return; }
+        cadence = { Recurring: { Weekly: { days } } };
+      } else {
+        const dueStr = fd.get("due");
+        cadence = { OneOff: { due: dueStr ? toDomainDate(dueStr) : null } };
+      }
+
+      // Assignment — "AllSquires" or {Squires:[ids]} (must be ≥1 active squire).
+      let assignment = "AllSquires";
+      if (fd.get("assign") === "some") {
+        const ids = fd.getAll("squire").map(Number);
+        if (ids.length === 0) { questErr.textContent = "Pick at least one squire, or choose All squires."; questErr.hidden = false; return; }
+        assignment = { Squires: ids };
+      }
+
+      const category = (fd.get("category") || "").trim();
       const quest = {
         // QuestId is a u128 deserialized from a JSON number; Date.now() is well under 2^53.
         id: Date.now(),
         title: fd.get("title"),
         description: null,
-        category: null,
+        category: category || null,
         reward: Number(fd.get("reward")),
-        cadence: { Recurring: "Daily" },
-        assignment: "AllSquires",
-        completion: "EachAssignee",
+        cadence,
+        assignment,
+        completion: fd.get("completion") || "EachAssignee",
         auto_approve: fd.get("auto_approve") === "on",
-        repeatable_within_day: false,
+        repeatable_within_day: fd.get("repeat_day") === "on",
         active: true,
         icon: null,
       };
@@ -408,6 +493,7 @@
         return;
       }
       questForm.reset();
+      syncQuestFields();
       loadQuests();
     });
   }
