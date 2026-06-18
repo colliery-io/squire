@@ -15,6 +15,9 @@
   --field: #FFFFFF;
 }
 * { box-sizing: border-box; }
+/* The `hidden` attribute must win over element display rules (e.g. `label { display: block }`),
+   so progressive-disclosure fields (due date, weekday picker, squire list) actually hide. */
+[hidden] { display: none !important; }
 body {
   margin: 0;
   font: 15px/1.5 system-ui, sans-serif;
@@ -69,11 +72,18 @@ input, select {
   color: var(--ink);
   font: inherit;
 }
-input[type="checkbox"] { width: auto; margin-right: .4rem; }
+input[type="checkbox"], input[type="radio"] { width: auto; margin-right: .4rem; }
+/* The assignment radios read as a simple vertical list. */
+fieldset > label { display: block; margin: .35rem 0; color: var(--ink); }
 input:focus, select:focus { outline: 2px solid var(--royal); outline-offset: 0; border-color: var(--royal); }
 
 fieldset { border: 1px solid var(--line); border-radius: 12px; margin: .6rem 0; padding: .4rem .9rem .9rem; }
 legend { color: var(--muted); font-size: .85rem; padding: 0 .35rem; }
+
+/* Inline checkbox rows: weekday picker + the "specific squires" assignment list (T-0062). */
+#quest-weekly-fields label,
+.checks label { display: inline-flex; align-items: center; gap: .25rem; margin: .25rem .9rem .25rem 0; color: var(--ink); }
+.checks { margin-top: .4rem; }
 
 button {
   margin-top: .85rem;

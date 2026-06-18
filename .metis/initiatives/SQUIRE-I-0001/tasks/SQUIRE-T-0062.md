@@ -11,7 +11,7 @@ archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -20,117 +20,32 @@ initiative_id: SQUIRE-I-0001
 
 # Keep: rich quest authoring (assign to squires, cadence, repeat, completion)
 
-*This template includes sections for various types of tasks. Delete sections that don't apply to your specific use case.*
+## Parent Initiative
 
-## Parent Initiative **[CONDITIONAL: Assigned Task]**
+[[SQUIRE-I-0001]] · The quest-creation cycle (user reqs: assign to squire(s) default-all; repeatable; one-off+due; multiple-per-day). Builds on [[SQUIRE-T-0061]] (Quests tab). The domain already models all of this — this exposes it in the Keep form.
 
-[[SQUIRE-I-0001]]
+## Objective
 
-## Objective **[REQUIRED]**
+Replace the Keep's minimal quest form (title/reward/auto-approve, everything else hardcoded) with the full authoring surface the domain already supports: **assignment** (All squires — default — or specific squires), **cadence** (Every day / Weekly pick-days / One-time + optional due date), **completion** (each-assignee vs race), **multiple-times-per-day**, and optional category. The quest list shows a cadence/assignment summary.
 
-{Clear statement of what this task accomplishes}
+## Acceptance Criteria
 
-## Backlog Item Details **[CONDITIONAL: Backlog Item]**
+- [x] Assignment: radio **All squires** (default, `"AllSquires"`) vs **Specific squires** → a checkbox list of active Squires (loaded from `/api/members`, filtered `role==Squire && active`), building `{Squires:[ids]}` (numbers). Validation: ≥1 squire when "specific".
+- [x] Cadence select → **Every day** (`{Recurring:"Daily"}`), **Weekly** (weekday checkboxes → `{Recurring:{Weekly:{days:[…]}}}`, ≥1 day), **One-time** (`{OneOff:{due}}`) with an optional date input converted to the domain's Monday-aligned day-count.
+- [x] **Completion** select (EachAssignee / Race) and a **"Can be earned multiple times per day"** checkbox (`repeatable_within_day`). Optional **Category** text. Progressive disclosure (weekday picker for Weekly, due for One-time, squire list for "specific").
+- [x] Quest list shows a summary (e.g. "Daily · all squires · auto-approve", "Mon/Wed/Fri · Gawain · race"). `cargo build -p keep` + `node --check` green; payload shapes verified against a live server (all cadence/assignment combos → 200; string ids → 400, confirming numbers are required).
 
-{Delete this section when task is assigned to an initiative}
-
-### Type
-- [ ] Bug - Production issue that needs fixing
-- [ ] Feature - New functionality or enhancement  
-- [ ] Tech Debt - Code improvement or refactoring
-- [ ] Chore - Maintenance or setup work
-
-### Priority
-- [ ] P0 - Critical (blocks users/revenue)
-- [ ] P1 - High (important for user experience)
-- [ ] P2 - Medium (nice to have)
-- [ ] P3 - Low (when time permits)
-
-### Impact Assessment **[CONDITIONAL: Bug]**
-- **Affected Users**: {Number/percentage of users affected}
-- **Reproduction Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected vs Actual**: {What should happen vs what happens}
-
-### Business Justification **[CONDITIONAL: Feature]**
-- **User Value**: {Why users need this}
-- **Business Value**: {Impact on metrics/revenue}
-- **Effort Estimate**: {Rough size - S/M/L/XL}
-
-### Technical Debt Impact **[CONDITIONAL: Tech Debt]**
-- **Current Problems**: {What's difficult/slow/buggy now}
-- **Benefits of Fixing**: {What improves after refactoring}
-- **Risk Assessment**: {Risks of not addressing this}
-
-## Acceptance Criteria **[REQUIRED]**
-
-- [ ] {Specific, testable requirement 1}
-- [ ] {Specific, testable requirement 2}
-- [ ] {Specific, testable requirement 3}
-
-## Test Cases **[CONDITIONAL: Testing Task]**
-
-{Delete unless this is a testing task}
-
-### Test Case 1: {Test Case Name}
-- **Test ID**: TC-001
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-### Test Case 2: {Test Case Name}
-- **Test ID**: TC-002
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-## Documentation Sections **[CONDITIONAL: Documentation Task]**
-
-{Delete unless this is a documentation task}
-
-### User Guide Content
-- **Feature Description**: {What this feature does and why it's useful}
-- **Prerequisites**: {What users need before using this feature}
-- **Step-by-Step Instructions**:
-  1. {Step 1 with screenshots/examples}
-  2. {Step 2 with screenshots/examples}
-  3. {Step 3 with screenshots/examples}
-
-### Troubleshooting Guide
-- **Common Issue 1**: {Problem description and solution}
-- **Common Issue 2**: {Problem description and solution}
-- **Error Messages**: {List of error messages and what they mean}
-
-### API Documentation **[CONDITIONAL: API Documentation]**
-- **Endpoint**: {API endpoint description}
-- **Parameters**: {Required and optional parameters}
-- **Example Request**: {Code example}
-- **Example Response**: {Expected response format}
-
-## Implementation Notes **[CONDITIONAL: Technical Task]**
-
-{Keep for technical tasks, delete for non-technical. Technical details, approach, or important considerations}
+## Implementation Notes
 
 ### Technical Approach
-{How this will be implemented}
+`index.html`: quest form gains category, a `How often` select with a weekday `<fieldset>` + a `due` date input, a completion select, an `Assign to` fieldset (radios + a `#quest-squires` checkbox box), and a multiple-per-day checkbox. `keep.js`: `loadQuestSquires()` (wired into the Quests tab loader) populates the picker + `squiresById`; `syncQuestFields()` does progressive disclosure; submit builds the externally-tagged cadence/assignment JSON; `toDomainDate()` converts yyyy-mm-dd → `floor(unixDays)+3`; `questSummary()` labels the list. `keep.css`: inline checkbox rows + `[hidden]{display:none!important}` so the `hidden` attribute beats `label{display:block}`.
 
 ### Dependencies
-{Other tasks or systems this depends on}
+[[SQUIRE-T-0061]] (Quests tab). The domain already supports `Assignment`/`Cadence`/`Completion`/`repeatable_within_day` — no contract change.
 
 ### Risk Considerations
-{Technical risks and mitigation strategies}
+UserId serializes as a **string** in the members DTO but `Assignment::Squires` deserializes UserId from **numbers** — `.map(Number)` is required (verified: `["2"]` → 400, `[2]` → 200). Weekly needs ≥1 day and "specific" needs ≥1 active squire or the domain returns InvalidDefinition (400). Due-date day-count uses the current UTC convention; will shift with the local-tz clock in [[SQUIRE-T-0060]].
 
-## Status Updates **[REQUIRED]**
+## Status Updates
 
-*To be added during implementation*
+**2026-06-18 — Done.** Built the full quest authoring form in the Keep Quests tab and verified payloads against a throwaway live server. All cadence shapes (Daily / Weekly{days} / OneOff{due|null}) and assignment shapes (AllSquires / Squires[numbers]) validate (200); string squire ids correctly 400. Form renders verified via headless Chrome (Daily/Weekly/One-time states, progressive disclosure, rich list summaries). Fixed a `[hidden]` vs `label{display:block}` CSS bug. No contract change. Next: [[SQUIRE-T-0063]] starter library + import.

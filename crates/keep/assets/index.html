@@ -69,7 +69,43 @@
       <form id="quest-form">
         <label>Title <input name="title" required /></label>
         <label>Reward (points) <input name="reward" type="number" min="0" value="5" required /></label>
+        <label>Category (optional) <input name="category" placeholder="e.g. Bedroom" /></label>
+
+        <label>How often
+          <select name="cadence" id="quest-cadence">
+            <option value="Daily">Every day</option>
+            <option value="Weekly">Weekly — pick days</option>
+            <option value="OneOff">One-time</option>
+          </select>
+        </label>
+        <fieldset id="quest-weekly-fields" hidden>
+          <legend>Days</legend>
+          <label><input type="checkbox" name="wd" value="Mon" /> Mon</label>
+          <label><input type="checkbox" name="wd" value="Tue" /> Tue</label>
+          <label><input type="checkbox" name="wd" value="Wed" /> Wed</label>
+          <label><input type="checkbox" name="wd" value="Thu" /> Thu</label>
+          <label><input type="checkbox" name="wd" value="Fri" /> Fri</label>
+          <label><input type="checkbox" name="wd" value="Sat" /> Sat</label>
+          <label><input type="checkbox" name="wd" value="Sun" /> Sun</label>
+        </fieldset>
+        <label id="quest-due-label" hidden>Due date (optional) <input name="due" type="date" /></label>
+
+        <label>Completion
+          <select name="completion">
+            <option value="EachAssignee">Each assignee does their own</option>
+            <option value="Race">First to finish wins (one payout)</option>
+          </select>
+        </label>
+
+        <fieldset>
+          <legend>Assign to</legend>
+          <label><input type="radio" name="assign" value="all" checked /> All squires (incl. ones added later)</label>
+          <label><input type="radio" name="assign" value="some" /> Specific squires</label>
+          <div id="quest-squires" class="checks" hidden></div>
+        </fieldset>
+
         <label><input name="auto_approve" type="checkbox" /> Auto-approve (skip review)</label>
+        <label><input name="repeat_day" type="checkbox" /> Can be earned multiple times per day</label>
         <button type="submit">Add quest</button>
       </form>
       <p id="quest-error" class="error" hidden></p>
