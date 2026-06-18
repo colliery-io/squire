@@ -305,6 +305,62 @@
         ]
       }
     },
+    "/admin/squire/{id}/state": {
+      "get": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`GET /admin/squire/{id}/state` — the **\"assume Squire\"** read (SQUIRE-T-0053): a Knight fetches\nany Squire's full [`StateView`] (the same assembly `GET /state` gives that Squire), so the parent\ncan view + operate a child's home. Read-only — acting still goes through the Knight's privileged\ncommands (mark-done / redeem / adjust), so the audit/single-writer model is untouched. An id that\nisn't an active Squire is a 404.",
+        "operationId": "squire_state",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The Squire's user id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Squire's player state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "No such active Squire"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/claims": {
       "post": {
         "tags": [

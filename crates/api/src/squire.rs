@@ -201,7 +201,12 @@ pub(crate) fn domain_status(err: DomainError) -> StatusCode {
 
 /// Build the per-Squire [`StateView`] from one snapshot. All reads are pure projections over
 /// `snap`; `today`/`now` come from the clock.
-fn assemble_state(snap: &Snapshot, squire: UserId, today: Date, now: Timestamp) -> StateView {
+pub(crate) fn assemble_state(
+    snap: &Snapshot,
+    squire: UserId,
+    today: Date,
+    now: Timestamp,
+) -> StateView {
     let quests_today = quests_today(snap, squire, today);
     let balance = clamp_balance(Proj::balance(snap, squire));
     let streaks = streaks(snap, squire, today);

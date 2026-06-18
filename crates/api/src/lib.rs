@@ -60,6 +60,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/admin/adjust", post(knight::adjust))
         .route("/admin/mark-done", post(knight::mark_done))
         .route("/household-review", get(knight::household_review))
+        .route("/admin/squire/{id}/state", get(knight::squire_state))
         // App-update distribution (SQUIRE-T-0051): version manifest + APK download, unauthenticated.
         .route("/app/manifest", get(app_dist::manifest))
         .route("/app/{file}", get(app_dist::download))
