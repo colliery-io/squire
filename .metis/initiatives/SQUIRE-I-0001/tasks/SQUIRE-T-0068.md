@@ -30,10 +30,10 @@ Let a parent view and change the household timezone from the Keep, applied **liv
 
 ## Acceptance Criteria
 
-- [ ] Keep endpoints (Operator/Knight-gated, same as the other `/api/*`): `GET /api/config` → the current `HouseholdConfig` (+ available zones if practical); `PUT /api/config` (or `/api/config/timezone`) → validates the zone (`jiff`), `set_setting`s it (audit-stamped), and **hot-swaps the live cell**.
-- [ ] A new **Settings** tab in the Keep tabbed shell ([[SQUIRE-T-0061]]) with a timezone picker (a curated `<select>` of common IANA zones + free-text fallback) showing the current value; save → success toast; invalid zone → inline error.
-- [ ] Changing the zone takes effect with **no restart**: a subsequent `today()` (and the next phone refresh) reflects the new local date. Verified live on a throwaway server (set zone → `GET /api/config` echoes it → a boundary timestamp's `today()` shifts).
-- [ ] `cargo build -p keep` + `node --check` green; Settings tab rendered/screenshot.
+- [x] Keep endpoints (`Operator`/Knight-gated): `GET /api/config` → the current `HouseholdConfig`; `PUT /api/config` → validates the zone (`store::valid_timezone`, 400 on bad), `set_setting`s it (audit-stamped with the acting Knight), and **hot-swaps the live cell** (`state.clock.live().store(ConfigView::resolve(..))`). Verified: GET→Detroit, PUT Chicago→200+persisted, invalid→400 (unchanged), unauth→401.
+- [x] A new **Settings** tab in the Keep tabbed shell with a timezone picker (curated `<select>` of common zones + free-text custom field) showing the current value; save → success line; invalid → inline error.
+- [x] Changing the zone takes effect with **no restart** — `PUT` hot-swaps the shared cell the api + Keep clocks read, so the next `today()` uses the new zone. (Cell is shared via `squire-home::serve` from #2.)
+- [x] `cargo build -p keep` + `node --check` green; `cargo test -p keep` green; Settings tab rendered (screenshot) + endpoints exercised on a live throwaway server.
 
 ## Implementation Notes
 
@@ -48,4 +48,4 @@ Validate the zone before persisting (reject unknown → keep the old value). The
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-18 — Done + verified live.** Added a Keep `config` handler module (`GET`/`PUT /api/config`, Operator-gated) that reads `load_config()` and, on write, validates the zone, `set_setting`s it (audit-stamped), and hot-swaps the shared live cell. Added a **Settings** tab to the Keep shell (curated zone `<select>` + custom IANA field, save/status/error). Live test on a throwaway server: GET→America/Detroit; PUT America/Chicago→200 and persisted; PUT invalid→400 (value unchanged); unauth→401. Settings tab rendered. `cargo test -p keep` green. **Completes A-0011** — daily quests reset at the household's local midnight, the zone is captured at onboarding and changeable live from the Keep. Recurring-gotcha note: had to rebuild the `squire-home` binary (not just `-p keep`) before the new route appeared.

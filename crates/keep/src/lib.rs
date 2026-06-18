@@ -51,6 +51,7 @@ pub(crate) fn clock_from_store(store: &SharedStore) -> LocalClock {
 }
 
 pub mod achievements;
+pub mod config;
 pub mod inspector;
 pub mod items;
 pub mod members;
@@ -423,6 +424,8 @@ pub fn router(state: Arc<KeepState>) -> Router {
         // ── Read-only event-log inspector (SQUIRE-T-0030) ──────────────────────
         .route("/api/log/quest/{id}", get(inspector::quest_log))
         .route("/api/log/item/{id}", get(inspector::item_log))
+        // Household settings (ADR A-0011 / T-0068): read + change the timezone (applied live).
+        .route("/api/config", get(config::get_config).put(config::update_config))
         .with_state(state)
 }
 
