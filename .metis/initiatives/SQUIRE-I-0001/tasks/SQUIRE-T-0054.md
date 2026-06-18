@@ -3,15 +3,15 @@ id: merge-squire-knight-into-one-app
 level: task
 title: "Merge Squire + Knight into one app keyed by the paired role"
 short_code: "SQUIRE-T-0054"
-created_at: 2026-06-17T23:00:00.000000+00:00
-updated_at: 2026-06-17T23:00:00.000000+00:00
+created_at: 2026-06-17T23:00:00+00:00
+updated_at: 2026-06-18T01:08:39.841789+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -35,10 +35,14 @@ defence-in-depth) per an explicit product decision.
 
 ## Acceptance Criteria
 
-- [ ] One application module (`com.squire.app`) depending on `:core` + `:knight-core` + `:sdk` + `:pairing`; the `:knight-app` application module is removed from `settings.gradle.kts`/the build (its UI/transport/Room code folds into the merged app under a `knight` package).
-- [ ] `MainActivity` is session-gated then **role-routed**: no session → `PairingScreen`; session role `Squire` → the player home; role `Knight` → the review home. Each role's `…HomeHost` (transport + Room + auto-refresh + relocate + update-banner) is preserved.
-- [ ] Both Room DBs coexist (`squire.db` / `knight.db`), each used only by its role's store. Pairing, Forget, offline-first, auto-refresh, the update banner (T-0051; one manifest entry now), and relocation (T-0052) all work in the merged app for both roles.
-- [ ] One signed release APK builds (`assembleRelease`), installs, and: pairing as a Squire → child home; pairing as a Knight → review home. `:core`/`:knight-core`/`:sdk` tests green. The update manifest is reduced to a single app entry (`squire`).
+## Acceptance Criteria
+
+## Acceptance Criteria
+
+- [x] One application module `:app` (`com.squire.app`) depending on `:core` + `:knight-core` + `:sdk` + `:pairing`; `:knight-app` removed from `settings.gradle.kts` and deleted — its UI/transport/Room sources `git mv`'d into `:app` (kept under `com.squire.knight.app`), the Knight `MainActivity` stripped to an `internal KnightHomeHost` composable.
+- [x] `MainActivity` is session-gated then **role-routed**: no session → `PairingScreen`; `session.role == "Knight"` → `KnightHomeHost`; else → `PlayerHomeHost`. Each `…HomeHost` is now self-contained (builds its own Room db / json / ids) and keeps auto-refresh + relocate + update-banner.
+- [x] Both Room DBs coexist (`squire.db` / `knight.db`), each built only inside its role's host. Pairing/Forget/offline-first/auto-refresh/relocate preserved; the update banner now uses the single `"squire"` manifest key.
+- [x] One signed release APK builds (`:app:assembleRelease`, R8, `CN=Squire` VALID, ~1.9 MB) and `:core`/`:knight-core`/`:sdk` tests green. **Live (merged debug app, one APK)**: paired as **Knight (user 1)** → review home ("Knight — review"); Forget; paired as **Squire (user 2)** → child home ("Squire — 0 pts"). RUNBOOK updated to one app / one manifest entry.
 
 ## Implementation Notes
 
@@ -53,4 +57,6 @@ Big client refactor — keep `:core`/`:knight-core` pure (UNchanged). Package mo
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-18 — Done.** `git mv`'d `knight-app/src/main/kotlin/com/squire/knight` into `:app`; renamed the Knight `MainActivity.kt` → `KnightHomeHost.kt` and stripped it to an `internal @Composable KnightHomeHost(session, discovery, onSessionChanged, onForget)` that builds its own `knight.db`/json/ids (uses `com.squire.app.BuildConfig`, update key `"squire"`). Refactored the Squire `PlayerHomeHost` the same self-contained way. The merged `MainActivity` is tiny: session-gate → `when` on `session.role` ("Knight" → `KnightHomeHost`, else `PlayerHomeHost`). Added `implementation(project(":knight-core"))` to `:app`, removed `:knight-app` from settings + deleted the module. `:core`/`:knight-core` unchanged (pure).
+
+**Verified**: merged debug app builds; paired as Knight (user 1) → review home, Forget, paired as Squire (user 2) → child home — both from the **one** APK. Signed release builds (R8, valid signature). Cores + SDK green. Trust boundary now fully server-side (`RequireKnight`); the app routes UI by `session.role`. Demo bypass pairs as the Squire (user 2); pair manually as user 1 for the Knight UI. Unblocks the assume-Squire mode ([[SQUIRE-T-0055]]).

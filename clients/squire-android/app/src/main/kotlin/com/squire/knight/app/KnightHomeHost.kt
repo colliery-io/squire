@@ -2,13 +2,9 @@ package com.squire.knight.app
 
 import android.content.Intent
 import android.net.Uri
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,7 +17,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.squire.knight.BuildConfig
+import com.squire.app.BuildConfig
 import com.squire.knight.app.data.KnightApiAdapter
 import com.squire.knight.app.data.RoomPrivilegedOutbox
 import com.squire.knight.app.data.RoomReviewCache
@@ -31,17 +27,11 @@ import com.squire.knight.core.KnightStore
 import com.squire.knight.core.KnightSyncEngine
 import com.squire.knight.core.KnightUiState
 import com.squire.pairing.NsdDiscovery
-import com.squire.pairing.PairingScreen
 import com.squire.pairing.Session
-import com.squire.pairing.SessionStore
 import com.squire.pairing.UpdateBanner
 import com.squire.pairing.UpdateChecker
 import com.squire.pairing.UpdateInfo
-import com.squire.sdk.api.ControlApi
-import com.squire.sdk.model.LoginReq
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicLong
 
@@ -52,79 +42,23 @@ private const val AUTO_REFRESH_MS = 5_000L
 private const val RELOCATE_INTERVAL_MS = 15_000L
 
 /**
- * Compose host for the Knight (parent) review home.
- *
- * **Session-gated** (ADR SQUIRE-A-0010 / SQUIRE-T-0046): first run shows the pairing screen; once a
- * [Session] is stored (Keystore-encrypted) it builds the transport from that session's host +
- * Knight-role token and shows the review home. "Forget" clears the session. A debug-only demo
- * bypass logs in as the Knight (user 1) so the emulator flow stays one-tap; release always pairs.
+ * The Knight (parent) review home — the role-routed branch of the merged app (SQUIRE-T-0054), shown
+ * when the paired [Session] role is `Knight`. Self-contained: builds its own durable `knight.db`
+ * store from the session's host + Knight token, runs auto-refresh (T-0041), self-heals a stale
+ * address via mDNS (T-0052), and surfaces the update banner (T-0051). "Forget" clears the session.
  */
-class MainActivity : ComponentActivity() {
-
-    private val ids = AtomicLong(System.currentTimeMillis())
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        val sessionStore = SessionStore(this)
-        val discovery = NsdDiscovery(this)
-        val db = KnightDb.build(this)
-        val json = Json { ignoreUnknownKeys = true }
-
-        setContent {
-            MaterialTheme {
-                var session by remember { mutableStateOf(sessionStore.load()) }
-                val current = session
-                if (current == null) {
-                    PairingScreen(
-                        discovery = discovery,
-                        demoLogin = if (BuildConfig.DEBUG) ({ demoLogin() }) else null,
-                        onPaired = { s -> sessionStore.save(s); session = s },
-                    )
-                } else {
-                    KnightHomeHost(
-                        session = current,
-                        db = db,
-                        json = json,
-                        ids = ids,
-                        discovery = discovery,
-                        onSessionChanged = { s -> sessionStore.save(s); session = s },
-                        onForget = {
-                            sessionStore.clear()
-                            session = null
-                        },
-                    )
-                }
-            }
-        }
-    }
-
-    /** Debug-only bypass: log in with the demo Knight creds against `squire-home` → a [Session]. */
-    private suspend fun demoLogin(): Session = withContext(Dispatchers.IO) {
-        val control = ControlApi(basePath = "http://10.0.2.2:8080")
-        val resp = control.login(LoginReq(household = "demo", secret = "demo", user = 1L))
-        Session(
-            host = "10.0.2.2",
-            port = 8080,
-            household = "demo",
-            token = resp.token,
-            user = 1L,
-            role = resp.role.value,
-        )
-    }
-}
-
-/** Builds the offline-first [KnightStore] from a paired [Session] and hosts the review home. */
 @Composable
-private fun KnightHomeHost(
+internal fun KnightHomeHost(
     session: Session,
-    db: KnightDb,
-    json: Json,
-    ids: AtomicLong,
     discovery: NsdDiscovery,
     onSessionChanged: (Session) -> Unit,
     onForget: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val json = remember { Json { ignoreUnknownKeys = true } }
+    val db = remember { KnightDb.build(context) }
+    val ids = remember { AtomicLong(System.currentTimeMillis()) }
+
     val viewModel = remember(session) {
         val adapter = KnightApiAdapter(session.baseUrl, session.household, session.token)
         val outbox = RoomPrivilegedOutbox(db.outboxDao(), json)
@@ -141,7 +75,6 @@ private fun KnightHomeHost(
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val context = LocalContext.current
 
     LaunchedEffect(session) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -169,10 +102,10 @@ private fun KnightHomeHost(
         }
     }
 
-    // Server-distributed update check (SQUIRE-T-0051).
+    // Server-distributed update check (SQUIRE-T-0051): one app now, so the manifest key is "squire".
     var update by remember(session) { mutableStateOf<UpdateInfo?>(null) }
     LaunchedEffect(session) {
-        update = UpdateChecker.check(session.baseUrl, "knight", BuildConfig.VERSION_CODE)
+        update = UpdateChecker.check(session.baseUrl, "squire", BuildConfig.VERSION_CODE)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {

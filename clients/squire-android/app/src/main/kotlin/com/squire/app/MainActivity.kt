@@ -29,6 +29,7 @@ import com.squire.app.ui.PlayerHomeScreen
 import com.squire.core.PlayerStore
 import com.squire.core.PlayerUiState
 import com.squire.core.SyncEngine
+import com.squire.knight.app.KnightHomeHost
 import com.squire.pairing.NsdDiscovery
 import com.squire.pairing.PairingScreen
 import com.squire.pairing.Session
@@ -50,56 +51,60 @@ private const val AUTO_REFRESH_MS = 5_000L
 /** How often to attempt mDNS re-discovery while the server is unreachable (SQUIRE-T-0052). */
 private const val RELOCATE_INTERVAL_MS = 15_000L
 
+/** Wire role: the paired session's role that gets the Knight (parent) UI; everyone else is a Squire. */
+private const val ROLE_KNIGHT = "Knight"
+
 /**
- * Compose host for the Squire player home.
- *
- * The app is **session-gated** (ADR SQUIRE-A-0010 / SQUIRE-T-0046): on first run it shows the
- * pairing screen; once a [Session] is stored (Keystore-encrypted) it builds the transport from that
- * session's host + per-user token and shows the player home. "Forget" clears the session and
- * returns to pairing. A debug-only "Use demo creds" bypass keeps the emulator/`squire-home` flow
- * one-tap; release builds always pair.
+ * The single household app (SQUIRE-T-0054). It is **session-gated** then **role-routed**: on first
+ * run it pairs (ADR SQUIRE-A-0010); once a [Session] is stored, its **role** decides the UI — a
+ * Knight session gets the parent review home, anyone else the child player home. There is no
+ * separate "Knight app"; the trust boundary lives on the server (`RequireKnight` gates every
+ * privileged call), so a Squire-paired device simply never renders — and can't successfully call —
+ * the parent surface. "Forget" returns to pairing; a debug-only demo bypass keeps the emulator flow
+ * one-tap (release always pairs).
  */
 class MainActivity : ComponentActivity() {
-
-    private val ids = AtomicLong(System.currentTimeMillis())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val sessionStore = SessionStore(this)
         val discovery = NsdDiscovery(this)
-        val db = SquireDb.build(this)
-        val json = Json { ignoreUnknownKeys = true }
 
         setContent {
             MaterialTheme {
                 var session by remember { mutableStateOf(sessionStore.load()) }
                 val current = session
-                if (current == null) {
-                    PairingScreen(
+                val onSessionChanged: (Session) -> Unit = { s -> sessionStore.save(s); session = s }
+                val onForget: () -> Unit = { sessionStore.clear(); session = null }
+
+                when {
+                    current == null -> PairingScreen(
                         discovery = discovery,
                         demoLogin = if (BuildConfig.DEBUG) ({ demoLogin() }) else null,
-                        onPaired = { s -> sessionStore.save(s); session = s },
+                        onPaired = onSessionChanged,
                     )
-                } else {
-                    PlayerHomeHost(
+                    current.role == ROLE_KNIGHT -> KnightHomeHost(
                         session = current,
-                        db = db,
-                        json = json,
-                        ids = ids,
                         discovery = discovery,
-                        onSessionChanged = { s -> sessionStore.save(s); session = s },
-                        onForget = {
-                            sessionStore.clear()
-                            session = null
-                        },
+                        onSessionChanged = onSessionChanged,
+                        onForget = onForget,
+                    )
+                    else -> PlayerHomeHost(
+                        session = current,
+                        discovery = discovery,
+                        onSessionChanged = onSessionChanged,
+                        onForget = onForget,
                     )
                 }
             }
         }
     }
 
-    /** Debug-only bypass: log in with the demo creds against `squire-home` → a ready [Session]. */
+    /**
+     * Debug-only bypass: log in with the demo creds against `squire-home` → a ready [Session]. The
+     * demo pairs as the **Squire** (user 2); pair manually as user 1 to exercise the Knight UI.
+     */
     private suspend fun demoLogin(): Session = withContext(Dispatchers.IO) {
         val control = ControlApi(basePath = "http://10.0.2.2:8080")
         val resp = control.login(LoginReq(household = "demo", secret = "demo", user = 2L))
@@ -114,17 +119,23 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Builds the offline-first [PlayerStore] from a paired [Session] and hosts the player home. */
+/**
+ * The Squire (child) player home — the role-routed branch shown for a non-Knight session. Self-
+ * contained: builds its own durable `squire.db` store from the session, runs auto-refresh (T-0041),
+ * self-heals a stale address via mDNS (T-0052), and surfaces the update banner (T-0051).
+ */
 @Composable
-private fun PlayerHomeHost(
+internal fun PlayerHomeHost(
     session: Session,
-    db: SquireDb,
-    json: Json,
-    ids: AtomicLong,
     discovery: NsdDiscovery,
     onSessionChanged: (Session) -> Unit,
     onForget: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val json = remember { Json { ignoreUnknownKeys = true } }
+    val db = remember { SquireDb.build(context) }
+    val ids = remember { AtomicLong(System.currentTimeMillis()) }
+
     val viewModel = remember(session) {
         val adapter = SquireApiAdapter(session.baseUrl, session.household, session.token)
         val outbox = RoomOutbox(db.outboxDao(), json)
@@ -141,7 +152,6 @@ private fun PlayerHomeHost(
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val context = LocalContext.current
 
     // Foreground auto-refresh (SQUIRE-T-0041): sync on a cadence while visible; never throws.
     LaunchedEffect(session) {
@@ -153,10 +163,8 @@ private fun PlayerHomeHost(
         }
     }
 
-    // Self-heal a stale server address (SQUIRE-T-0052): while we can't reach the stored host (the
-    // view is from cache, or errored), best-effort re-discover the server over mDNS; if it now lives
-    // at a different host/port, update the session (keeping the token) so the adapter reconnects to
-    // the new address — no re-pairing. No-op while online; the actual relocate needs a real LAN.
+    // Self-heal a stale server address (SQUIRE-T-0052): while unreachable, re-discover over mDNS and
+    // update the session host/port (keeping the token) so the adapter reconnects. No-op while online.
     LaunchedEffect(session) {
         while (true) {
             val s = viewModel.state.value
@@ -165,15 +173,14 @@ private fun PlayerHomeHost(
                 val found = discovery.discover()
                 if (found != null && (found.first != session.host || found.second != session.port)) {
                     onSessionChanged(session.copy(host = found.first, port = found.second))
-                    break // session changes → this effect re-keys against the new address
+                    break
                 }
             }
             delay(RELOCATE_INTERVAL_MS)
         }
     }
 
-    // Server-distributed update check (SQUIRE-T-0051): once per session, surface a banner if the
-    // server advertises a newer build. "Get update" opens the APK download in the browser.
+    // Server-distributed update check (SQUIRE-T-0051).
     var update by remember(session) { mutableStateOf<UpdateInfo?>(null) }
     LaunchedEffect(session) {
         update = UpdateChecker.check(session.baseUrl, "squire", BuildConfig.VERSION_CODE)

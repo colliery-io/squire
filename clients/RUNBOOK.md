@@ -12,20 +12,19 @@ pair to it over your home Wi-Fi. Everything is LAN-only (no cloud).
 cargo build --release -p squire-home          # builds squire-serve (and the demo)
 ```
 
-**Build the signed phone apps** (needs the JDK/Android SDK — see `clients/android-env.sh`):
+**Build the signed app** (needs the JDK/Android SDK — see `clients/android-env.sh`). It's **one app**
+that shows the child or parent UI based on the role of whoever it's paired as:
 
 ```sh
 cd clients/squire-android
 source ../android-env.sh
-./gradlew :app:assembleRelease :knight-app:assembleRelease
-# Signed APKs:
-#   app/build/outputs/apk/release/app-release.apk          → the child's phone (Squire)
-#   knight-app/build/outputs/apk/release/knight-app-release.apk → the parent's phone (Knight)
+./gradlew :app:assembleRelease
+# Signed APK: app/build/outputs/apk/release/app-release.apk
 ```
 
-Sideload each APK onto the right phone (`adb install <apk>`, or copy + tap to install with
-"unknown sources" enabled). The Squire app goes on the child's phone, the Knight app on the
-parent's.
+Sideload the same APK onto every phone (`adb install <apk>`, or copy + tap to install with "unknown
+sources" enabled). Pair a child's phone as a Squire → it shows the child home; pair a parent's phone
+as a Knight → it shows the parent review home (and can assume any Squire).
 
 ## 1. Start the server
 
@@ -67,21 +66,17 @@ Repeat for each phone. "Forget" on a phone clears its pairing to re-pair.
 
 The server can offer app updates over the LAN so you don't have to re-sideload each phone by hand:
 
-1. Build new **signed** release APKs (bump `versionCode` in each app's `build.gradle.kts`, same
-   keystore — see `SQUIRE-T-0049`).
-2. Put the APKs + a `manifest.json` in a directory, and point the server at it with `SQUIRE_APK_DIR`:
+1. Build a new **signed** release APK (bump `versionCode` in `app/build.gradle.kts`, same keystore —
+   see `SQUIRE-T-0049`).
+2. Put the APK + a `manifest.json` in a directory, and point the server at it with `SQUIRE_APK_DIR`:
 
    ```
    <SQUIRE_APK_DIR>/
      squire.apk
-     knight.apk
      manifest.json
    ```
    ```json
-   {
-     "squire": { "versionCode": 2, "versionName": "0.2.0", "file": "squire.apk" },
-     "knight": { "versionCode": 2, "versionName": "0.2.0", "file": "knight.apk" }
-   }
+   { "squire": { "versionCode": 2, "versionName": "0.2.0", "file": "squire.apk" } }
    ```
 
    ```sh
