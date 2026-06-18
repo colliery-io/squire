@@ -69,6 +69,7 @@ fun KnightHomeScreen(
     onMarkDone: (squire: Long, questId: Long, on: Int) -> Unit,
     onForget: () -> Unit = {},
     onOpenSquire: (squire: Long, name: String) -> Unit = { _, _ -> },
+    onManageQuests: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -81,6 +82,10 @@ fun KnightHomeScreen(
                     actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
                 actions = {
+                    TextButton(
+                        onClick = onManageQuests,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
+                    ) { Text("Quests") }
                     TextButton(
                         onClick = onRefresh,
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),

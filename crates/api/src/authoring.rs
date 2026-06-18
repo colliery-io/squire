@@ -93,17 +93,17 @@ pub struct CreateQuestReq {
     /// Optional free-text grouping (e.g. "Bedroom").
     pub category: Option<String>,
     pub cadence: CadenceKind,
-    /// Days for a `Weekly` cadence (≥1 required for `Weekly`).
+    /// Days for a `Weekly` cadence (≥1 required for `Weekly`). `null`/absent ⇒ none.
     #[serde(default)]
-    pub weekdays: Vec<WeekdayDto>,
+    pub weekdays: Option<Vec<WeekdayDto>>,
     /// Optional due date (a `Date` day-count) for a `OneOff` cadence.
     pub due: Option<Date>,
     pub completion: CompletionDto,
     /// True = all squires (auto-includes ones added later); false = the explicit `squires` list.
     pub assign_all: bool,
-    /// Explicit assignees when `assign_all` is false (≥1 active Squire required).
+    /// Explicit assignees when `assign_all` is false (≥1 active Squire required). `null`/absent ⇒ none.
     #[serde(default)]
-    pub squires: Vec<u64>,
+    pub squires: Option<Vec<u64>>,
     pub repeatable_within_day: bool,
     pub auto_approve: bool,
 }
@@ -153,10 +153,12 @@ pub async fn create_quest(
     RequireKnight(principal): RequireKnight,
     Json(req): Json<CreateQuestReq>,
 ) -> Result<Json<CreatedQuest>, StatusCode> {
+    let weekdays = req.weekdays.unwrap_or_default();
+    let squires = req.squires.unwrap_or_default();
     let cadence = match req.cadence {
         CadenceKind::Daily => Cadence::Recurring(Schedule::Daily),
         CadenceKind::Weekly => {
-            let days: BTreeSet<Weekday> = req.weekdays.iter().map(|d| Weekday::from(*d)).collect();
+            let days: BTreeSet<Weekday> = weekdays.iter().map(|d| Weekday::from(*d)).collect();
             Cadence::Recurring(Schedule::Weekly { days })
         }
         CadenceKind::OneOff => Cadence::OneOff { due: req.due },
@@ -164,8 +166,7 @@ pub async fn create_quest(
     let assignment = if req.assign_all {
         Assignment::AllSquires
     } else {
-        let set: BTreeSet<_> = req
-            .squires
+        let set: BTreeSet<_> = squires
             .iter()
             .map(|u| domain_core::contract::UserId(u128::from(*u)))
             .collect();

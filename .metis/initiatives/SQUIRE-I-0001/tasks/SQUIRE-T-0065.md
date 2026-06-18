@@ -11,7 +11,7 @@ archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -20,117 +20,32 @@ initiative_id: SQUIRE-I-0001
 
 # Knight app: native Quests tab (create / assign / schedule / import)
 
-*This template includes sections for various types of tasks. Delete sections that don't apply to your specific use case.*
+## Parent Initiative
 
-## Parent Initiative **[CONDITIONAL: Assigned Task]**
+[[SQUIRE-I-0001]] · The UI half of "the Keep usable from the app for Knights" (native, per the user's choice). Consumes the [[SQUIRE-T-0064]] endpoints. **Closes the quest-creation initiative.**
 
-[[SQUIRE-I-0001]]
+## Objective
 
-## Objective **[REQUIRED]**
+A native **Manage Quests** screen in the Knight app: create quests (assign all/specific squires, daily/weekly/one-time + due, completion, multiple-per-day, auto-approve), import from a bundled starter library, and archive — all over the LAN api's `RequireKnight` `/admin/quests`.
 
-{Clear statement of what this task accomplishes}
+## Acceptance Criteria
 
-## Backlog Item Details **[CONDITIONAL: Backlog Item]**
+- [x] `QuestAdminScreen` (themed): a create form (title, reward, category, cadence chips Daily/Weekly/One-time + weekday chips + due-date picker, completion chips, All/Specific squires from the review, multiple-per-day + auto-approve toggles), a **starter library** (bundled `assets/library.json`) with one-tap Import, and a **Current quests** list with Archive.
+- [x] `KnightApiAdapter` gains `listQuests`/`createQuest`/`archiveQuest` (generated `KnightApi`). Wired into `KnightHomeHost` via a `managingQuests` state + a **"Quests"** action in the Round Table top bar; `BackHandler` returns to the review home (not exit). `:app` gains the kotlinx-serialization plugin (for the bundled library model).
+- [x] Verified live on the emulator (paired as Knight): screen renders; `listQuests` round-trips ("Current quests" shows the household quests with correct labels); **create succeeds end-to-end** (app POST → server quest created, confirmed in the list + server).
+- [x] **Bug found + fixed during integration:** the SDK sent explicit `"weekdays": null` / `"squires": null`, but the server's `#[serde(default)] Vec<…>` only tolerated *absent* fields → **422**. Changed `CreateQuestReq.weekdays`/`squires` to `Option<Vec<…>>` (handler `unwrap_or_default()`); regenerated `openapi.json` (conformance green) + SDK. Null case now 200.
 
-{Delete this section when task is assigned to an initiative}
-
-### Type
-- [ ] Bug - Production issue that needs fixing
-- [ ] Feature - New functionality or enhancement  
-- [ ] Tech Debt - Code improvement or refactoring
-- [ ] Chore - Maintenance or setup work
-
-### Priority
-- [ ] P0 - Critical (blocks users/revenue)
-- [ ] P1 - High (important for user experience)
-- [ ] P2 - Medium (nice to have)
-- [ ] P3 - Low (when time permits)
-
-### Impact Assessment **[CONDITIONAL: Bug]**
-- **Affected Users**: {Number/percentage of users affected}
-- **Reproduction Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected vs Actual**: {What should happen vs what happens}
-
-### Business Justification **[CONDITIONAL: Feature]**
-- **User Value**: {Why users need this}
-- **Business Value**: {Impact on metrics/revenue}
-- **Effort Estimate**: {Rough size - S/M/L/XL}
-
-### Technical Debt Impact **[CONDITIONAL: Tech Debt]**
-- **Current Problems**: {What's difficult/slow/buggy now}
-- **Benefits of Fixing**: {What improves after refactoring}
-- **Risk Assessment**: {Risks of not addressing this}
-
-## Acceptance Criteria **[REQUIRED]**
-
-- [ ] {Specific, testable requirement 1}
-- [ ] {Specific, testable requirement 2}
-- [ ] {Specific, testable requirement 3}
-
-## Test Cases **[CONDITIONAL: Testing Task]**
-
-{Delete unless this is a testing task}
-
-### Test Case 1: {Test Case Name}
-- **Test ID**: TC-001
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-### Test Case 2: {Test Case Name}
-- **Test ID**: TC-002
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-## Documentation Sections **[CONDITIONAL: Documentation Task]**
-
-{Delete unless this is a documentation task}
-
-### User Guide Content
-- **Feature Description**: {What this feature does and why it's useful}
-- **Prerequisites**: {What users need before using this feature}
-- **Step-by-Step Instructions**:
-  1. {Step 1 with screenshots/examples}
-  2. {Step 2 with screenshots/examples}
-  3. {Step 3 with screenshots/examples}
-
-### Troubleshooting Guide
-- **Common Issue 1**: {Problem description and solution}
-- **Common Issue 2**: {Problem description and solution}
-- **Error Messages**: {List of error messages and what they mean}
-
-### API Documentation **[CONDITIONAL: API Documentation]**
-- **Endpoint**: {API endpoint description}
-- **Parameters**: {Required and optional parameters}
-- **Example Request**: {Code example}
-- **Example Response**: {Expected response format}
-
-## Implementation Notes **[CONDITIONAL: Technical Task]**
-
-{Keep for technical tasks, delete for non-technical. Technical details, approach, or important considerations}
+## Implementation Notes
 
 ### Technical Approach
-{How this will be implemented}
+`app/.../knight/app/ui/QuestAdminScreen.kt` — Compose form with `FilterChip` selectors + a Material3 `DatePicker` (due → Monday-aligned day-count). `assets/library.json` bundled (copy of the Keep's); parsed with kotlinx-serialization (plugin added to `:app`). Assignment picker reuses `HouseholdReview.squires`. Reuses `SquireTheme`/`SquireUi`. Diagnosed the 422 via a temporary auto-create + `Log.e` (removed).
 
 ### Dependencies
-{Other tasks or systems this depends on}
+[[SQUIRE-T-0064]] (endpoints + SDK), [[SQUIRE-T-0056]] (theme). Frozen-contract regen.
 
 ### Risk Considerations
-{Technical risks and mitigation strategies}
+adb tap automation on Compose is unreliable (no stable hit targets) — verification leaned on the deterministic `listQuests` round-trip + a temporary on-open create. The 422 null-tolerance fix is the key correctness item. Optional follow-ups: in-app quest edit (id reuse already supported server-side), squire-token impersonation.
 
-## Status Updates **[REQUIRED]**
+## Status Updates
 
-*To be added during implementation*
+**2026-06-18 — Done + verified end-to-end.** Built the native Manage Quests screen (form + library import + list/archive), wired the adapter + a "Quests" top-bar action + BackHandler, added the serialization plugin + bundled library to `:app`. Live on the emulator: renders, `listQuests` round-trips, and **create works** (confirmed app→server). Found + fixed a real 422 (SDK sent explicit nulls for `weekdays`/`squires`; made them `Option<Vec>` server-side, regen openapi+SDK, conformance green). Completes the quest-creation initiative (Keep cycle + timezone + native phone authoring).

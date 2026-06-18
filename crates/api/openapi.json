@@ -1148,23 +1148,29 @@
             "format": "int64"
           },
           "squires": {
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "integer",
               "format": "int64",
               "minimum": 0
             },
-            "description": "Explicit assignees when `assign_all` is false (≥1 active Squire required)."
+            "description": "Explicit assignees when `assign_all` is false (≥1 active Squire required). `null`/absent ⇒ none."
           },
           "title": {
             "type": "string"
           },
           "weekdays": {
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "$ref": "#/components/schemas/WeekdayDto"
             },
-            "description": "Days for a `Weekly` cadence (≥1 required for `Weekly`)."
+            "description": "Days for a `Weekly` cadence (≥1 required for `Weekly`). `null`/absent ⇒ none."
           }
         }
       },
