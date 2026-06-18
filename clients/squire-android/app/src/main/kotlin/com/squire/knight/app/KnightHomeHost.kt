@@ -117,6 +117,8 @@ internal fun KnightHomeHost(
 
     // The Squire currently being "assumed" (id + display name), or null for the review home.
     var assumed by remember(session) { mutableStateOf<Pair<Long, String>?>(null) }
+    // Whether the native quest-authoring surface (SQUIRE-T-0065) is open.
+    var managingQuests by remember(session) { mutableStateOf(false) }
 
     val current = assumed
     if (current != null) {
@@ -127,6 +129,21 @@ internal fun KnightHomeHost(
             squireId = current.first,
             squireName = current.second,
             onBack = { assumed = null },
+        )
+        return
+    }
+
+    if (managingQuests) {
+        // The assignment picker reuses the squires already in the review.
+        val squires = (state as? KnightUiState.Ready)
+            ?.review
+            ?.squires
+            ?.map { it.squire to it.displayName }
+            ?: emptyList()
+        com.squire.knight.app.ui.QuestAdminScreen(
+            adapter = adapter,
+            squires = squires,
+            onBack = { managingQuests = false },
         )
         return
     }
@@ -146,6 +163,7 @@ internal fun KnightHomeHost(
                 onMarkDone = { squire, questId, on -> viewModel.markDone(squire, questId, on) },
                 onForget = onForget,
                 onOpenSquire = { id, name -> assumed = id to name },
+                onManageQuests = { managingQuests = true },
             )
         }
     }

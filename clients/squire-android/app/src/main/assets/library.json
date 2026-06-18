@@ -1,0 +1,28 @@
+{
+  "comment": "Squire starter quest library (SQUIRE-T-0063). Shipped with every household; parents import what fits and edit/archive freely. cadence is 'daily' or 'weekly' (+ days). reward is in points (★).",
+  "quests": [
+    { "category": "Bedroom",  "title": "Make your bed",        "reward": 5,  "cadence": "daily" },
+    { "category": "Bedroom",  "title": "Tidy your room",       "reward": 10, "cadence": "daily" },
+    { "category": "Bedroom",  "title": "Put away laundry",     "reward": 5,  "cadence": "weekly", "days": ["Sun"] },
+
+    { "category": "Kitchen",  "title": "Clear the table",      "reward": 5,  "cadence": "daily" },
+    { "category": "Kitchen",  "title": "Load the dishwasher",  "reward": 5,  "cadence": "daily" },
+    { "category": "Kitchen",  "title": "Wipe the counters",    "reward": 4,  "cadence": "daily" },
+
+    { "category": "Hygiene",  "title": "Brush teeth (morning)","reward": 2,  "cadence": "daily" },
+    { "category": "Hygiene",  "title": "Brush teeth (night)",  "reward": 2,  "cadence": "daily" },
+    { "category": "Hygiene",  "title": "Take a shower",        "reward": 3,  "cadence": "daily" },
+
+    { "category": "Homework", "title": "20 minutes reading",   "reward": 10, "cadence": "daily" },
+    { "category": "Homework", "title": "Finish homework",      "reward": 10, "cadence": "weekly", "days": ["Mon","Tue","Wed","Thu","Fri"] },
+    { "category": "Homework", "title": "Practice instrument",  "reward": 8,  "cadence": "daily" },
+
+    { "category": "Pets",     "title": "Feed the dog",         "reward": 5,  "cadence": "daily" },
+    { "category": "Pets",     "title": "Walk the dog",         "reward": 8,  "cadence": "daily" },
+    { "category": "Pets",     "title": "Clean the litter box", "reward": 6,  "cadence": "weekly", "days": ["Wed","Sat"] },
+
+    { "category": "Outdoor",  "title": "Take out the trash",   "reward": 5,  "cadence": "weekly", "days": ["Sun"] },
+    { "category": "Outdoor",  "title": "Water the plants",     "reward": 4,  "cadence": "weekly", "days": ["Mon","Thu"] },
+    { "category": "Outdoor",  "title": "Sweep the porch",      "reward": 5,  "cadence": "weekly", "days": ["Sat"] }
+  ]
+}

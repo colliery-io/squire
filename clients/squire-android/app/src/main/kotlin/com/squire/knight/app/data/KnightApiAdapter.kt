@@ -7,7 +7,10 @@ import com.squire.knight.core.SubmitResult
 import com.squire.sdk.api.KnightApi
 import com.squire.sdk.infrastructure.ClientException
 import com.squire.sdk.infrastructure.ServerException
+import com.squire.sdk.model.CreateQuestReq
+import com.squire.sdk.model.CreatedQuest
 import com.squire.sdk.model.HouseholdReview
+import com.squire.sdk.model.QuestSummaryDto
 import com.squire.sdk.model.StateView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -53,6 +56,22 @@ class KnightApiAdapter(
     /** The "assume Squire" read (SQUIRE-T-0053): a chosen Squire's full [StateView] (Knight-gated). */
     suspend fun squireState(squire: Long): StateView = withContext(Dispatchers.IO) {
         api.squireState(xHousehold = household, id = squire)
+    }
+
+    // ── Quest authoring from the phone (SQUIRE-T-0064/0065) ──────────────────────────────────────
+    /** Every quest (active + archived) as flat summaries with server-computed labels. */
+    suspend fun listQuests(): List<QuestSummaryDto> = withContext(Dispatchers.IO) {
+        api.listQuests(xHousehold = household)
+    }
+
+    /** Create or edit a quest; returns the (new or kept) id. */
+    suspend fun createQuest(req: CreateQuestReq): CreatedQuest = withContext(Dispatchers.IO) {
+        api.createQuest(xHousehold = household, createQuestReq = req)
+    }
+
+    /** Archive a quest (never deletes). */
+    suspend fun archiveQuest(id: Long) = withContext(Dispatchers.IO) {
+        api.archiveQuest(xHousehold = household, id = id)
     }
 
     override suspend fun submit(command: KnightCommand): SubmitResult = withContext(Dispatchers.IO) {
