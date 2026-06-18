@@ -44,6 +44,7 @@ import com.squire.sdk.model.ClaimStatus
 import com.squire.sdk.model.LockReasonKind
 import com.squire.sdk.model.QuestCard
 import com.squire.sdk.model.QuestStatus
+import com.squire.sdk.model.RedemptionStateKind
 import com.squire.sdk.model.RedemptionStatus
 import com.squire.sdk.model.RewardCard
 import com.squire.sdk.model.StateView
@@ -160,9 +161,9 @@ private fun ReadyContent(
         item { Spacer(Modifier.height(2.dp)) }
         item { SectionTitle("Rewards") }
         if (view.rewards.isEmpty()) {
-            item { EmptyHint("No rewards yet.") }
+            item { EmptyHint("No rewards in the shop yet — ask a grown-up! 🛒") }
         } else {
-            items(view.rewards, key = { "i" + it.itemId }) { RewardCardRow(it, onRedeem) }
+            items(view.rewards, key = { "i" + it.itemId }) { RewardCardRow(it, view.balance, onRedeem) }
         }
 
         // Earned achievements — the payoff, distinct from in-progress streaks (SQUIRE-T-0079).
@@ -180,9 +181,9 @@ private fun ReadyContent(
         }
 
         item { Spacer(Modifier.height(2.dp)) }
-        item { SectionTitle("Recent") }
+        item { SectionTitle("Recent activity") }
         if (view.myClaims.isEmpty() && view.myRequests.isEmpty()) {
-            item { EmptyHint("Nothing yet — go finish a quest!") }
+            item { EmptyHint("Nothing yet — go finish a quest! 💪") }
         } else {
             items(view.myClaims, key = { "c" + it.claimId }) { ClaimRow(it) }
             items(view.myRequests, key = { "r" + it.requestId }) { RequestRow(it) }
@@ -233,7 +234,7 @@ private fun QuestCardRow(quest: QuestCard, onMarkDone: (Long) -> Unit) {
 }
 
 @Composable
-private fun RewardCardRow(reward: RewardCard, onRedeem: (Long) -> Unit) {
+private fun RewardCardRow(reward: RewardCard, balance: Int, onRedeem: (Long) -> Unit) {
     QuestCard {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(reward.icon ?: "🎁", modifier = Modifier.padding(end = 12.dp))
@@ -262,7 +263,8 @@ private fun RewardCardRow(reward: RewardCard, onRedeem: (Long) -> Unit) {
                 }
                 reward.affordable -> Button(onClick = { onRedeem(reward.itemId) }) { Text("Redeem") }
                 else -> StatusChip(
-                    "Need more ★",
+                    // Show how close the child is, not a flat "Need more ★".
+                    "${(reward.cost - balance).coerceAtLeast(1)} more ★",
                     MaterialTheme.colorScheme.surfaceVariant,
                     MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -313,29 +315,55 @@ private fun StreakCardRow(streak: StreakView) {
 @Composable
 private fun ClaimRow(claim: ClaimStatus) {
     val st = claim.state
-    val label = when (st.state) {
-        ClaimStateKind.Pending -> "⏳ Pending"
-        ClaimStateKind.Approved -> "✓ Approved" + (st.points?.let { " (+$it ★)" } ?: "")
-        ClaimStateKind.Rejected -> "✗ Rejected" + (st.reason?.let { ": $it" } ?: "")
+    when (st.state) {
+        ClaimStateKind.Approved -> RecentCard(
+            claim.questTitle, null, "✓ +${st.points ?: 0} ★",
+            MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer,
+        )
+        ClaimStateKind.Rejected -> RecentCard(
+            claim.questTitle, st.reason, "✗ Rejected",
+            MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer,
+        )
+        ClaimStateKind.Pending -> RecentCard(
+            claim.questTitle, null, "⏳ Pending",
+            MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer,
+        )
     }
-    RecentRow(claim.questTitle, label)
 }
 
 @Composable
 private fun RequestRow(request: RedemptionStatus) {
     val st = request.state
-    val label = "${request.cost} ★ · " + st.state.value + (st.reason?.let { ": $it" } ?: "")
-    RecentRow(request.itemName, label)
+    val cost = "${request.cost} ★"
+    when (st.state) {
+        RedemptionStateKind.Approved -> RecentCard(
+            request.itemName, null, "✓ Redeemed · $cost",
+            MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer,
+        )
+        RedemptionStateKind.Rejected -> RecentCard(
+            request.itemName, st.reason, "✗ Rejected · $cost",
+            MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer,
+        )
+        RedemptionStateKind.Pending -> RecentCard(
+            request.itemName, null, "⏳ Pending · $cost",
+            MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+    }
 }
 
+/** One activity row: the quest/reward name (+ an optional reason subtitle) and a semantic status chip. */
 @Composable
-private fun RecentRow(title: String, label: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(title, modifier = Modifier.weight(1f))
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun RecentCard(title: String, subtitle: String?, chipText: String, container: androidx.compose.ui.graphics.Color, content: androidx.compose.ui.graphics.Color) {
+    QuestCard {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                if (subtitle != null) {
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            StatusChip(chipText, container, content)
+        }
     }
 }
 
