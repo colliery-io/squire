@@ -121,6 +121,8 @@ internal fun KnightHomeHost(
     var managingQuests by remember(session) { mutableStateOf(false) }
     // Whether the native achievement-authoring surface (SQUIRE-T-0072) is open.
     var managingAchievements by remember(session) { mutableStateOf(false) }
+    // Whether the native reward-authoring surface (SQUIRE-T-0074) is open.
+    var managingRewards by remember(session) { mutableStateOf(false) }
 
     val current = assumed
     if (current != null) {
@@ -158,6 +160,14 @@ internal fun KnightHomeHost(
         return
     }
 
+    if (managingRewards) {
+        com.squire.knight.app.ui.RewardAdminScreen(
+            adapter = adapter,
+            onBack = { managingRewards = false },
+        )
+        return
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         update?.let { info -> UpdateBanner(info) }
         Box(modifier = Modifier.weight(1f)) {
@@ -175,6 +185,7 @@ internal fun KnightHomeHost(
                 onOpenSquire = { id, name -> assumed = id to name },
                 onManageQuests = { managingQuests = true },
                 onManageAchievements = { managingAchievements = true },
+                onManageRewards = { managingRewards = true },
             )
         }
     }

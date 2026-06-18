@@ -15,8 +15,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use domain_core::contract::{
-    Achievement, AchievementId, Assignment, Cadence, Category, Clock, Command, Completion,
-    Criterion, Date, Quest, QuestId, Repository, Schedule, Scope, Snapshot, StreakBasis, Weekday,
+    Achievement, AchievementId, Assignment, Availability, Cadence, Category, Clock, Command,
+    Completion, Criterion, Date, ItemId, Quest, QuestId, RedeemableItem, Repository, Schedule,
+    Scope, Snapshot, StreakBasis, Weekday,
 };
 
 use crate::auth::RequireKnight;
@@ -505,5 +506,187 @@ fn achievement_summary(snap: &Snapshot, c: &Criterion) -> String {
         Criterion::PointsEarned { total } => format!("{total} points"),
         Criterion::TotalCompletions { scope, count } => format!("{count} completions · {}", scope_label(scope)),
         Criterion::Streak { scope, length, .. } => format!("{length}-day streak · {}", scope_label(scope)),
+    }
+}
+
+// ─── Reward (item) authoring (SQUIRE-T-0074) ─────────────────────────────────────────────────────
+// The redemption catalog, authored from the parent phone. `RedeemableItem`'s fields are flat already,
+// but `Availability` is an enum, so the wire uses a flat `AvailabilityKind` discriminant (matching the
+// quest/achievement pattern). An optional `gate` requires an achievement to be unlocked first; the
+// engine's `validate_item` rejects a gate to a missing achievement (404 via `domain_status`).
+
+/// Reward availability on the wire (flat): `Repeatable` (a recurring privilege) or `Once` (a one-time
+/// treat, out of stock household-wide after the first redemption).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum AvailabilityKind {
+    Once,
+    Repeatable,
+}
+
+impl From<AvailabilityKind> for Availability {
+    fn from(a: AvailabilityKind) -> Self {
+        match a {
+            AvailabilityKind::Once => Availability::Once,
+            AvailabilityKind::Repeatable => Availability::Repeatable,
+        }
+    }
+}
+
+impl From<Availability> for AvailabilityKind {
+    fn from(a: Availability) -> Self {
+        match a {
+            Availability::Once => AvailabilityKind::Once,
+            Availability::Repeatable => AvailabilityKind::Repeatable,
+        }
+    }
+}
+
+/// `POST /admin/items` request — a flat reward definition authored from the phone.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct CreateItemReq {
+    /// Existing id to edit (upsert), or null/absent to create (the server assigns).
+    pub id: Option<ItemId>,
+    pub name: String,
+    /// Optional flavor text shown to the child.
+    pub description: Option<String>,
+    /// Cost in points (clamped ≥ 0; the phone form enforces ≥ 1).
+    pub cost: i64,
+    pub availability: AvailabilityKind,
+    /// Optional achievement that must be unlocked before this reward can be redeemed.
+    pub gate: Option<AchievementId>,
+    /// Optional display icon (emoji).
+    pub icon: Option<String>,
+}
+
+/// The id of a created / edited reward, echoed back.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct CreatedItem {
+    pub id: ItemId,
+}
+
+/// A reward in the authoring list — flat, with a server-computed availability/gate summary.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ItemSummaryDto {
+    pub id: ItemId,
+    pub name: String,
+    pub cost: i64,
+    /// e.g. "Repeatable", "Once", "Once · needs: Saver".
+    pub summary: String,
+    pub active: bool,
+}
+
+/// `POST /admin/items` (RequireKnight) — create or edit a reward. A gate to a missing achievement
+/// is a 404.
+#[utoipa::path(
+    post,
+    path = "/admin/items",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant")),
+    request_body = CreateItemReq,
+    responses(
+        (status = 200, description = "The created/edited reward id", body = CreatedItem),
+        (status = 400, description = "Invalid reward definition"),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "Gate achievement not found"),
+    ),
+)]
+pub async fn create_item(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(principal): RequireKnight,
+    Json(req): Json<CreateItemReq>,
+) -> Result<Json<CreatedItem>, StatusCode> {
+    let id = req.id.unwrap_or_else(|| ItemId(state.clock.now().0 as u128));
+    let item = RedeemableItem {
+        id,
+        name: req.name,
+        description: req.description.filter(|d| !d.is_empty()),
+        cost: req.cost.max(0) as u32,
+        gate: req.gate,
+        availability: req.availability.into(),
+        active: true,
+        icon: req.icon.filter(|s| !s.is_empty()),
+    };
+    handle_command(&state, Some(principal.user), Command::DefineItem(item)).map_err(domain_status)?;
+    Ok(Json(CreatedItem { id }))
+}
+
+/// `GET /admin/items` (RequireKnight) — every reward (active + archived) as flat summaries.
+#[utoipa::path(
+    get,
+    path = "/admin/items",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant")),
+    responses(
+        (status = 200, description = "All rewards, flat", body = [ItemSummaryDto]),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+    ),
+)]
+pub async fn list_items(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(_principal): RequireKnight,
+) -> Json<Vec<ItemSummaryDto>> {
+    let snap = state.store.lock().expect("store mutex poisoned").snapshot();
+    let rows = snap
+        .items
+        .iter()
+        .map(|i| ItemSummaryDto {
+            id: i.id,
+            name: i.name.clone(),
+            cost: i.cost as i64,
+            summary: item_summary(&snap, i),
+            active: i.active,
+        })
+        .collect();
+    Json(rows)
+}
+
+/// `POST /admin/items/{id}/archive` (RequireKnight) — archive (never delete). 404 if absent.
+#[utoipa::path(
+    post,
+    path = "/admin/items/{id}/archive",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+        ("id" = i64, Path, description = "Reward id"),
+    ),
+    responses(
+        (status = 204, description = "Archived"),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "Reward not found"),
+    ),
+)]
+pub async fn archive_item(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(principal): RequireKnight,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, StatusCode> {
+    let iid = ItemId(u128::from(id));
+    handle_command(&state, Some(principal.user), Command::ArchiveItem(iid)).map_err(domain_status)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// A short human summary of a reward's availability + gate (mirrors the Keep's list label).
+fn item_summary(snap: &Snapshot, item: &RedeemableItem) -> String {
+    let avail = match item.availability {
+        Availability::Once => "Once",
+        Availability::Repeatable => "Repeatable",
+    };
+    match item.gate {
+        Some(aid) => {
+            let name = snap
+                .achievements
+                .iter()
+                .find(|a| a.id == aid)
+                .map(|a| a.name.clone())
+                .unwrap_or_else(|| format!("#{}", aid.0));
+            format!("{avail} · needs: {name}")
+        }
+        None => avail.to_string(),
     }
 }

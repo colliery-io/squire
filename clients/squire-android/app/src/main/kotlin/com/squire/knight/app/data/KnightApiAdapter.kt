@@ -9,10 +9,13 @@ import com.squire.sdk.infrastructure.ClientException
 import com.squire.sdk.infrastructure.ServerException
 import com.squire.sdk.model.AchievementSummaryDto
 import com.squire.sdk.model.CreateAchievementReq
+import com.squire.sdk.model.CreateItemReq
 import com.squire.sdk.model.CreateQuestReq
 import com.squire.sdk.model.CreatedAchievement
+import com.squire.sdk.model.CreatedItem
 import com.squire.sdk.model.CreatedQuest
 import com.squire.sdk.model.HouseholdReview
+import com.squire.sdk.model.ItemSummaryDto
 import com.squire.sdk.model.QuestSummaryDto
 import com.squire.sdk.model.StateView
 import kotlinx.coroutines.Dispatchers
@@ -91,6 +94,22 @@ class KnightApiAdapter(
     /** Archive an achievement (never deletes). */
     suspend fun archiveAchievement(id: Long) = withContext(Dispatchers.IO) {
         api.archiveAchievement(xHousehold = household, id = id)
+    }
+
+    // ── Reward (item) authoring from the phone (SQUIRE-T-0074) ───────────────────────────────────
+    /** Every reward as a flat summary (server-computed availability/gate label). */
+    suspend fun listItems(): List<ItemSummaryDto> = withContext(Dispatchers.IO) {
+        api.listItems(xHousehold = household)
+    }
+
+    /** Create or edit a reward; returns the (new or kept) id. */
+    suspend fun createItem(req: CreateItemReq): CreatedItem = withContext(Dispatchers.IO) {
+        api.createItem(xHousehold = household, createItemReq = req)
+    }
+
+    /** Archive a reward (never deletes). */
+    suspend fun archiveItem(id: Long) = withContext(Dispatchers.IO) {
+        api.archiveItem(xHousehold = household, id = id)
     }
 
     override suspend fun submit(command: KnightCommand): SubmitResult = withContext(Dispatchers.IO) {
