@@ -1,0 +1,16 @@
+{
+  "comment": "Squire starter REWARD library (SQUIRE-T-0073). Common household rewards a parent can one-tap import, then edit/archive. cost is in points (★). availability: Repeatable (a recurring privilege) | Once (a one-time treat, out of stock household-wide after the first redemption). description is optional flavor text shown to the child.",
+  "rewards": [
+    { "name": "Extra screen time",      "cost": 10,  "availability": "Repeatable", "description": "30 extra minutes of games or shows." },
+    { "name": "Dessert of choice",      "cost": 8,   "availability": "Repeatable", "description": "Pick tonight's dessert." },
+    { "name": "Choose tonight's dinner","cost": 15,  "availability": "Repeatable", "description": "You decide what the family eats." },
+    { "name": "Stay up 30 min late",    "cost": 20,  "availability": "Repeatable", "description": "A later bedtime, just for tonight." },
+    { "name": "Movie night pick",       "cost": 25,  "availability": "Repeatable", "description": "Choose the family movie." },
+    { "name": "Skip one chore",         "cost": 30,  "availability": "Repeatable", "description": "A one-time pass on a single chore." },
+    { "name": "Weekly allowance ($5)",  "cost": 50,  "availability": "Repeatable", "description": "Trade points for five real dollars." },
+
+    { "name": "Friend sleepover",       "cost": 60,  "availability": "Once",       "description": "Invite a friend to stay over." },
+    { "name": "New book or small toy",  "cost": 80,  "availability": "Once",       "description": "A trip to pick something new." },
+    { "name": "Family day-trip pick",   "cost": 100, "availability": "Once",       "description": "Choose the next outing — zoo, park, or museum." }
+  ]
+}
