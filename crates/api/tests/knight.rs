@@ -498,3 +498,92 @@ async fn a_squire_token_cannot_author_items() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
+
+// ─── Member administration from the phone (SQUIRE-T-0075) ────────────────────────────────────────
+
+/// `GET /admin/members` lists the seeded Knight + two Squires with role + active flags.
+#[tokio::test]
+async fn list_members_returns_seeded_household() {
+    let (state, _dir, _today) = test_state();
+    let resp = router(state)
+        .oneshot(req("GET", "/admin/members", Some(KNIGHT_TOKEN), None))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let rows: serde_json::Value = json_body(resp).await;
+    let arr = rows.as_array().unwrap();
+    assert_eq!(arr.len(), 3, "Knight + two Squires");
+    let knight = arr.iter().find(|m| m["user"] == KNIGHT_ID as i64).unwrap();
+    assert_eq!(knight["role"], "Knight");
+    assert_eq!(knight["active"], true);
+    assert!(arr.iter().filter(|m| m["role"] == "Squire").count() == 2);
+}
+
+/// Deactivating a Squire flips its active flag in the list; reactivating restores it.
+#[tokio::test]
+async fn set_member_active_toggles_then_lists() {
+    let (state, _dir, _today) = test_state();
+    let off = serde_json::json!({ "active": false }).to_string();
+    let resp = router(state.clone())
+        .oneshot(req("POST", &format!("/admin/members/{SQUIRE_A_ID}/active"), Some(KNIGHT_TOKEN), Some(off)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+
+    let resp = router(state.clone())
+        .oneshot(req("GET", "/admin/members", Some(KNIGHT_TOKEN), None))
+        .await
+        .unwrap();
+    let rows: serde_json::Value = json_body(resp).await;
+    let sq = rows.as_array().unwrap().iter().find(|m| m["user"] == SQUIRE_A_ID as i64).unwrap().clone();
+    assert_eq!(sq["active"], false, "deactivated");
+
+    let on = serde_json::json!({ "active": true }).to_string();
+    let resp = router(state)
+        .oneshot(req("POST", &format!("/admin/members/{SQUIRE_A_ID}/active"), Some(KNIGHT_TOKEN), Some(on)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+}
+
+/// Setting active on a missing member is a 404.
+#[tokio::test]
+async fn set_member_active_missing_is_404() {
+    let (state, _dir, _today) = test_state();
+    let body = serde_json::json!({ "active": false }).to_string();
+    let resp = router(state)
+        .oneshot(req("POST", "/admin/members/999999/active", Some(KNIGHT_TOKEN), Some(body)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+/// A Knight cannot deactivate their own account (no self-lockout) → 400.
+#[tokio::test]
+async fn a_knight_cannot_deactivate_self() {
+    let (state, _dir, _today) = test_state();
+    let body = serde_json::json!({ "active": false }).to_string();
+    let resp = router(state)
+        .oneshot(req("POST", &format!("/admin/members/{KNIGHT_ID}/active"), Some(KNIGHT_TOKEN), Some(body)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+/// A Squire token cannot read or change members (trust boundary — 403 on each).
+#[tokio::test]
+async fn a_squire_token_cannot_administer_members() {
+    let (state, _dir, _today) = test_state();
+    let resp = router(state.clone())
+        .oneshot(req("GET", "/admin/members", Some(SQUIRE_TOKEN), None))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    let body = serde_json::json!({ "active": false }).to_string();
+    let resp = router(state)
+        .oneshot(req("POST", &format!("/admin/members/{SQUIRE_B_ID}/active"), Some(SQUIRE_TOKEN), Some(body)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}

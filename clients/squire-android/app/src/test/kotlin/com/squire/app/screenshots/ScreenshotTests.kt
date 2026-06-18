@@ -12,12 +12,15 @@ import com.squire.knight.app.ui.KnightHomeScreen
 import com.squire.knight.app.ui.LibraryAch
 import com.squire.knight.app.ui.LibraryQuest
 import com.squire.knight.app.ui.LibraryReward
+import com.squire.knight.app.ui.MemberAdminScreen
 import com.squire.knight.app.ui.QuestAdminScreen
 import com.squire.knight.app.ui.RewardAdminScreen
 import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.AchievementSummaryDto
 import com.squire.sdk.model.CompletionDto
 import com.squire.sdk.model.ItemSummaryDto
+import com.squire.sdk.model.MemberSummaryDto
+import com.squire.sdk.model.Role
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.ItemOption
 import com.squire.sdk.model.PendingClaim
@@ -180,6 +183,30 @@ class ScreenshotTests {
                     initialItems = items,
                     libraryOverride = library,
                     gateOverride = gates,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun knightManageMembers() {
+        // A dummy adapter (no network — `initialMembers` is injected so the live fetch is skipped).
+        val adapter = KnightApiAdapter(baseUrl = "http://localhost", household = "demo", token = "t")
+        val members = listOf(
+            MemberSummaryDto(active = true, displayName = "Arthur", role = Role.Knight, user = 1),
+            MemberSummaryDto(active = true, displayName = "Gawain", role = Role.Squire, user = 2),
+            MemberSummaryDto(active = false, displayName = "Percival", role = Role.Squire, user = 3),
+        )
+        paparazzi.snapshot {
+            SquireTheme {
+                MemberAdminScreen(
+                    adapter = adapter,
+                    selfUser = 1,
+                    host = "10.0.0.227",
+                    port = 8088,
+                    household = "demo",
+                    onBack = {},
+                    initialMembers = members,
                 )
             }
         }

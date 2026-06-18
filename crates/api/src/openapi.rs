@@ -80,6 +80,9 @@ impl Modify for SecurityAddon {
         crate::authoring::create_item,
         crate::authoring::list_items,
         crate::authoring::archive_item,
+        // Knight member administration (SQUIRE-T-0075)
+        crate::authoring::list_members,
+        crate::authoring::set_member_active,
     ),
     components(schemas(
         // ── Squire state view + nested ──
@@ -158,6 +161,9 @@ impl Modify for SecurityAddon {
         crate::authoring::CreatedItem,
         crate::authoring::ItemSummaryDto,
         crate::authoring::AvailabilityKind,
+        // ── Knight member-admin DTOs (SQUIRE-T-0075) ──
+        crate::authoring::MemberSummaryDto,
+        crate::authoring::SetActiveReq,
     )),
     modifiers(&SecurityAddon),
     tags(

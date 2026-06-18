@@ -15,9 +15,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use domain_core::contract::{
-    Achievement, AchievementId, Assignment, Availability, Cadence, Category, Clock, Command,
-    Completion, Criterion, Date, ItemId, Quest, QuestId, RedeemableItem, Repository, Schedule,
-    Scope, Snapshot, StreakBasis, Weekday,
+    Achievement, AchievementId, Assignment, Availability, Cadence, Category, Change, Clock, Command,
+    Completion, Criterion, Date, ItemId, Quest, QuestId, RedeemableItem, Repository, Role, Schedule,
+    Scope, Snapshot, StreakBasis, UserId, Weekday,
 };
 
 use crate::auth::RequireKnight;
@@ -689,4 +689,99 @@ fn item_summary(snap: &Snapshot, item: &RedeemableItem) -> String {
         }
         None => avail.to_string(),
     }
+}
+
+// ─── Member administration (SQUIRE-T-0075) ───────────────────────────────────────────────────────
+// The phone can already *add* a member (`POST /members`) and *mint* a pairing code (`POST /pair/codes`)
+// via the control-plane (both RequireKnight). These two endpoints fill the gap: a Knight-gated member
+// **list** and **de/reactivate** (mirroring the Keep's `members.rs`). Set-active applies a raw
+// `Change::SetUserActive` (members are identity-owned, not engine-commanded), audited to the caller.
+
+/// A household member in the authoring list — flat (id as an i64 wire number, role as a plain string).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct MemberSummaryDto {
+    pub user: UserId,
+    pub display_name: String,
+    pub role: Role,
+    pub active: bool,
+}
+
+/// `POST /admin/members/{id}/active` body.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct SetActiveReq {
+    pub active: bool,
+}
+
+/// `GET /admin/members` (RequireKnight) — every household member (Knights + Squires) with role and
+/// active flag.
+#[utoipa::path(
+    get,
+    path = "/admin/members",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant")),
+    responses(
+        (status = 200, description = "All members, flat", body = [MemberSummaryDto]),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+    ),
+)]
+pub async fn list_members(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(_principal): RequireKnight,
+) -> Json<Vec<MemberSummaryDto>> {
+    let snap = state.store.lock().expect("store mutex poisoned").snapshot();
+    let rows = snap
+        .users
+        .iter()
+        .map(|u| MemberSummaryDto {
+            user: u.id,
+            display_name: u.display_name.clone(),
+            role: u.role,
+            active: u.active,
+        })
+        .collect();
+    Json(rows)
+}
+
+/// `POST /admin/members/{id}/active` (RequireKnight) — de/reactivate a member via `SetUserActive`
+/// (archive-not-delete), audited to the acting Knight. A missing member is a 404; a Knight cannot
+/// deactivate **their own** account (no self-lockout) → 400.
+#[utoipa::path(
+    post,
+    path = "/admin/members/{id}/active",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+        ("id" = i64, Path, description = "Member user id"),
+    ),
+    request_body = SetActiveReq,
+    responses(
+        (status = 204, description = "Updated"),
+        (status = 400, description = "A Knight may not deactivate their own account"),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "Member not found"),
+    ),
+)]
+pub async fn set_member_active(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(principal): RequireKnight,
+    Path(id): Path<u64>,
+    Json(req): Json<SetActiveReq>,
+) -> Result<StatusCode, StatusCode> {
+    let uid = UserId(u128::from(id));
+    // No self-lockout: a Knight can't deactivate the account they're acting as.
+    if uid == principal.user && !req.active {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let mut store = state.store.lock().expect("store mutex poisoned");
+    if !store.snapshot().users.iter().any(|u| u.id == uid) {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    store
+        .apply(Some(principal.user), &[Change::SetUserActive(uid, req.active)])
+        .expect("apply: single-writer store write failed");
+    Ok(StatusCode::NO_CONTENT)
 }

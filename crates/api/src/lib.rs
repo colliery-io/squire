@@ -71,6 +71,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         // Knight reward (item) authoring from the phone (SQUIRE-T-0074).
         .route("/admin/items", get(authoring::list_items).post(authoring::create_item))
         .route("/admin/items/{id}/archive", post(authoring::archive_item))
+        // Knight member administration from the phone (SQUIRE-T-0075): list + de/reactivate. (Add +
+        // mint-pair-code already live on the control-plane /members and /pair/codes, both Knight-gated.)
+        .route("/admin/members", get(authoring::list_members))
+        .route("/admin/members/{id}/active", post(authoring::set_member_active))
         // App-update distribution (SQUIRE-T-0051): version manifest + APK download, unauthenticated.
         .route("/app/manifest", get(app_dist::manifest))
         .route("/app/{file}", get(app_dist::download))
