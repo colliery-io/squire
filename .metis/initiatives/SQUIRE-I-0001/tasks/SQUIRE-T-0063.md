@@ -11,7 +11,7 @@ archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -20,117 +20,31 @@ initiative_id: SQUIRE-I-0001
 
 # Starter quest library + one-tap import
 
-*This template includes sections for various types of tasks. Delete sections that don't apply to your specific use case.*
+## Parent Initiative
 
-## Parent Initiative **[CONDITIONAL: Assigned Task]**
+[[SQUIRE-I-0001]] · User: "We should ship a common set of quests (library) that all tenants can import from." Closes the Keep quest-creation cycle ([[SQUIRE-T-0061]]/[[SQUIRE-T-0062]]).
 
-[[SQUIRE-I-0001]]
+## Objective
 
-## Objective **[REQUIRED]**
+Ship a curated, categorized starter quest library with the Keep, and a one-tap **Import** in the Quests tab that creates the chosen quest for all squires (parents then edit/archive). The library is a shipped asset every household gets.
 
-{Clear statement of what this task accomplishes}
+## Acceptance Criteria
 
-## Backlog Item Details **[CONDITIONAL: Backlog Item]**
+- [x] `assets/library.json` — a categorized set (Bedroom, Kitchen, Hygiene, Homework, Pets, Outdoor; ~3 each) with title, reward (★), and cadence (`daily` or `weekly`+days). Served at `/static/library.json` (embedded; `json` MIME already mapped).
+- [x] Quests tab gains a collapsible **"📚 Add from the starter library"** section listing entries grouped by category, each with an **Import** button. Import → POST a quest (AllSquires, EachAssignee, cadence from the entry) → button becomes "Imported ✓" and the quest list refreshes. Monotonic `freshId()` avoids same-millisecond id collisions on rapid imports.
+- [x] Verified on a live server: `/static/library.json` served + valid; daily and weekly library imports → 200. Rendered via the real login→`enterShell`→`loadLibrary` path (mocked fetch) — categories + Import buttons display. `node --check` + `cargo build -p keep` green.
 
-{Delete this section when task is assigned to an initiative}
-
-### Type
-- [ ] Bug - Production issue that needs fixing
-- [ ] Feature - New functionality or enhancement  
-- [ ] Tech Debt - Code improvement or refactoring
-- [ ] Chore - Maintenance or setup work
-
-### Priority
-- [ ] P0 - Critical (blocks users/revenue)
-- [ ] P1 - High (important for user experience)
-- [ ] P2 - Medium (nice to have)
-- [ ] P3 - Low (when time permits)
-
-### Impact Assessment **[CONDITIONAL: Bug]**
-- **Affected Users**: {Number/percentage of users affected}
-- **Reproduction Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected vs Actual**: {What should happen vs what happens}
-
-### Business Justification **[CONDITIONAL: Feature]**
-- **User Value**: {Why users need this}
-- **Business Value**: {Impact on metrics/revenue}
-- **Effort Estimate**: {Rough size - S/M/L/XL}
-
-### Technical Debt Impact **[CONDITIONAL: Tech Debt]**
-- **Current Problems**: {What's difficult/slow/buggy now}
-- **Benefits of Fixing**: {What improves after refactoring}
-- **Risk Assessment**: {Risks of not addressing this}
-
-## Acceptance Criteria **[REQUIRED]**
-
-- [ ] {Specific, testable requirement 1}
-- [ ] {Specific, testable requirement 2}
-- [ ] {Specific, testable requirement 3}
-
-## Test Cases **[CONDITIONAL: Testing Task]**
-
-{Delete unless this is a testing task}
-
-### Test Case 1: {Test Case Name}
-- **Test ID**: TC-001
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-  3. {Step 3}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-### Test Case 2: {Test Case Name}
-- **Test ID**: TC-002
-- **Preconditions**: {What must be true before testing}
-- **Steps**: 
-  1. {Step 1}
-  2. {Step 2}
-- **Expected Results**: {What should happen}
-- **Actual Results**: {To be filled during execution}
-- **Status**: {Pass/Fail/Blocked}
-
-## Documentation Sections **[CONDITIONAL: Documentation Task]**
-
-{Delete unless this is a documentation task}
-
-### User Guide Content
-- **Feature Description**: {What this feature does and why it's useful}
-- **Prerequisites**: {What users need before using this feature}
-- **Step-by-Step Instructions**:
-  1. {Step 1 with screenshots/examples}
-  2. {Step 2 with screenshots/examples}
-  3. {Step 3 with screenshots/examples}
-
-### Troubleshooting Guide
-- **Common Issue 1**: {Problem description and solution}
-- **Common Issue 2**: {Problem description and solution}
-- **Error Messages**: {List of error messages and what they mean}
-
-### API Documentation **[CONDITIONAL: API Documentation]**
-- **Endpoint**: {API endpoint description}
-- **Parameters**: {Required and optional parameters}
-- **Example Request**: {Code example}
-- **Example Response**: {Expected response format}
-
-## Implementation Notes **[CONDITIONAL: Technical Task]**
-
-{Keep for technical tasks, delete for non-technical. Technical details, approach, or important considerations}
+## Implementation Notes
 
 ### Technical Approach
-{How this will be implemented}
+`assets/library.json` ({comment, quests:[{category,title,reward,cadence,days?}]}). `keep.js`: `loadLibrary()` (called once from `enterShell`) fetches it, groups by category, renders rows + Import buttons; Import builds the same quest payload as the form (cadence `daily`→`{Recurring:"Daily"}`, `weekly`→`{Recurring:{Weekly:{days}}}`), POSTs, marks imported, refreshes. `index.html`: a `<details id="library">` in the Quests panel. Reuses T-0062's verified payload shape.
 
 ### Dependencies
-{Other tasks or systems this depends on}
+[[SQUIRE-T-0062]] (quest payload shape + Quests tab). Static asset pipeline (rust-embed `/static/{*path}`).
 
 ### Risk Considerations
-{Technical risks and mitigation strategies}
+Library is plain data — parents own their quests after import (edit/archive). Import uses AllSquires/daily defaults to stay safe; weekly entries carry their days. Same-ms id collisions avoided via `freshId()`. No contract change.
 
-## Status Updates **[REQUIRED]**
+## Status Updates
 
-*To be added during implementation*
+**2026-06-18 — Done.** Shipped `assets/library.json` (18 chores across 6 categories) + a collapsible library section in the Quests tab with per-quest Import. Verified against a live throwaway server: asset served at `/static/library.json` (valid JSON), daily + weekly imports → 200, and the section renders correctly through the real `loadLibrary` path. Closes the Keep quest-creation cycle (tabs + authoring + library). Next: deploy the refreshed Keep to the live server, then [[SQUIRE-T-0060]] (local-midnight timezone) before the native phone tasks.
