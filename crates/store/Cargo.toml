@@ -13,6 +13,11 @@ libsqlite3-sys = { version = "0.30", features = ["bundled"] }
 # Backend-portable serialized dump (per-tenant export/import — SQUIRE-T-0012).
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Household-config (ADR SQUIRE-A-0011): timezone-aware local-midnight clock. `jiff` provides the
+# IANA tz database + DST-correct civil-date conversion. `arc-swap` backs the hot, lock-free config
+# cell (`Arc<ArcSwap<ConfigView>>`).
+jiff = "0.2"
+arc-swap = "1"
 
 [features]
 default = []

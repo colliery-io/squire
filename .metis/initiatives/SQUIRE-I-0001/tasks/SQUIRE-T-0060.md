@@ -1,17 +1,17 @@
 ---
-id: household-timezone-onboarding
+id: a-0011-1-config-kv-store
 level: task
 title: "A-0011 #1 — config KV store + HouseholdConfig + ArcSwap cell + LocalClock"
 short_code: "SQUIRE-T-0060"
 created_at: 2026-06-18T11:35:15.846742+00:00
-updated_at: 2026-06-18T12:14:00.000000+00:00
+updated_at: 2026-06-18T12:51:05.559291+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -30,10 +30,12 @@ Build the storage + runtime + clock layer for household configuration, **additiv
 
 ## Acceptance Criteria
 
-- [ ] **Migration** `config(key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_by TEXT, updated_at BIGINT NOT NULL)` (new dir; PK is the lookup index) + `down.sql`. `schema.rs` table def added; existing-DB open still runs clean.
-- [ ] **`domain_core::HouseholdConfig { timezone: String }`** (serde-gated, `Default` → `"UTC"`). **`store`**: `get_setting(key)`, `set_setting(key, value, by)` (upsert, audit-stamped via `now()`), `load_config() -> HouseholdConfig` (assembles from known keys, defaults absent).
-- [ ] **Hot cell**: `ConfigView { config: HouseholdConfig, tz: jiff::tz::TimeZone }` + `LiveConfig = Arc<ArcSwap<ConfigView>>`; a resolver parsing the zone with **UTC fallback** on an unknown string (no panic). Pure `date_in_zone(millis, &tz) -> Date` (Monday-aligned day-count) factored out + unit-tested (a 23:00 PST instant resolves to the PST calendar day, not the UTC next-day).
-- [ ] **`LocalClock { live: LiveConfig }`** impl `Clock`: `now()` = system millis (unchanged); `today()` = `date_in_zone(now, &live.load().tz)` (lock-free). `SystemClock`/`FixedClock` untouched; `cargo test -p store` + `-p domain-core` green; new deps `jiff` + `arc-swap` added to `store`.
+## Acceptance Criteria
+
+- [x] **Migration** `config(key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_by TEXT, updated_at BIGINT NOT NULL)` (`2026-06-18-000000_household_config`) + `down.sql`. `schema.rs` table def added; workspace builds (existing-DB open runs the migration on open).
+- [x] **`domain_core::HouseholdConfig { timezone: String }`** (serde+openapi-gated, `Default` → `"UTC"`) + `config_keys::TIMEZONE`. **`store`**: `get_setting`, `set_setting(key, value, by)` (upsert via `run_upsert!`, audit-stamped from `clock.now()`), `load_config() -> HouseholdConfig`.
+- [x] **Hot cell**: `ConfigView { config, tz: jiff::tz::TimeZone }` + `LiveConfig = Arc<ArcSwap<ConfigView>>` + `live_config()`; resolver with **UTC fallback** on a bad zone (tested). Pure `date_in_zone(millis, &tz)` (Hinnant `days_from_civil` + Monday offset) — tested: 07:30 UTC resolves to the LA day one behind, and UTC agrees exactly with the legacy `date_from_unix_millis`.
+- [x] **`LocalClock { live }`** impl `Clock`: `now()` = shared `now_millis()`; `today()` = `date_in_zone(now, &live.load().tz)` (lock-free). `SystemClock`/`FixedClock` untouched. `cargo test -p store -p domain-core` green (3 new settings tests pass); `jiff` + `arc-swap` added. (Module named `settings` to avoid colliding with the `config` schema table.)
 
 ## Implementation Notes
 
@@ -48,4 +50,4 @@ New migration under `crates/store/migrations/`. `domain-core/src/contract/` gets
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-18 — Done.** Built the household-config foundation per [[SQUIRE-A-0011]], additively (no caller rewire — that's #2). `domain-core`: `HouseholdConfig` + `config_keys`. `store`: `config` KV migration + schema; `get_setting`/`set_setting`/`load_config`; a `settings` module with `ConfigView`/`LiveConfig`/`live_config`/`date_in_zone` (pure Hinnant day-count) and `LocalClock` over `Arc<ArcSwap<ConfigView>>`; refactored `now_millis()` shared by `SystemClock` + `LocalClock`. Deps `jiff` (tz/civil-date) + `arc-swap`. **Gotcha:** the runtime module had to be named `settings` because `config` collided with the Diesel `config` table module. 3 new tests green (LA-vs-UTC midnight; UTC≡legacy; bad-zone→UTC fallback); `cargo build --workspace` + `cargo test -p store -p domain-core` green. Next: [[SQUIRE-T-0066]] (#2) wires `LocalClock` + the shared cell through `Store`/`AppState`/`KeepState`/`squire-serve`.
