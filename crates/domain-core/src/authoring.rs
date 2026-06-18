@@ -82,8 +82,16 @@ fn validate_item(snap: &Snapshot, item: &RedeemableItem) -> Result<(), DomainErr
 
 fn validate_achievement(snap: &Snapshot, a: &Achievement) -> Result<(), DomainError> {
     let scope_ok = |scope: &Scope| -> Result<(), DomainError> {
-        if let Scope::Quest(qid) = scope {
-            find_quest(snap, *qid).ok_or(DomainError::QuestNotFound)?;
+        match scope {
+            // A Quest scope must name an existing quest.
+            Scope::Quest(qid) => {
+                find_quest(snap, *qid).ok_or(DomainError::QuestNotFound)?;
+            }
+            // A Category scope must be a non-blank label (an empty category matches nothing useful).
+            Scope::Category(c) if c.0.trim().is_empty() => {
+                return Err(DomainError::InvalidDefinition);
+            }
+            _ => {}
         }
         Ok(())
     };
