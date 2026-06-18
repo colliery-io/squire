@@ -18,6 +18,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.squire.app.BuildConfig
+import com.squire.app.ui.PlayerHomeScreen
+import com.squire.core.PlayerUiState
 import com.squire.knight.app.data.KnightApiAdapter
 import com.squire.knight.app.data.RoomPrivilegedOutbox
 import com.squire.knight.app.data.RoomReviewCache
@@ -46,6 +48,10 @@ private const val RELOCATE_INTERVAL_MS = 15_000L
  * when the paired [Session] role is `Knight`. Self-contained: builds its own durable `knight.db`
  * store from the session's host + Knight token, runs auto-refresh (T-0041), self-heals a stale
  * address via mDNS (T-0052), and surfaces the update banner (T-0051). "Forget" clears the session.
+ *
+ * A Knight can also **assume any Squire** (SQUIRE-T-0055): "Open" on a Squire drops into that
+ * Squire's player home; acting there goes through the Knight's privileged commands (audited as the
+ * Knight, no impersonation token).
  */
 @Composable
 internal fun KnightHomeHost(
@@ -59,8 +65,11 @@ internal fun KnightHomeHost(
     val db = remember { KnightDb.build(context) }
     val ids = remember { AtomicLong(System.currentTimeMillis()) }
 
+    // Hoisted so both the review store and the "assume Squire" read use the same Knight-token transport.
+    val adapter = remember(session) {
+        KnightApiAdapter(session.baseUrl, session.household, session.token)
+    }
     val viewModel = remember(session) {
-        val adapter = KnightApiAdapter(session.baseUrl, session.household, session.token)
         val outbox = RoomPrivilegedOutbox(db.outboxDao(), json)
         val store = KnightStore(
             fetcher = adapter,
@@ -108,6 +117,22 @@ internal fun KnightHomeHost(
         update = UpdateChecker.check(session.baseUrl, "squire", BuildConfig.VERSION_CODE)
     }
 
+    // The Squire currently being "assumed" (id + display name), or null for the review home.
+    var assumed by remember(session) { mutableStateOf<Pair<Long, String>?>(null) }
+
+    val current = assumed
+    if (current != null) {
+        AssumedSquireHome(
+            adapter = adapter,
+            viewModel = viewModel,
+            lifecycle = lifecycle,
+            squireId = current.first,
+            squireName = current.second,
+            onBack = { assumed = null },
+        )
+        return
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         update?.let { info ->
             UpdateBanner(info) {
@@ -126,7 +151,65 @@ internal fun KnightHomeHost(
                 onRedeem = { squire, itemId -> viewModel.redeem(squire, itemId) },
                 onMarkDone = { squire, questId, on -> viewModel.markDone(squire, questId, on) },
                 onForget = onForget,
+                onOpenSquire = { id, name -> assumed = id to name },
             )
         }
     }
+}
+
+/**
+ * "Acting as <Squire>" — a Knight operating a chosen Squire's player home (SQUIRE-T-0055). The view
+ * is the child [PlayerHomeScreen] fed by the Knight-gated `GET /admin/squire/{id}/state` (T-0053);
+ * its actions route through the Knight's privileged commands (mark-done / redeem **for** the Squire),
+ * so they are audited as the Knight. Refetches after an action and on the auto-refresh cadence.
+ */
+@Composable
+private fun AssumedSquireHome(
+    adapter: KnightApiAdapter,
+    viewModel: KnightViewModel,
+    lifecycle: Lifecycle,
+    squireId: Long,
+    squireName: String,
+    onBack: () -> Unit,
+) {
+    var view by remember(squireId) { mutableStateOf<PlayerUiState>(PlayerUiState.Loading) }
+    var tick by remember(squireId) { mutableStateOf(0) }
+
+    // Fetch the assumed Squire's state on entry, after each action, and on the refresh cadence.
+    LaunchedEffect(squireId, tick) {
+        view = try {
+            PlayerUiState.Ready(adapter.squireState(squireId), fromCache = false)
+        } catch (e: Exception) {
+            PlayerUiState.Error("Couldn't load $squireName's home — is the computer reachable?")
+        }
+    }
+    LaunchedEffect(squireId) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                delay(AUTO_REFRESH_MS)
+                tick++
+            }
+        }
+    }
+
+    PlayerHomeScreen(
+        state = view,
+        onRefresh = { tick++ },
+        onMarkDone = { questId ->
+            val on = (view as? PlayerUiState.Ready)
+                ?.view
+                ?.questsToday
+                ?.firstOrNull { it.questId == questId }
+                ?.on
+                ?: 0
+            viewModel.markDone(squireId, questId, on)
+            tick++
+        },
+        onRedeem = { itemId ->
+            viewModel.redeem(squireId, itemId)
+            tick++
+        },
+        headerLabel = "Acting as $squireName",
+        onBack = onBack,
+    )
 }

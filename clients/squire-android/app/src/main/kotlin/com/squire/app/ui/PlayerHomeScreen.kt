@@ -52,20 +52,28 @@ fun PlayerHomeScreen(
     onMarkDone: (questId: Long) -> Unit,
     onRedeem: (itemId: Long) -> Unit,
     onForget: () -> Unit = {},
+    headerLabel: String? = null,
+    onBack: (() -> Unit)? = null,
 ) {
     val balance = (state as? PlayerUiState.Ready)?.view?.balance
+    val name = headerLabel ?: "Squire"
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        if (balance != null) "Squire — $balance pts" else "Squire",
+                        if (balance != null) "$name — $balance pts" else name,
                         fontWeight = FontWeight.Bold,
                     )
                 },
                 actions = {
                     TextButton(onClick = onRefresh) { Text("Refresh") }
-                    TextButton(onClick = onForget) { Text("Forget") }
+                    // In "assume Squire" mode (onBack set) the action is Back, not Forget.
+                    if (onBack != null) {
+                        TextButton(onClick = onBack) { Text("Back") }
+                    } else {
+                        TextButton(onClick = onForget) { Text("Forget") }
+                    }
                 },
             )
         },

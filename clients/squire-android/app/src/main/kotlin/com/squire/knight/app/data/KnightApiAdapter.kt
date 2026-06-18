@@ -8,6 +8,7 @@ import com.squire.sdk.api.KnightApi
 import com.squire.sdk.infrastructure.ClientException
 import com.squire.sdk.infrastructure.ServerException
 import com.squire.sdk.model.HouseholdReview
+import com.squire.sdk.model.StateView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
@@ -47,6 +48,11 @@ class KnightApiAdapter(
 
     override suspend fun fetch(): HouseholdReview = withContext(Dispatchers.IO) {
         api.householdReview(xHousehold = household)
+    }
+
+    /** The "assume Squire" read (SQUIRE-T-0053): a chosen Squire's full [StateView] (Knight-gated). */
+    suspend fun squireState(squire: Long): StateView = withContext(Dispatchers.IO) {
+        api.squireState(xHousehold = household, id = squire)
     }
 
     override suspend fun submit(command: KnightCommand): SubmitResult = withContext(Dispatchers.IO) {

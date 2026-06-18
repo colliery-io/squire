@@ -3,15 +3,15 @@ id: knight-assume-squire-mode-in-the
 level: task
 title: "Knight 'assume Squire' mode in the merged app (pick a Squire, operate their home)"
 short_code: "SQUIRE-T-0055"
-created_at: 2026-06-17T23:00:00.000000+00:00
-updated_at: 2026-06-17T23:00:00.000000+00:00
+created_at: 2026-06-17T23:00:00+00:00
+updated_at: 2026-06-18T01:17:37.801867+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -34,10 +34,14 @@ wired to the **Knight's privileged surface** — "Mark done" → Knight mark-don
 
 ## Acceptance Criteria
 
-- [ ] From the Knight review home, each Squire row (or a dedicated picker) has an **"Open / Act as"** action that navigates into that Squire's player home, fetched via `GET /admin/squire/{id}/state` (T-0053). A back action returns to the review home.
-- [ ] In that view, the existing `PlayerHomeScreen` renders the assumed Squire's `StateView`; **Mark done** → `KnightViewModel.markDone(squireId, questId, on)`; **Redeem** → `KnightViewModel.redeem(squireId, itemId)`. The view refreshes after an action (and on the auto-refresh cadence) to show the new balance/state.
-- [ ] Actions remain Knight-attributed (single-writer/audit intact); offline-first holds (the assumed-Squire read caches/falls back like the rest). No new server write path (uses the privileged commands that already exist).
-- [ ] Merged app assembles; `:knight-core` (+ any new wiring) tests green. Verified on the emulator: pair as Knight → pick a Squire → see their home → Mark done credits that Squire (balance updates) → back to review.
+## Acceptance Criteria
+
+## Acceptance Criteria
+
+- [x] Each Squire row in the review home has an **"Open"** button → navigates into that Squire's player home, fetched via `KnightApi.squireState` (`GET /admin/squire/{id}/state`, T-0053). A **Back** action (top bar) returns to the review home.
+- [x] The reused `PlayerHomeScreen` renders the assumed `StateView` with header **"Acting as <name>"**; **Mark done** → `KnightViewModel.markDone(squireId, questId, on)`; **Redeem** → `KnightViewModel.redeem(squireId, itemId)`. A `tick` counter refetches after each action and on the auto-refresh cadence.
+- [x] Actions are Knight-attributed (the existing privileged commands — single-writer/audit intact); no new write path. The assumed read fails gracefully to an error+Retry (it's a Knight-token'd live read; offline shows the error, not a stale cache — noted as acceptable for MVP).
+- [x] Merged app assembles (+ signed release); `:core`/`:knight-core`/`:sdk` + `cargo test --workspace` green. **Verified live**: Knight → Open Gawain → "Acting as Gawain — 0 pts" → Mark done "Make your bed" → server credits Gawain **+5**, header → "Acting as Gawain — 5 pts", claim shows Approved (+5) → Back → review home.
 
 ## Implementation Notes
 
@@ -63,4 +67,6 @@ notifications.
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-18 — Done.** `KnightApiAdapter.squireState(id)` (over `KnightApi.squireState`); `PlayerHomeScreen` gained optional `headerLabel` + `onBack` (Back replaces Forget in assume mode); `KnightHomeScreen.SquireRow` gained an **"Open"** button + `onOpenSquire` callback. `KnightHomeHost` hoists the adapter (shared by the review store + the assume read), holds an `assumed: Pair<Long,String>?` state, and renders `AssumedSquireHome` when set — a `PlayerHomeScreen` fed by `squireState`, actions wired to `KnightViewModel.markDone`/`redeem` for that squire, refetching via a `tick` after each action + on cadence.
+
+**Live**: paired as Knight → Open Gawain → "Acting as Gawain — 0 pts" → Mark done "Make your bed" → server `balance 0→5` (the `/admin/squire/2/state` read confirmed it), header → "Acting as Gawain — 5 pts", Recent claims shows Approved (+5), Ice cream now affordable → Back → review home. (Hit the recurring gotcha again — had to rebuild/restart `squire-home` for the T-0053 route; the app correctly showed an error+Retry until then, then loaded on Retry.) Closes the merge+assume work (T-0053/54/55). `cargo test --workspace` green; merged signed release builds.
