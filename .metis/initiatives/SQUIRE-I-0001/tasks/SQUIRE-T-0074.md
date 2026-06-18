@@ -4,14 +4,14 @@ level: task
 title: "Rewards authoring on the phone (LAN endpoints + native Manage Rewards + library)"
 short_code: "SQUIRE-T-0074"
 created_at: 2026-06-18T18:15:36.113290+00:00
-updated_at: 2026-06-18T18:15:36.113290+00:00
+updated_at: 2026-06-18T18:27:40.355729+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -46,15 +46,16 @@ Complete the authoring trio on the native phone app: after Quests (T-0065) and A
 
 ## Acceptance Criteria
 
-- [ ] LAN api exposes `RequireKnight` `/admin/items` (GET list / POST create) and `/admin/items/{id}/archive` (POST), using the flat-DTO pattern (`AvailabilityKind` + `CreateItemReq` + `ItemSummaryDto`) with `Option<_>` request fields (no 422 on explicit nulls).
-- [ ] Engine gate validation flows through `domain_status` (gate→unknown achievement = 400).
-- [ ] `openapi.json` regenerated; conformance tests pass; SDK regenerated.
-- [ ] `KnightApiAdapter` gains `listItems` / `createItem` / `archiveItem`.
-- [ ] Native `RewardAdminScreen` (Compose): name, cost, availability (Once / Repeatable) chips, gate picker (None + achievements), icon, bonus-free; starter-library import rows; catalog list with Archive. Reuses `ChoiceChip`/`SectionTitle`.
-- [ ] Reachable from `KnightHomeScreen` overflow ⋮ menu ("Manage rewards"); wired through `KnightHomeHost`.
-- [ ] Bundled `rewards-library.json` in `app/src/main/assets/`.
-- [ ] Paparazzi snapshot (`knightManageRewards`) renders the screen for image validation.
-- [ ] App builds (`:app:assembleDebug`).
+- [x] LAN api exposes `RequireKnight` `/admin/items` (GET list / POST create) and `/admin/items/{id}/archive` (POST), using the flat-DTO pattern (`AvailabilityKind` + `CreateItemReq` + `ItemSummaryDto`) with `Option<_>` request fields (no 422 on explicit nulls).
+- [x] Engine gate validation flows through `domain_status` (gate→unknown achievement = **404** `AchievementNotFound`; the define-first draft said 400 — the engine maps it to NotFound, matching the Keep).
+- [x] `openapi.json` regenerated; conformance tests pass; SDK regenerated.
+- [x] `KnightApiAdapter` gains `listItems` / `createItem` / `archiveItem`.
+- [x] Native `RewardAdminScreen` (Compose): name, description, cost, availability (Repeatable / Once) chips, gate picker (None + achievements as chips), icon; starter-library import rows; catalog list with Archive. Reuses `ChoiceChip`/`SectionTitle`.
+- [x] Reachable from `KnightHomeScreen` overflow ⋮ menu ("Manage rewards"); wired through `KnightHomeHost`.
+- [x] Bundled `rewards-library.json` in `app/src/main/assets/`.
+- [x] Paparazzi snapshot (`knightManageRewards`) renders the screen for image validation.
+- [x] App builds (`:app:assembleDebug` SUCCESSFUL).
+- [x] api integration tests in `crates/api/tests/knight.rs` cover the explicit-null create, gate-404, archive + missing-404, and Squire-403 boundary (15 pass).
 
 ## Implementation Notes
 
@@ -68,4 +69,11 @@ Complete the authoring trio on the native phone app: after Quests (T-0065) and A
 
 ## Status Updates
 
-*To be added during implementation.*
+**2026-06-18 — Done.**
+- api (`crates/api/src/authoring.rs`): appended the items section — `AvailabilityKind` flat enum (+`From` both ways), `CreateItemReq` (all-`Option` optionals), `CreatedItem`, `ItemSummaryDto` with server-computed `summary` ("Repeatable" / "Once · needs: <gate>"). Handler rebuilds `RedeemableItem` → `Command::DefineItem` / `ArchiveItem` via `domain_status`. Routes in `lib.rs`; paths+schemas in `openapi.rs`.
+- `cargo build -p api` SUCCESS; `openapi.json` regenerated; conformance (2) PASS.
+- **api integration tests** (`tests/knight.rs`, +4): explicit-null create → 200 (the T-0065 422 guard), gate→missing = 404, archive 204 + missing 404, Squire token = 403. `cargo test -p api --test knight` → 15 pass.
+- SDK regenerated (`AvailabilityKind`, `CreateItemReq`, `CreatedItem`, `ItemSummaryDto`; `KnightApi.{listItems,createItem,archiveItem}`).
+- Android: `KnightApiAdapter` item methods; `RewardAdminScreen.kt` (reuses `ChoiceChip`/`SectionTitle`, gate chips from `listAchievements()`); overflow "Manage rewards"; `KnightHomeHost` `managingRewards`. Bundled `rewards-library.json`. `:app:assembleDebug` SUCCESSFUL.
+- Paparazzi `knightManageRewards` recorded — image-validated (form, availability+gate chips, library import rows).
+- Validated via api oneshot tests + Paparazzi (no live curl / squire-home rebuild needed this pass).

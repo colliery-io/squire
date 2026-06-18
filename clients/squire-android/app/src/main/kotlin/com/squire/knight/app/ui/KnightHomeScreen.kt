@@ -74,6 +74,7 @@ fun KnightHomeScreen(
     onOpenSquire: (squire: Long, name: String) -> Unit = { _, _ -> },
     onManageQuests: () -> Unit = {},
     onManageAchievements: () -> Unit = {},
+    onManageRewards: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -93,6 +94,7 @@ fun KnightHomeScreen(
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(text = { Text("Manage quests") }, onClick = { menuOpen = false; onManageQuests() })
                         DropdownMenuItem(text = { Text("Manage achievements") }, onClick = { menuOpen = false; onManageAchievements() })
+                        DropdownMenuItem(text = { Text("Manage rewards") }, onClick = { menuOpen = false; onManageRewards() })
                         DropdownMenuItem(text = { Text("Refresh") }, onClick = { menuOpen = false; onRefresh() })
                         DropdownMenuItem(text = { Text("Forget device") }, onClick = { menuOpen = false; onForget() })
                     }

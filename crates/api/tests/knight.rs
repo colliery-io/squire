@@ -418,3 +418,83 @@ async fn a_squire_token_cannot_assume_a_squire() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
+
+// ─── Reward (item) authoring from the phone (SQUIRE-T-0074) ──────────────────────────────────────
+
+/// A reward created over `/admin/items` with **explicit JSON nulls** for every optional field (the
+/// shape the generated SDK emits) is accepted — guards against the `#[serde(default)]`-on-`Vec` 422
+/// that bit quest authoring (SQUIRE-T-0065). It then lists with a server-computed availability label.
+#[tokio::test]
+async fn create_item_with_explicit_nulls_lists_with_label() {
+    let (state, _dir, _today) = test_state();
+    let body = serde_json::json!({
+        "id": null, "name": "Sticker pack", "description": null,
+        "cost": 5, "availability": "Repeatable", "gate": null, "icon": null,
+    })
+    .to_string();
+    let resp = router(state.clone())
+        .oneshot(req("POST", "/admin/items", Some(KNIGHT_TOKEN), Some(body)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "explicit nulls must not 422");
+
+    let resp = router(state)
+        .oneshot(req("GET", "/admin/items", Some(KNIGHT_TOKEN), None))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let rows: serde_json::Value = json_body(resp).await;
+    let row = rows.as_array().unwrap().iter().find(|r| r["name"] == "Sticker pack").unwrap();
+    assert_eq!(row["cost"], 5);
+    assert_eq!(row["summary"], "Repeatable");
+    assert_eq!(row["active"], true);
+}
+
+/// A reward gated on a non-existent achievement is a 404 (engine `validate_item`).
+#[tokio::test]
+async fn create_item_gated_on_missing_achievement_is_404() {
+    let (state, _dir, _today) = test_state();
+    let body = serde_json::json!({
+        "id": null, "name": "Locked treat", "description": null,
+        "cost": 1, "availability": "Once", "gate": 999999, "icon": null,
+    })
+    .to_string();
+    let resp = router(state)
+        .oneshot(req("POST", "/admin/items", Some(KNIGHT_TOKEN), Some(body)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+/// Archive the seeded reward (204); archiving a missing reward is a 404.
+#[tokio::test]
+async fn archive_item_then_missing_is_404() {
+    let (state, _dir, _today) = test_state();
+    let resp = router(state.clone())
+        .oneshot(req("POST", &format!("/admin/items/{ITEM_ID}/archive"), Some(KNIGHT_TOKEN), None))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+
+    let resp = router(state)
+        .oneshot(req("POST", "/admin/items/424242/archive", Some(KNIGHT_TOKEN), None))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+/// A Squire token cannot author rewards (trust boundary — 403).
+#[tokio::test]
+async fn a_squire_token_cannot_author_items() {
+    let (state, _dir, _today) = test_state();
+    let body = serde_json::json!({
+        "id": null, "name": "Nope", "description": null,
+        "cost": 1, "availability": "Repeatable", "gate": null, "icon": null,
+    })
+    .to_string();
+    let resp = router(state)
+        .oneshot(req("POST", "/admin/items", Some(SQUIRE_TOKEN), Some(body)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}

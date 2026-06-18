@@ -11,10 +11,13 @@ import com.squire.knight.app.ui.AchievementAdminScreen
 import com.squire.knight.app.ui.KnightHomeScreen
 import com.squire.knight.app.ui.LibraryAch
 import com.squire.knight.app.ui.LibraryQuest
+import com.squire.knight.app.ui.LibraryReward
 import com.squire.knight.app.ui.QuestAdminScreen
+import com.squire.knight.app.ui.RewardAdminScreen
 import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.AchievementSummaryDto
 import com.squire.sdk.model.CompletionDto
+import com.squire.sdk.model.ItemSummaryDto
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.ItemOption
 import com.squire.sdk.model.PendingClaim
@@ -150,6 +153,33 @@ class ScreenshotTests {
                     onBack = {},
                     initialAchievements = achievements,
                     libraryOverride = library,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun knightManageRewards() {
+        // A dummy adapter (no network — `initialItems` is injected so the live fetch is skipped).
+        val adapter = KnightApiAdapter(baseUrl = "http://localhost", household = "demo", token = "t")
+        val items = listOf(
+            ItemSummaryDto(id = 1, name = "Extra screen time", cost = 10, summary = "Repeatable", active = true),
+            ItemSummaryDto(id = 2, name = "Movie night pick", cost = 25, summary = "Repeatable", active = true),
+            ItemSummaryDto(id = 3, name = "Day-trip pick", cost = 100, summary = "Once · needs: Century Club", active = false),
+        )
+        val library = listOf(
+            LibraryReward(name = "Dessert of choice", cost = 8, availability = "Repeatable"),
+            LibraryReward(name = "Friend sleepover", cost = 60, availability = "Once"),
+        )
+        val gates = listOf(1L to "Century Club", 2L to "Tidy Streak")
+        paparazzi.snapshot {
+            SquireTheme {
+                RewardAdminScreen(
+                    adapter = adapter,
+                    onBack = {},
+                    initialItems = items,
+                    libraryOverride = library,
+                    gateOverride = gates,
                 )
             }
         }
