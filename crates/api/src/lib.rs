@@ -65,6 +65,9 @@ pub fn router(state: Arc<AppState>) -> Router {
         // Knight quest authoring from the phone (SQUIRE-T-0064): create / list / archive quests.
         .route("/admin/quests", get(authoring::list_quests).post(authoring::create_quest))
         .route("/admin/quests/{id}/archive", post(authoring::archive_quest))
+        // Knight achievement authoring from the phone (SQUIRE-T-0072).
+        .route("/admin/achievements", get(authoring::list_achievements).post(authoring::create_achievement))
+        .route("/admin/achievements/{id}/archive", post(authoring::archive_achievement))
         // App-update distribution (SQUIRE-T-0051): version manifest + APK download, unauthenticated.
         .route("/app/manifest", get(app_dist::manifest))
         .route("/app/{file}", get(app_dist::download))

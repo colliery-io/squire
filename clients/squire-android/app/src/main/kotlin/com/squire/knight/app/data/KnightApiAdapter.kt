@@ -7,7 +7,10 @@ import com.squire.knight.core.SubmitResult
 import com.squire.sdk.api.KnightApi
 import com.squire.sdk.infrastructure.ClientException
 import com.squire.sdk.infrastructure.ServerException
+import com.squire.sdk.model.AchievementSummaryDto
+import com.squire.sdk.model.CreateAchievementReq
 import com.squire.sdk.model.CreateQuestReq
+import com.squire.sdk.model.CreatedAchievement
 import com.squire.sdk.model.CreatedQuest
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.QuestSummaryDto
@@ -72,6 +75,22 @@ class KnightApiAdapter(
     /** Archive a quest (never deletes). */
     suspend fun archiveQuest(id: Long) = withContext(Dispatchers.IO) {
         api.archiveQuest(xHousehold = household, id = id)
+    }
+
+    // ── Achievement authoring from the phone (SQUIRE-T-0072) ─────────────────────────────────────
+    /** Every achievement as a flat summary (server-computed label). */
+    suspend fun listAchievements(): List<AchievementSummaryDto> = withContext(Dispatchers.IO) {
+        api.listAchievements(xHousehold = household)
+    }
+
+    /** Create or edit an achievement; returns the (new or kept) id. */
+    suspend fun createAchievement(req: CreateAchievementReq): CreatedAchievement = withContext(Dispatchers.IO) {
+        api.createAchievement(xHousehold = household, createAchievementReq = req)
+    }
+
+    /** Archive an achievement (never deletes). */
+    suspend fun archiveAchievement(id: Long) = withContext(Dispatchers.IO) {
+        api.archiveAchievement(xHousehold = household, id = id)
     }
 
     override suspend fun submit(command: KnightCommand): SubmitResult = withContext(Dispatchers.IO) {

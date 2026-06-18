@@ -1,0 +1,16 @@
+{
+  "comment": "Squire starter ACHIEVEMENT library (SQUIRE-T-0071). Built against the quest library's categories (Bedroom/Kitchen/Hygiene/Homework/Pets/Outdoor) so they line up with quests imported from the quest library, plus a few Any-scoped + points milestones. criterion: streak (length + basis) | total (count) | points (total). scope: category (+category) | any. bonus is in points (★).",
+  "achievements": [
+    { "name": "Tidy Streak",    "criterion": "streak", "scope": "category", "category": "Bedroom",  "length": 7,  "basis": "CalendarDays",        "bonus": 25 },
+    { "name": "Kitchen Helper", "criterion": "total",  "scope": "category", "category": "Kitchen",  "count": 20,                                  "bonus": 20 },
+    { "name": "Clean Machine",  "criterion": "streak", "scope": "category", "category": "Hygiene",  "length": 14, "basis": "CalendarDays",        "bonus": 30 },
+    { "name": "Bookworm",       "criterion": "streak", "scope": "category", "category": "Homework", "length": 5,  "basis": "CalendarDays",        "bonus": 25 },
+    { "name": "Best Friend",    "criterion": "total",  "scope": "category", "category": "Pets",     "count": 30,                                  "bonus": 20 },
+    { "name": "Yard Hero",      "criterion": "total",  "scope": "category", "category": "Outdoor",  "count": 10,                                  "bonus": 15 },
+
+    { "name": "Chore Champion", "criterion": "total",  "scope": "any",      "count": 50,                                                          "bonus": 50 },
+    { "name": "On a Roll",      "criterion": "streak", "scope": "any",      "length": 7,  "basis": "CalendarDays",                               "bonus": 30 },
+    { "name": "Century Club",   "criterion": "points",                      "total": 100,                                                         "bonus": 25 },
+    { "name": "Big Saver",      "criterion": "points",                      "total": 500,                                                         "bonus": 100 }
+  ]
+}

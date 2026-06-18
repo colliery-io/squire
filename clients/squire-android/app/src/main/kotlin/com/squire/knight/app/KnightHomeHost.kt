@@ -119,6 +119,8 @@ internal fun KnightHomeHost(
     var assumed by remember(session) { mutableStateOf<Pair<Long, String>?>(null) }
     // Whether the native quest-authoring surface (SQUIRE-T-0065) is open.
     var managingQuests by remember(session) { mutableStateOf(false) }
+    // Whether the native achievement-authoring surface (SQUIRE-T-0072) is open.
+    var managingAchievements by remember(session) { mutableStateOf(false) }
 
     val current = assumed
     if (current != null) {
@@ -148,6 +150,14 @@ internal fun KnightHomeHost(
         return
     }
 
+    if (managingAchievements) {
+        com.squire.knight.app.ui.AchievementAdminScreen(
+            adapter = adapter,
+            onBack = { managingAchievements = false },
+        )
+        return
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         update?.let { info -> UpdateBanner(info) }
         Box(modifier = Modifier.weight(1f)) {
@@ -164,6 +174,7 @@ internal fun KnightHomeHost(
                 onForget = onForget,
                 onOpenSquire = { id, name -> assumed = id to name },
                 onManageQuests = { managingQuests = true },
+                onManageAchievements = { managingAchievements = true },
             )
         }
     }
