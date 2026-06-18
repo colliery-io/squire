@@ -3,15 +3,15 @@ id: ui-polish-2-parent-knight-review
 level: task
 title: "UI polish 2: parent (Knight) review + assume + pairing screens restyle"
 short_code: "SQUIRE-T-0057"
-created_at: 2026-06-18T03:10:00.000000+00:00
-updated_at: 2026-06-18T03:10:00.000000+00:00
+created_at: 2026-06-18T03:10:00+00:00
+updated_at: 2026-06-18T03:21:22.448615+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -30,10 +30,12 @@ Propagate the "playful quest" theme/components (from T-0056) to the **parent** s
 
 ## Acceptance Criteria
 
-- [ ] `KnightHomeScreen` restyled with the shared components: per-Squire cards (name + gold balance + Open/Mark-done/Redeem/Add-funds), pending-claim and pending-redemption cards with clear Approve/Reject, a themed offline + update banner. Add-funds dialog tidied.
-- [ ] The **pairing screen** (`:pairing/PairingScreen`) restyled: a friendly themed onboarding (title/crest, clear Scan QR primary + manual fields + Discover + debug button), consistent inputs/buttons.
-- [ ] The "Acting as <name>" assumed-Squire view (reuses the themed `PlayerHomeScreen`) reads cleanly with the parent-context header/back.
-- [ ] `:app:assembleDebug` builds; behaviour unchanged; screenshots captured (Knight home, pairing).
+## Acceptance Criteria
+
+- [x] `KnightHomeScreen` restyled with the shared components: per-Squire cards (name + gold balance + Open/Mark-done/Redeem/Add-funds), pending-claim and pending-redemption cards with clear Approve/Reject, a themed offline + update banner. Add-funds dialog tidied.
+- [x] The **pairing screen** (`:pairing/PairingScreen`) restyled: a friendly themed onboarding (title/crest, clear Scan QR primary + manual fields + Discover + debug button), consistent inputs/buttons.
+- [x] The "Acting as <name>" assumed-Squire view (reuses the themed `PlayerHomeScreen`) reads cleanly with the parent-context header/back.
+- [x] `:app:assembleDebug` builds; behaviour unchanged; screenshots captured (Knight home, pairing).
 
 ## Implementation Notes
 
@@ -48,4 +50,9 @@ Reuse the `SquireTheme` + components from T-0056 (gold pill, cards, section head
 
 ## Status Updates
 
-*To be added during implementation*
+**2026-06-17 — Done (all three parent surfaces restyled + verified live).** Applied the "playful quest" theme to the parent UI:
+- **`KnightHomeScreen`** (`:app`): royal app bar "🛡 The Round Table" (serif), `SectionTitle` headers ("Your Squires · N awaiting your seal", "Quests to approve", "Rewards to grant"), parchment Squire **cards** (⚔ name + `GoldPill` balance + tonal "Open" + outlined Mark done/Redeem/Add ★), review cards with a kind `StatusChip` (Quest/Reward) + herald-green **Approve ✓** / outlined Reject, friendly empty states, themed offline `Banner`. Reuses `:app`'s `SquireUi` + `SquireTheme`.
+- **`PairingScreen`** (`:pairing`, shared — can't import `:app`; uses raw Material tokens but inherits `SquireTheme`): shield crest + "Welcome, traveller" royal serif headline, royal "📷 Scan the QR", a parchment "Enter it by hand" card wrapping the form, errors surfaced in an `errorContainer` card.
+- **Assume-Squire view**: already renders the themed `PlayerHomeScreen` ("⚔ Acting as Gawain") — inherits the T-0056 restyle, no change needed.
+
+`:app:assembleDebug` SUCCESS. Verified live on the emulator: captured the pairing screen, then minted a Knight pairing code against the demo server (login user 1 → POST /pair/codes) and paired as Knight to capture the parent home + the "Open"→assume view. Pure presentation — no callback/transport/`:core` change. Screenshots sent for sign-off. Next: SQUIRE-T-0058 (app icon + Keep web UI), then bump versionCode and package one OTA update.
