@@ -47,6 +47,13 @@ pub fn live_config(config: HouseholdConfig) -> LiveConfig {
     Arc::new(ArcSwap::from_pointee(ConfigView::resolve(config)))
 }
 
+/// Whether `name` resolves to a real IANA timezone (ADR A-0011). Used by onboarding (#3) and the
+/// Keep Settings handler (#4) to validate a candidate zone *before* persisting it, so the stored
+/// value is always meaningful rather than silently falling back to UTC at clock-build time.
+pub fn valid_timezone(name: &str) -> bool {
+    jiff::tz::TimeZone::get(name).is_ok()
+}
+
 /// Convert unix `millis` to the domain's Monday-aligned [`Date`] **in `tz`** (DST-correct). Agrees
 /// with the UTC `date_from_unix_millis` when `tz` is UTC.
 pub fn date_in_zone(millis: i64, tz: &jiff::tz::TimeZone) -> Date {

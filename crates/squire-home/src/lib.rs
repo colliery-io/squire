@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 use api::AppState;
 use keep::KeepState;
 
-use domain_core::contract::{HouseholdHandle, Repository, Role};
+use domain_core::contract::{config_keys, HouseholdHandle, Repository, Role};
 use identity::{Identity, ProdIdentity, SharedStore, TokenSigner};
 use store::tenant::{Backend, Provisioner};
 use store::SystemClock;
@@ -46,6 +46,36 @@ pub fn open_household(
         token_ttl_ms,
     ));
     Ok((store, identity))
+}
+
+/// Ensure the household has a timezone setting (ADR SQUIRE-A-0011 onboarding, SQUIRE-T-0067).
+///
+/// **Idempotent**: an existing, non-empty `timezone` is returned untouched (so a parent's later
+/// choice via the Keep is never clobbered). If absent, seed it from `SQUIRE_TZ` (when it's a valid
+/// IANA zone), else the **auto-detected host zone** (`iana-time-zone`), else `"UTC"`; the candidate
+/// is validated (`store::valid_timezone`) before persisting, so the stored value is always real.
+/// Returns the active zone name. Call before [`serve`] so the clock is built from the seeded value.
+pub fn ensure_timezone(store: &SharedStore) -> String {
+    let store = store.lock().expect("store mutex poisoned");
+    if let Some(tz) = store.get_setting(config_keys::TIMEZONE) {
+        if !tz.is_empty() {
+            return tz;
+        }
+    }
+    let candidate = std::env::var("SQUIRE_TZ")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| iana_time_zone::get_timezone().ok())
+        .unwrap_or_else(|| "UTC".to_string());
+    let zone = if store::valid_timezone(&candidate) {
+        candidate
+    } else {
+        "UTC".to_string()
+    };
+    store
+        .set_setting(config_keys::TIMEZONE, &zone, None)
+        .expect("seed timezone setting");
+    zone
 }
 
 /// Whether the household already has an admin Knight — i.e. it's been bootstrapped (so the

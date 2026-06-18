@@ -18,7 +18,8 @@ use std::path::PathBuf;
 use domain_core::contract::{HouseholdHandle, RegisterHouseholdReq};
 
 use squire_home::{
-    env_u16, has_admin, local_lan_ip, open_household, serve, signing_key, TOKEN_TTL_MS,
+    ensure_timezone, env_u16, has_admin, local_lan_ip, open_household, serve, signing_key,
+    TOKEN_TTL_MS,
 };
 
 #[tokio::main]
@@ -39,6 +40,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Provision-if-absent + open (NEVER wiped). Idempotent on an existing store.
     let (store, identity) = open_household(&data_dir, &handle, &key, TOKEN_TTL_MS)?;
+
+    // Onboarding (ADR A-0011): ensure a household timezone is set — seeded from SQUIRE_TZ or the
+    // detected host zone on first run, respected thereafter — so "midnight" is the family's midnight.
+    let timezone = ensure_timezone(&store);
 
     // Register-or-load: bootstrap the first admin only if the household has none yet.
     let first_run = !has_admin(&store);
@@ -74,6 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("════════════════════════════════════════════════════════════════════");
     println!("  Squire server (squire-serve) — persistent, data in {}", data_dir.display());
     println!("  Household:               {}{}", handle.0, if first_run { " (newly bootstrapped)" } else { " (loaded)" });
+    println!("  Timezone:                {timezone}   ← daily quests reset at this local midnight");
     println!("  Keep (parent, loopback): http://127.0.0.1:{keep_port}");
     match &lan_host {
         Some(h) => {
