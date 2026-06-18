@@ -228,3 +228,57 @@ fn race_rejected_claim_reopens_the_occurrence() {
     run(&mut r, approve(2, 3)).unwrap();
     assert_eq!(approved(&r, 3).unwrap().2, 20);
 }
+
+// ── Hardening (SQUIRE-T-0076) ──────────────────────────────────────────────────────────────────
+
+/// An `Any`-scoped TotalCompletions achievement, unlocked once `count` completions are approved.
+fn total_achievement(id: u128, count: u32, bonus: Points) -> Achievement {
+    Achievement {
+        id: AchievementId(id),
+        name: "First chore".into(),
+        description: None,
+        criterion: Criterion::TotalCompletions { scope: Scope::Any, count },
+        bonus_points: bonus,
+        active: true,
+    }
+}
+
+/// Approving a claim that completes an achievement criterion emits `AchievementUnlocked` and the
+/// bonus lands on the balance — exercised end-to-end via the claim→approve path (not just
+/// `achievements.rs`), so a regression in `approval_events` → `unlocks_after` is caught here.
+#[test]
+fn approving_a_claim_that_completes_a_criterion_unlocks_and_credits_bonus() {
+    let mut r = repo();
+    r.seed(&[
+        Change::PutQuest(each(10, 10, false, false)),
+        Change::PutAchievement(total_achievement(900, 1, 50)),
+    ]);
+    run(&mut r, submit(1, 1, 10, 0)).unwrap();
+    run(&mut r, approve(2, 1)).unwrap();
+
+    // The reward (10) plus the unlock bonus (50) are both on the balance.
+    assert_eq!(Proj::balance(&r.snapshot(), UserId(1)), 60, "reward + achievement bonus");
+    let unlocked = r.events.iter().any(|e| matches!(
+        e, Event::AchievementUnlocked { squire, id, bonus, .. }
+            if *squire == UserId(1) && *id == AchievementId(900) && *bonus == 50
+    ));
+    assert!(unlocked, "approval emits the AchievementUnlocked event");
+}
+
+/// The full reject → re-claim → approve cycle: a rejected claim credits nothing and re-opens the
+/// slot; the child's *second* claim, once approved, credits exactly once.
+#[test]
+fn reject_then_reclaim_then_approve_credits_once() {
+    let mut r = repo();
+    r.seed(&[Change::PutQuest(each(10, 10, false, false))]);
+    run(&mut r, submit(1, 1, 10, 0)).unwrap();
+    run(&mut r, reject(2, 1)).unwrap();
+    assert_eq!(Proj::balance(&r.snapshot(), UserId(1)), 0, "a rejected claim credits nothing");
+
+    // Re-claim the same (squire, quest, day) with a fresh claim id, then approve it.
+    run(&mut r, submit(2, 1, 10, 0)).unwrap();
+    run(&mut r, approve(2, 2)).unwrap();
+    assert_eq!(Proj::balance(&r.snapshot(), UserId(1)), 10, "the re-claim credits exactly once");
+    let approvals = r.events.iter().filter(|e| matches!(e, Event::CompletionApproved { squire, .. } if *squire == UserId(1))).count();
+    assert_eq!(approvals, 1, "only the second claim was approved");
+}
