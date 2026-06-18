@@ -13,9 +13,17 @@ use std::sync::{Arc, Mutex};
 use domain_core::contract::HouseholdHandle;
 use domain_core::DomainEngine;
 use store::tenant::{Backend, ProvisionError, Provisioner};
-use store::SystemClock;
+use store::{live_config, LocalClock, SystemClock};
 
 use identity::{Identity, ProdIdentity, TokenSigner};
+
+/// Build a household-local clock seeded from the store's persisted config (ADR SQUIRE-A-0011). The
+/// store keeps a UTC [`SystemClock`] for audit timestamps; this is the **handler-facing** clock
+/// whose `today()` honours the household timezone for quest scheduling.
+pub(crate) fn clock_from_store(store: &SharedStore) -> LocalClock {
+    let cfg = store.lock().expect("store mutex poisoned").load_config();
+    LocalClock::new(live_config(cfg))
+}
 
 /// The tenant store shared (interior-mutably, single-writer) across the API. Held by both
 /// [`AppState`] (the request handlers) and the [`identity::Identity`] impl (the control-plane,
@@ -31,23 +39,27 @@ pub struct AppState {
     pub store: SharedStore,
     /// The pure, stateless domain engine (the one validated entry point).
     pub engine: DomainEngine,
-    /// Real wall-clock, passed to [`domain_core::contract::Engine::handle`].
-    pub clock: SystemClock,
+    /// Household-local wall clock (ADR A-0011): `today()` honours the household timezone, read
+    /// lock-free from the live config cell. Passed to [`domain_core::contract::Engine::handle`].
+    pub clock: LocalClock,
     /// The authentication / membership seam (dev impl now, production in SQUIRE-S-0007).
     pub identity: Arc<dyn identity::Identity>,
 }
 
 impl AppState {
-    /// Wire the pieces into shared, ref-counted state. The `store` is the same [`SharedStore`]
-    /// the `identity` impl was built over, so register / add-member writes land in the store
-    /// these handlers read.
+    /// Wire the pieces into shared, ref-counted state, with a clock seeded from the store's
+    /// persisted config. The `store` is the same [`SharedStore`] the `identity` impl was built
+    /// over, so register / add-member writes land in the store these handlers read.
     pub fn new(store: SharedStore, identity: Arc<dyn Identity>) -> Arc<Self> {
-        Arc::new(Self {
-            store,
-            engine: DomainEngine,
-            clock: SystemClock,
-            identity,
-        })
+        let clock = clock_from_store(&store);
+        Self::with_clock(store, identity, clock)
+    }
+
+    /// Like [`AppState::new`] but with an explicit, **shared** [`LocalClock`] — used by the home
+    /// server so the api and the Keep read (and hot-swap) the SAME live-config cell (so a Keep
+    /// timezone change applies to the api without a restart).
+    pub fn with_clock(store: SharedStore, identity: Arc<dyn Identity>, clock: LocalClock) -> Arc<Self> {
+        Arc::new(Self { store, engine: DomainEngine, clock, identity })
     }
 
     /// Wire a **production** `AppState` for a single local tenant (the LAN-local MVP posture).
