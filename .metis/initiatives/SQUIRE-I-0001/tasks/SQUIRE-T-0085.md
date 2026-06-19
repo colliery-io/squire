@@ -78,3 +78,6 @@ redesign release [[SQUIRE-T-0084]] (which exposed the same-version-no-propagate 
 ## Status Updates
 
 - Plan recorded. Implementing Phase 1.
+- Phase 1 code shipped + committed (`297e5b2`): server injects mtime-cached `sha256` (verified equal to an independent shasum of the published APK); phone persists installed hash and compares hash-first with versionCode bootstrap/fallback; versionCode bumped 5 -> 6 / 0.7.2. Signed release v6 built (signer matches live cert) and published (`squire-6.apk` + manifest).
+- `squire-serve` now **defaults** `SQUIRE_APK_DIR` to `<data_dir>/updates` (created on start), so the `/app/*` endpoints are always available without the env var; an explicit value still wins. Migrated the published APKs + manifest from `~/squire-updates` into the default dir (and removed the old dir). The relaunch command should now DROP `SQUIRE_APK_DIR`. Verified: default dir auto-created, `/app/manifest` live (200).
+- REMAINING (operator): relaunch prod `squire-serve` on the new binary (WITHOUT `SQUIRE_APK_DIR`) so the live server injects the hash and uses the default dir. Until then the live server advertises v6 by versionCode only (existing clients still update; hash field appears after relaunch). Task stays active until relaunched. Phase 2 (drop versionCode) is a future release.

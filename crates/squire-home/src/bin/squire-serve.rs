@@ -11,6 +11,7 @@
 //! * `SQUIRE_HOUSEHOLD`  — tenant handle (default `home`).
 //! * `SQUIRE_ADMIN_NAME` / `SQUIRE_ADMIN_SECRET` — first-run admin (secret REQUIRED on first run).
 //! * `API_PORT` (8080) / `KEEP_PORT` (4920) — listeners.
+//! * `SQUIRE_APK_DIR` — OTA app-update dir (default: `<data_dir>/updates`, created on start).
 //! * `SQUIRE_SIGNING_KEY` — override the persisted key (raw bytes); `SQUIRE_MDNS=off` — disable mDNS.
 
 use std::path::PathBuf;
@@ -29,6 +30,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .unwrap_or_else(|| {
             dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("squire")
         });
+
+    // OTA app-update dir (SQUIRE-T-0051/0085): default to `<data_dir>/updates` and create it, so the
+    // `/app/*` endpoints are always available without setting `SQUIRE_APK_DIR`. An explicit env var
+    // still wins. Dropping a new APK + manifest there is picked up live (read per request) — no
+    // relaunch needed.
+    if std::env::var_os("SQUIRE_APK_DIR").is_none() {
+        let apk_dir = data_dir.join("updates");
+        let _ = std::fs::create_dir_all(&apk_dir);
+        std::env::set_var("SQUIRE_APK_DIR", &apk_dir);
+    }
+
     let api_port = env_u16("API_PORT", 8080);
     let keep_port = env_u16("KEEP_PORT", 4920);
     let handle = HouseholdHandle(
@@ -80,6 +92,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("  Squire server (squire-serve) — persistent, data in {}", data_dir.display());
     println!("  Household:               {}{}", handle.0, if first_run { " (newly bootstrapped)" } else { " (loaded)" });
     println!("  Timezone:                {timezone}   ← daily quests reset at this local midnight");
+    if let Some(apk) = std::env::var_os("SQUIRE_APK_DIR") {
+        println!("  App updates (OTA):       {}   ← drop <name>.apk + manifest.json here (live, no relaunch)", PathBuf::from(apk).display());
+    }
     println!("  Keep (parent, loopback): http://127.0.0.1:{keep_port}");
     match &lan_host {
         Some(h) => {
