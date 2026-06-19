@@ -170,3 +170,53 @@ strong { color: var(--royal-deep); }
 .inline-editor input.adjust-reason { min-width: 16rem; }
 .inline-editor input.adjust-amount { width: 6rem; }
 .confirm-reject, .apply-adjust { background: var(--crimson); color: #fff; }
+
+/* ── Members / Pair / Log polish (SQUIRE-T-0082) ── */
+/* A list item laid out as content (left) + actions (right) on one line. */
+.list-row { display: flex; align-items: center; gap: .75rem; }
+.list-row .grow { flex: 1; min-width: 0; }
+.list-row.inactive { opacity: .55; }
+.list-row button { margin-top: 0; }
+
+/* Small inline action button for list rows (the default button is large + has top margin). */
+.btn-sm { margin-top: 0; padding: .35rem .8rem; font-size: .85rem; }
+.btn-ghost { background: transparent; color: var(--royal); border: 1px solid var(--line); }
+.btn-ghost:hover { background: var(--gold-soft); }
+
+/* Role / status badges. */
+.badge {
+  display: inline-block;
+  padding: .12rem .55rem;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  vertical-align: middle;
+}
+.badge-knight { background: #E6E1F6; color: var(--royal-deep); }
+.badge-squire { background: var(--gold-soft); color: var(--gold-on, #5A4300); }
+.badge-muted { background: #EADFC4; color: var(--muted); }
+
+/* A boxed notice (e.g. the freshly-minted pairing token). */
+.notice {
+  margin-top: .75rem;
+  padding: .7rem .9rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #FBF6E8;
+}
+.notice-success { border-color: var(--herald); background: #E7F3EC; }
+.notice .tok { display: block; margin-top: .35rem; word-break: break-all; }
+
+/* Pairing hand-off card: centred QR + code + caption. */
+.pair-card {
+  margin-top: 1rem;
+  padding: 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #FFFEFA;
+  text-align: center;
+  max-width: 22rem;
+}
+.pair-card svg { width: 220px; height: 220px; }
+.pair-card .pair-code { font-size: 1.05rem; padding: .25rem .6rem; }

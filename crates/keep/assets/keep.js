@@ -203,8 +203,26 @@
     ul.innerHTML = "";
     for (const m of rows) {
       const li = document.createElement("li");
-      li.textContent = `${m.display_name} — ${m.role}${m.active ? "" : " (inactive)"} `;
+      li.className = "list-row" + (m.active ? "" : " inactive");
+
+      const info = document.createElement("span");
+      info.className = "grow";
+      const name = document.createElement("strong");
+      name.textContent = m.display_name + " ";
+      const role = document.createElement("span");
+      role.className = "badge " + (m.role === "Knight" ? "badge-knight" : "badge-squire");
+      role.textContent = m.role;
+      info.append(name, role);
+      if (!m.active) {
+        const inactive = document.createElement("span");
+        inactive.className = "badge badge-muted";
+        inactive.textContent = "Inactive";
+        inactive.style.marginLeft = ".35rem";
+        info.append(inactive);
+      }
+
       const btn = document.createElement("button");
+      btn.className = "btn-sm btn-ghost";
       btn.textContent = m.active ? "Deactivate" : "Reactivate";
       btn.addEventListener("click", async () => {
         await fetch(`/api/members/${m.user}/active`, {
@@ -215,7 +233,8 @@
         loadMembers();
         loadPairMembers();
       });
-      li.appendChild(btn);
+
+      li.append(info, btn);
       ul.appendChild(li);
     }
   }
@@ -244,7 +263,14 @@
         return;
       }
       const added = await res.json();
-      memberTok.textContent = `Pairing token for ${fd.get("display_name")}: ${added.token}`;
+      memberTok.className = "notice notice-success";
+      memberTok.innerHTML = "";
+      const head = document.createElement("span");
+      head.textContent = `Added ${fd.get("display_name")}. Pairing token (use it to provision their device):`;
+      const tok = document.createElement("code");
+      tok.className = "tok";
+      tok.textContent = added.token;
+      memberTok.append(head, tok);
       memberTok.hidden = false;
       memberForm.reset();
       loadMembers();
@@ -916,7 +942,10 @@
       const fd = new FormData(logForm);
       const res = await fetch(`/api/log/${fd.get("scope")}/${fd.get("id")}`);
       const out = document.getElementById("log-output");
+      const hint = document.getElementById("log-hint");
       out.textContent = res.ok ? JSON.stringify(await res.json(), null, 2) : `Error ${res.status}`;
+      out.hidden = false;
+      if (hint) hint.hidden = true;
     });
   }
 
