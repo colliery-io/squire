@@ -6,6 +6,56 @@
   const errEl = document.getElementById("login-error");
   if (!form) return;
 
+  // ── Redesign card helpers (medallion · body · coin · chip). Pure presentation;
+  //    all data, fetches and handlers below are unchanged. ─────────────────────
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function pickEmoji(text, table, fallback) {
+    const t = text || "";
+    for (const [re, e] of table) if (re.test(t)) return e;
+    return fallback;
+  }
+  const QUEST_EMOJI = [
+    [/bed|wake|morning/i, "🛏"], [/tidy|room|clean|vacuum|dust/i, "🧹"],
+    [/dog|walk|pet|biscuit|cat|feed/i, "🐕"], [/piano|music|practice|guitar|violin/i, "🎹"],
+    [/homework|study|read|school|book/i, "📚"], [/table|dish|kitchen|wash|plate/i, "🍽"],
+    [/trash|recycl|bin|garbage|compost/i, "♻"], [/laundry|fold|fluff/i, "🧺"],
+    [/tooth|brush|teeth/i, "🪥"], [/water|plant|garden|flower|leaf/i, "🪴"],
+  ];
+  const REWARD_EMOJI = [
+    [/ice ?cream|sundae|gelato/i, "🍦"], [/movie|film|cinema/i, "🎬"],
+    [/screen|game|video|tv|console/i, "🎮"], [/park|outing|trip|zoo|outside/i, "🌳"],
+    [/pizza|dinner|treat|candy|snack|dessert/i, "🍕"], [/book|read|story|comic/i, "📖"],
+    [/money|allowance|cash|coin/i, "💰"], [/toy|lego|figure/i, "🧸"],
+    [/sleep|stay ?up|bed ?time|late/i, "🌙"],
+  ];
+  function questEmoji(q) { return q.icon || pickEmoji((q.title || "") + " " + (q.category || ""), QUEST_EMOJI, "📜"); }
+  function rewardEmoji(it) { return it.icon || pickEmoji(it.name || "", REWARD_EMOJI, "🎁"); }
+  function medallion(emoji) { return el("span", "medallion", emoji); }
+  function coinPill(amount) {
+    const c = el("span", "coin");
+    c.innerHTML = '<span class="disc">★</span>';
+    c.appendChild(el("span", "amt", String(amount)));
+    return c;
+  }
+  function cardBody(title, metaArr) {
+    const body = el("div", "grow");
+    body.appendChild(el("div", "card-title", title));
+    if (metaArr && metaArr.length) {
+      const meta = el("div", "card-meta");
+      metaArr.forEach((p, i) => {
+        if (i) meta.appendChild(el("span", "sep", "·"));
+        meta.appendChild(el("span", i === 0 ? "lead" : null, p));
+      });
+      body.appendChild(meta);
+    }
+    return body;
+  }
+
   // ── Tabbed shell (T-0061) ────────────────────────────────────────────────────
   // One panel visible at a time; the nav is a tab bar. Each tab maps to a panel and a loader
   // that re-pulls its data on activation (so Review etc. stay fresh). Function declarations
@@ -124,39 +174,47 @@
     document.getElementById("review-empty").hidden = r.pending_claims.length + r.pending_requests.length > 0;
 
     for (const c of r.pending_claims) {
-      const li = document.createElement("li");
-      li.textContent = `${c.quest_title} — squire #${c.squire} `;
-      const ok = document.createElement("button");
-      ok.textContent = "Approve";
+      const li = el("li", "review-card");
+      const rowEl = el("div", "card-row");
+      rowEl.appendChild(medallion(pickEmoji(c.quest_title, QUEST_EMOJI, "📜")));
+      const who = squiresById[c.squire] || ("Squire #" + c.squire);
+      rowEl.appendChild(cardBody(c.quest_title, [who, "awaiting review"]));
+      li.appendChild(rowEl);
+      const actions = el("div", "card-actions");
+      const ok = el("button", "approve", "✓ Approve");
       ok.addEventListener("click", () => reviewAction("/api/review/claim", { claim_id: c.claim_id, decision: "approve" }));
-      const no = document.createElement("button");
-      no.textContent = "Reject";
-      no.className = "reject";
+      const no = el("button", "reject", "Reject");
       attachRejectEditor(li, no, (reason) =>
         reviewAction("/api/review/claim", { claim_id: c.claim_id, decision: { reject: { reason } } }));
-      li.append(ok, no);
+      actions.append(ok, no);
+      li.appendChild(actions);
       claims.appendChild(li);
     }
     for (const q of r.pending_requests) {
-      const li = document.createElement("li");
-      li.textContent = `${q.item_name} (${q.cost} pts) — squire #${q.squire} `;
-      const ok = document.createElement("button");
-      ok.textContent = "Approve";
+      const li = el("li", "review-card");
+      const rowEl = el("div", "card-row");
+      rowEl.appendChild(medallion(pickEmoji(q.item_name, REWARD_EMOJI, "🎁")));
+      const who = squiresById[q.squire] || ("Squire #" + q.squire);
+      rowEl.appendChild(cardBody(q.item_name, [who, "wants to redeem · " + q.cost + " ★"]));
+      li.appendChild(rowEl);
+      const actions = el("div", "card-actions");
+      const ok = el("button", "approve", "✓ Grant");
       ok.addEventListener("click", () => reviewAction("/api/review/redemption", { request_id: q.request_id, decision: "approve" }));
-      const no = document.createElement("button");
-      no.textContent = "Reject";
-      no.className = "reject";
+      const no = el("button", "reject", "Reject");
       attachRejectEditor(li, no, (reason) =>
         reviewAction("/api/review/redemption", { request_id: q.request_id, decision: { reject: { reason } } }));
-      li.append(ok, no);
+      actions.append(ok, no);
+      li.appendChild(actions);
       reqs.appendChild(li);
     }
     for (const s of r.squires) {
-      const li = document.createElement("li");
-      li.textContent = `${s.display_name}: ${s.balance} pts `;
-      const adj = document.createElement("button");
-      adj.textContent = "Adjust";
-      adj.className = "adjust";
+      const li = el("li", "list-row");
+      const av = el("span", "medallion avatar-green", (s.display_name || "?").slice(0, 1).toUpperCase());
+      const info = el("div", "grow");
+      info.appendChild(el("div", "card-title", s.display_name));
+      info.appendChild(el("div", "card-meta", "Squire"));
+      const coin = coinPill(s.balance);
+      const adj = el("button", "btn-sm btn-ghost", "Adjust");
       // Inline adjust editor (T-0080): amount (±) + a required reason; Apply stays disabled until the
       // reason is non-blank (the engine 400s an empty reason).
       adj.addEventListener("click", () => {
@@ -189,7 +247,7 @@
         li.appendChild(editor);
         reason.focus();
       });
-      li.appendChild(adj);
+      li.append(av, info, coin, adj);
       sqs.appendChild(li);
     }
   }
@@ -328,18 +386,28 @@
     ul.innerHTML = "";
     for (const row of rows) {
       const obj = row.item || row.achievement;
-      const li = document.createElement("li");
-      let label;
+      const accentCls = row.item ? (row.out_of_stock ? "accent-blue" : "accent-gold") : "accent-epic";
+      const li = el("li", "card-row " + accentCls + (obj.active ? "" : " is-archived"));
       if (row.item) {
-        const gate = obj.gate != null ? ` · needs: ${gateLabel(obj.gate)}` : "";
-        label = `${obj.name} — ${obj.cost} pts${obj.active ? "" : " (archived)"}${row.out_of_stock ? " · out of stock" : ""}${gate}`;
+        li.appendChild(medallion(rewardEmoji(obj)));
+        const meta = [];
+        if (obj.gate != null) meta.push("needs " + gateLabel(obj.gate));
+        if (row.out_of_stock) meta.push("out of stock");
+        if (!obj.active) meta.push("archived");
+        li.appendChild(cardBody(obj.name, meta.length ? meta : ["reward"]));
+        li.appendChild(coinPill(obj.cost));
       } else {
-        label = `${obj.name} — ${criterionSummary(obj.criterion)} · +${obj.bonus_points}${obj.active ? "" : " (archived)"}`;
+        li.appendChild(medallion("🛡"));
+        const meta = [criterionSummary(obj.criterion)];
+        if (!obj.active) meta.push("archived");
+        li.appendChild(cardBody(obj.name, meta));
+        const c = el("span", "coin");
+        c.innerHTML = '<span class="disc">★</span>';
+        c.appendChild(el("span", "amt", "+" + obj.bonus_points));
+        li.appendChild(c);
       }
-      li.textContent = label + " ";
       if (obj.active) {
-        const btn = document.createElement("button");
-        btn.textContent = "Archive";
+        const btn = el("button", "archive", "Archive");
         btn.addEventListener("click", async () => {
           await fetch(`/api/${kind}/${obj.id}/archive`, { method: "POST" });
           loadCatalog(kind, listId);
@@ -502,14 +570,16 @@
     ul.innerHTML = "";
     for (const row of rows) {
       const q = row.quest;
-      const li = document.createElement("li");
-      const tag = q.active ? "" : " (archived)";
-      const strong = document.createElement("strong");
-      strong.textContent = q.title;
-      li.append(strong, document.createTextNode(` — ${q.reward} ★ · ${questSummary(q)}${tag} `));
+      const accent = q.auto_approve ? "accent-green" : "accent-royal";
+      const li = el("li", "card-row " + accent + (q.active ? "" : " is-archived"));
+      li.appendChild(medallion(questEmoji(q)));
+      const meta = [questSummary(q)];
+      if (!q.active) meta.push("archived");
+      li.appendChild(cardBody(q.title, meta));
+      if (q.auto_approve) li.appendChild(el("span", "chip chip-auto", "Auto"));
+      li.appendChild(coinPill(q.reward));
       if (q.active) {
-        const btn = document.createElement("button");
-        btn.textContent = "Archive";
+        const btn = el("button", "archive", "Archive");
         btn.addEventListener("click", async () => {
           await fetch(`/api/quests/${q.id}/archive`, { method: "POST" });
           loadQuests();

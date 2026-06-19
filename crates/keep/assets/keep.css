@@ -1,222 +1,422 @@
-/* The Keep — "playful quest" admin theme (SQUIRE-T-0058): parchment + royal indigo + heraldic gold,
-   matched to the phone app's SquireTheme. Local-only household admin, so it favours clarity. */
+/* ============================================================================
+   The Keep — Squire household admin theme  (redesign 2026)
+   Adventure-journal system: Royal Purple · Adventure Gold · Parchment Cream.
+   Local-only & offline-safe: uses system fonts (no network web-font fetch).
+   To upgrade the type, self-host Bitter + Nunito Sans — see README.
+   ============================================================================ */
+
 :root {
-  --bg: #F4EAD3;          /* parchment */
-  --panel: #FFFDF6;       /* card cream */
-  --ink: #2B2533;         /* slate body text */
-  --muted: #6B6150;       /* secondary text */
-  --royal: #4B3F8F;       /* primary */
-  --royal-deep: #2E2657;
-  --gold: #B8860B;        /* accent / points */
-  --gold-soft: #F1DEA6;   /* gold container */
-  --line: #DDD0B2;        /* hairline on parchment */
-  --herald: #2E7D52;      /* success */
-  --crimson: #9E2B25;     /* error */
+  /* ── Brand ── */
+  --royal: #5A3D8E;        /* primary */
+  --royal-light: #7A5FB5;
+  --royal-deep: #402A67;
+  --gold: #D8A13A;         /* currency / progression */
+  --gold-light: #F1C15C;
+  --gold-deep: #A97822;
+  --gold-on: #5A4300;      /* legible gold-on-light text */
+  --epic: #E08B2D;         /* high-value / streak heat */
+
+  /* ── Surfaces ── */
+  --parch: #F2E6C8;        /* app background */
+  --parch-light: #FAF4E6;
+  --parch-deep: #DCC9A0;
+  --cream: #FBF5E7;        /* panel */
+  --card: #FFFEFA;         /* card */
+
+  /* ── Semantic ── */
+  --green: #5D8A42;  --green-deep: #42642E;  --green-soft: #E4EFD8;
+  --blue:  #4E79A7;  --blue-soft:  #DEEAF3;
+  --red:   #B55443;  --red-deep:   #8A3E32;  --red-soft:   #F3DED9;
+
+  /* ── Neutrals ── */
+  --ink: #3C2D21;          /* primary text */
+  --stone: #8C857B;        /* secondary text */
+  --mist: #D8D5D0;         /* disabled */
+  --line: #E2D2AC;         /* hairline */
+  --line-soft: #EADFC4;
   --field: #FFFFFF;
-}
-* { box-sizing: border-box; }
-/* The `hidden` attribute must win over element display rules (e.g. `label { display: block }`),
-   so progressive-disclosure fields (due date, weekday picker, squire list) actually hide. */
-[hidden] { display: none !important; }
-body {
-  margin: 0;
-  font: 15px/1.5 system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--ink);
+
+  /* ── Type ── */
+  --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+  --font-ui: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+
+  --shadow-card: 0 1px 2px rgba(46,38,87,.05);
+  --shadow-pop: 0 8px 18px rgba(46,38,87,.12);
 }
 
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  font: 15px/1.55 var(--font-ui);
+  color: var(--ink);
+  background-color: var(--parch);
+  background-image:
+    radial-gradient(circle at 16% 0%, rgba(255,255,255,.5), transparent 48%),
+    radial-gradient(circle at 92% 100%, rgba(90,61,142,.05), transparent 50%);
+  background-attachment: fixed;
+}
+
+/* ── Banner header ───────────────────────────────────────────────────────── */
 header {
-  padding: 1.1rem 1.5rem;
-  background: var(--royal);
+  position: relative;
+  padding: 18px 28px;
+  background: linear-gradient(120deg, #5A3D8E 0%, #4A3179 60%, #402A67 100%);
   color: #fff;
   border-bottom: 3px solid var(--gold);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+header .emblem {
+  width: 44px; height: 44px; flex: none;
+  border-radius: 12px;
+  background: rgba(255,255,255,.10);
+  border: 1.5px solid rgba(241,193,92,.7);
+  display: grid; place-items: center;
 }
 header h1 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: 1.5rem;
   letter-spacing: .3px;
+  line-height: 1.1;
 }
-header .sub { margin: .2rem 0 0; color: #D9D3F0; font-size: .85rem; }
+header .sub { margin: 2px 0 0; color: #CDC2EC; font-size: .82rem; }
 
-main { max-width: 60rem; margin: 1.5rem auto; padding: 0 1.5rem; }
+main { max-width: 64rem; margin: 1.4rem auto 3rem; padding: 0 1.4rem; }
 
+/* ── Panels / sections ───────────────────────────────────────────────────── */
 section {
-  background: var(--panel);
+  background: var(--cream);
+  background-image: radial-gradient(circle at 10% 0%, rgba(255,255,255,.5), transparent 42%);
   border: 1px solid var(--line);
   border-radius: 16px;
-  padding: 1.25rem 1.5rem;
+  padding: 1.3rem 1.5rem;
   margin-bottom: 1.25rem;
-  box-shadow: 0 1px 2px rgba(46, 38, 87, .06);
+  box-shadow: var(--shadow-card);
 }
+
+/* The signed-in shell sits tight to the tab bar. */
+#shell { padding-bottom: .5rem; }
+#who-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: .25rem;
+}
+.who-chip {
+  display: inline-flex; align-items: center; gap: 9px;
+  background: #EFE7FB; border: 1px solid #D8C7E8;
+  border-radius: 999px; padding: 5px 6px 5px 13px;
+  font-size: .85rem; color: var(--royal-deep); font-weight: 700;
+}
+.who-chip .avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(150deg, var(--gold-light), #C98F23);
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 13px;
+  color: var(--royal-deep); border: 1.5px solid var(--gold-light);
+}
+
 h2 {
-  margin-top: 0;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.2rem;
-  color: var(--royal);
-}
-h3 {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1rem;
+  margin: 0 0 .25rem;
+  display: flex; align-items: center; gap: 9px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.28rem;
   color: var(--royal-deep);
-  margin-bottom: .35rem;
 }
+h2 .ico { width: 30px; height: 30px; flex: none; border-radius: 8px; background: #EFE7FB; display: grid; place-items: center; }
+h2 + .sub { margin-top: -.1rem; margin-bottom: 1rem; }
 
-label { display: block; margin: .6rem 0; font-size: .92rem; color: var(--muted); }
-input, select {
-  width: 100%;
-  padding: .55rem .6rem;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--field);
-  color: var(--ink);
-  font: inherit;
-}
-input[type="checkbox"], input[type="radio"] { width: auto; margin-right: .4rem; }
-/* The assignment radios read as a simple vertical list. */
-fieldset > label { display: block; margin: .35rem 0; color: var(--ink); }
-input:focus, select:focus { outline: 2px solid var(--royal); outline-offset: 0; border-color: var(--royal); }
-
-fieldset { border: 1px solid var(--line); border-radius: 12px; margin: .6rem 0; padding: .4rem .9rem .9rem; }
-legend { color: var(--muted); font-size: .85rem; padding: 0 .35rem; }
-
-/* Inline checkbox rows: weekday picker + the "specific squires" assignment list (T-0062). */
-#quest-weekly-fields label,
-.checks label { display: inline-flex; align-items: center; gap: .25rem; margin: .25rem .9rem .25rem 0; color: var(--ink); }
-.checks { margin-top: .4rem; }
-
-button {
-  margin-top: .85rem;
-  padding: .6rem 1.2rem;
-  border: 0;
-  border-radius: 999px;
-  background: var(--royal);
-  color: #fff;
+h3 {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-display);
   font-weight: 600;
-  cursor: pointer;
+  font-size: .82rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--royal-light);
+  margin: 1.3rem 0 .6rem;
 }
-button:hover { background: var(--royal-deep); }
 
-/* Tab bar (T-0061): the shell's nav switches one panel at a time. */
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
 .tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .35rem;
-  margin-top: .75rem;
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: .9rem;
   border-bottom: 2px solid var(--line);
 }
 .tabs .tab {
-  color: var(--royal);
-  font-weight: 600;
+  display: inline-flex; align-items: center; gap: 7px;
+  color: var(--royal); font-weight: 700; font-size: .88rem;
   text-decoration: none;
-  padding: .5rem .9rem;
+  padding: .5rem .85rem;
   border-radius: 10px 10px 0 0;
-  border: 1px solid transparent;
-  border-bottom: none;
+  border: 1px solid transparent; border-bottom: none;
   margin-bottom: -2px;
+  transition: background .12s ease, color .12s ease;
 }
-.tabs .tab:hover { background: var(--gold-soft); }
+.tabs .tab svg { opacity: .85; }
+.tabs .tab:hover { background: #EFE7FB; }
 .tabs .tab.active {
-  color: #fff;
-  background: var(--royal);
-  border-color: var(--royal);
+  color: var(--royal); background: var(--cream);
+  border-color: var(--line); border-bottom-color: var(--cream);
+  box-shadow: 0 -2px 8px rgba(0,0,0,.05);
+}
+.tabs .tab .count {
+  background: var(--gold); color: #3a2a06;
+  font-weight: 800; font-size: .68rem;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; display: inline-grid; place-items: center;
 }
 
-details summary { cursor: pointer; color: var(--royal); margin-top: .5rem; }
-
-ul { list-style: none; padding: 0; margin: .75rem 0 0; }
-li {
-  padding: .65rem .8rem;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  margin-bottom: .5rem;
-  background: #FFFEFA;
-}
-
-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: var(--gold-soft);
-  color: var(--royal-deep);
-  padding: .15rem .45rem;
-  border-radius: 6px;
-}
-pre {
-  background: #FBF6E8;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 1rem;
-  overflow: auto;
+/* ── Forms ───────────────────────────────────────────────────────────────── */
+label { display: block; margin: .55rem 0; font-size: .8rem; font-weight: 700; color: #6E6450; }
+input, select {
+  width: 100%; margin-top: .3rem;
+  padding: .58rem .65rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--field);
   color: var(--ink);
+  font: inherit;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+input::placeholder { color: #B7AC95; }
+input[type="checkbox"], input[type="radio"] { width: auto; margin: 0 .45rem 0 0; accent-color: var(--royal); }
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--royal);
+  box-shadow: 0 0 0 3px rgba(90,61,142,.15);
 }
 
-.error { color: var(--crimson); font-weight: 600; }
-.sub { color: var(--muted); font-size: .85rem; }
-strong { color: var(--royal-deep); }
+fieldset {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin: .7rem 0;
+  padding: .5rem .9rem .9rem;
+  background: var(--parch-light);
+}
+legend { color: var(--stone); font-size: .78rem; font-weight: 700; padding: 0 .4rem; text-transform: uppercase; letter-spacing: .04em; }
+fieldset > label { display: block; margin: .4rem 0; color: var(--ink); font-weight: 600; }
 
-/* Inline reject/adjust editors in the Review queue (SQUIRE-T-0080) — replaces browser prompt(). */
+#quest-weekly-fields label,
+.checks label {
+  display: inline-flex; align-items: center; gap: .3rem;
+  margin: .25rem .9rem .25rem 0; color: var(--ink); font-weight: 600;
+}
+.checks { margin-top: .45rem; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+button {
+  margin-top: .85rem;
+  padding: .62rem 1.25rem;
+  border: 0; border-radius: 11px;
+  background: linear-gradient(180deg, #6B4D9E, var(--royal));
+  color: #fff;
+  font-family: var(--font-ui); font-weight: 800; font-size: .9rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(90,61,142,.28), inset 0 1px 0 rgba(255,255,255,.2);
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+}
+button:hover { transform: translateY(-1px); box-shadow: 0 8px 16px rgba(90,61,142,.36), inset 0 1px 0 rgba(255,255,255,.2); }
+button:active { transform: translateY(0); }
+button:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* Approve / positive actions go green; reject / destructive go hearth-red. */
+button.approve, .apply-adjust + *, button.btn-approve {
+  background: linear-gradient(180deg, #6FA050, var(--green));
+  box-shadow: 0 4px 12px rgba(66,100,46,.28), inset 0 1px 0 rgba(255,255,255,.22);
+}
+button.approve:hover { box-shadow: 0 8px 16px rgba(66,100,46,.36), inset 0 1px 0 rgba(255,255,255,.22); }
+button.reject, .confirm-reject {
+  background: var(--field); color: var(--red-deep);
+  border: 1.5px solid var(--line); box-shadow: none;
+}
+button.reject:hover { background: var(--red-soft); border-color: var(--red); transform: translateY(-1px); }
+.confirm-reject { background: var(--red); color: #fff; border: 0; }
+
+/* Small / ghost buttons for inline list actions. */
+.btn-sm { margin-top: 0; padding: .4rem .85rem; font-size: .8rem; border-radius: 9px; }
+.btn-ghost {
+  background: var(--field); color: var(--royal);
+  border: 1.5px solid var(--line); box-shadow: none;
+}
+.btn-ghost:hover { background: #EFE7FB; border-color: #D8C7E8; }
+button.archive {
+  margin-top: 0; padding: .4rem .8rem; font-size: .78rem; border-radius: 9px;
+  background: var(--field); color: var(--stone); border: 1.5px solid var(--line); box-shadow: none;
+}
+button.archive:hover { background: var(--red-soft); border-color: var(--red); color: var(--red-deep); transform: none; }
+
+details summary {
+  cursor: pointer; color: var(--royal); font-weight: 700;
+  margin-top: .8rem; list-style: none; user-select: none;
+}
+details summary::-webkit-details-marker { display: none; }
+details summary::before { content: "▸ "; color: var(--gold-deep); }
+details[open] summary::before { content: "▾ "; }
+
+/* ── Generic list cards (quests, rewards, achievements, review, members) ──── */
+ul { list-style: none; padding: 0; margin: .8rem 0 0; }
+li {
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  padding: .8rem .95rem;
+  margin-bottom: .6rem;
+}
+
+/* Rich card row: medallion · body · coin · action. */
+.card-row { display: flex; align-items: center; gap: 14px; }
+.card-row.accent-green  { border-left: 4px solid var(--green); }
+.card-row.accent-royal  { border-left: 4px solid var(--royal); }
+.card-row.accent-blue   { border-left: 4px solid var(--blue); }
+.card-row.accent-epic   { border-left: 4px solid var(--epic); }
+.card-row.accent-gold   { border-left: 4px solid var(--gold); }
+.card-row.is-archived { opacity: .55; }
+.card-row .grow { flex: 1; min-width: 0; }
+
+.medallion {
+  width: 44px; height: 44px; flex: none;
+  border-radius: 12px;
+  background: radial-gradient(circle at 35% 28%, #FBF1D8, #EAD9AE);
+  border: 1.5px solid var(--parch-deep);
+  display: grid; place-items: center;
+  font-size: 22px; line-height: 1;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.7);
+}
+.medallion.avatar-green {
+  background: linear-gradient(150deg, #7DAE5C, var(--green));
+  border-color: var(--green-soft);
+  font-family: var(--font-display); font-weight: 700; font-size: 16px; color: #fff;
+}
+
+.card-title { font-family: var(--font-display); font-weight: 700; font-size: 1rem; color: var(--royal-deep); }
+.card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 3px; font-size: .78rem; color: var(--stone); font-weight: 600; }
+.card-meta .lead { color: var(--royal); }
+.card-meta .sep { color: var(--parch-deep); }
+.card-meta .afford { color: var(--green-deep); font-weight: 800; }
+
+/* Gold coin pill — the currency token. */
+.coin {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px 5px 9px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #F6E8C8, #EBD79E);
+  border: 1px solid var(--gold);
+  white-space: nowrap;
+}
+.coin .disc {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold));
+  box-shadow: inset 0 0 0 1.5px var(--gold-deep);
+  display: grid; place-items: center; font-size: 9px; color: #7a5a12;
+}
+.coin .amt { font-family: var(--font-display); font-weight: 700; font-size: .9rem; color: var(--gold-on); }
+
+/* Status chips. */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 999px;
+  font-size: .74rem; font-weight: 800; letter-spacing: .01em; white-space: nowrap;
+}
+.chip-auto    { background: var(--green-soft); color: var(--green-deep); text-transform: uppercase; font-size: .66rem; letter-spacing: .04em; padding: 3px 8px; }
+.chip-pending { background: #EFE7FB; color: var(--royal); border: 1px solid #D8C7E8; }
+.chip-done    { background: var(--green); color: #fff; }
+.chip-locked  { background: #EAE2CF; color: #8A7B5E; border: 1px solid var(--parch-deep); }
+.chip-stock   { background: #EAE2CF; color: #8A7B5E; }
+
+/* Action cluster (approve + reject) under review cards. */
+.card-actions { display: flex; gap: 8px; margin-top: .7rem; }
+.card-actions button { margin-top: 0; flex: 0 0 auto; }
+.card-actions .approve, .card-actions .btn-approve { flex: 1; }
+
+/* The review card stacks its action row beneath the content. */
+.review-card { display: block; }
+.review-card .card-row { display: flex; }
+
+/* ── Inline editors (reject reason / point adjust) ───────────────────────── */
 .inline-editor {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: .4rem;
-  margin-left: .5rem;
+  display: flex; flex-wrap: wrap; align-items: center; gap: .45rem;
+  margin-top: .6rem;
 }
 .inline-editor input {
-  padding: .3rem .5rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  margin-top: 0; padding: .4rem .55rem;
+  border: 1.5px solid var(--line); border-radius: 9px;
 }
-.inline-editor input.reject-reason,
-.inline-editor input.adjust-reason { min-width: 16rem; }
+.inline-editor input.reject-reason, .inline-editor input.adjust-reason { min-width: 15rem; flex: 1; }
 .inline-editor input.adjust-amount { width: 6rem; }
-.confirm-reject, .apply-adjust { background: var(--crimson); color: #fff; }
+.inline-editor button { margin-top: 0; }
 
-/* ── Members / Pair / Log polish (SQUIRE-T-0082) ── */
-/* A list item laid out as content (left) + actions (right) on one line. */
+/* ── Badges (role / status) ──────────────────────────────────────────────── */
 .list-row { display: flex; align-items: center; gap: .75rem; }
 .list-row .grow { flex: 1; min-width: 0; }
 .list-row.inactive { opacity: .55; }
 .list-row button { margin-top: 0; }
 
-/* Small inline action button for list rows (the default button is large + has top margin). */
-.btn-sm { margin-top: 0; padding: .35rem .8rem; font-size: .85rem; }
-.btn-ghost { background: transparent; color: var(--royal); border: 1px solid var(--line); }
-.btn-ghost:hover { background: var(--gold-soft); }
-
-/* Role / status badges. */
 .badge {
-  display: inline-block;
-  padding: .12rem .55rem;
-  border-radius: 999px;
-  font-size: .72rem;
-  font-weight: 700;
-  letter-spacing: .02em;
-  vertical-align: middle;
+  display: inline-block; padding: .14rem .6rem; border-radius: 999px;
+  font-size: .68rem; font-weight: 800; letter-spacing: .03em; vertical-align: middle;
 }
 .badge-knight { background: #E6E1F6; color: var(--royal-deep); }
-.badge-squire { background: var(--gold-soft); color: var(--gold-on, #5A4300); }
-.badge-muted { background: #EADFC4; color: var(--muted); }
+.badge-squire { background: var(--green-soft); color: var(--green-deep); }
+.badge-muted  { background: #EADFC4; color: var(--stone); }
 
-/* A boxed notice (e.g. the freshly-minted pairing token). */
-.notice {
-  margin-top: .75rem;
-  padding: .7rem .9rem;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: #FBF6E8;
+/* ── Notices & code ──────────────────────────────────────────────────────── */
+.error { color: var(--red-deep); font-weight: 700; background: var(--red-soft); border: 1px solid #E6BDB5; border-radius: 10px; padding: .55rem .8rem; }
+.sub { color: var(--stone); font-size: .82rem; }
+strong { color: var(--royal-deep); }
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #F1DEA6; color: var(--royal-deep);
+  padding: .15rem .45rem; border-radius: 6px;
 }
-.notice-success { border-color: var(--herald); background: #E7F3EC; }
-.notice .tok { display: block; margin-top: .35rem; word-break: break-all; }
+pre {
+  background: #FBF6E8; border: 1px solid var(--line);
+  border-radius: 12px; padding: 1rem; overflow: auto; color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem;
+}
 
-/* Pairing hand-off card: centred QR + code + caption. */
+.notice {
+  margin-top: .8rem; padding: .8rem 1rem;
+  border-radius: 12px; border: 1px solid var(--line); background: #FBF6E8;
+}
+.notice-success { border-color: var(--green); background: var(--green-soft); }
+.notice .tok { display: block; margin-top: .4rem; word-break: break-all; font-family: ui-monospace, monospace; }
+
+/* ── Pairing hand-off card ───────────────────────────────────────────────── */
 .pair-card {
-  margin-top: 1rem;
-  padding: 1.1rem;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #FFFEFA;
-  text-align: center;
-  max-width: 22rem;
+  margin-top: 1rem; padding: 1.25rem;
+  border: 1px solid var(--line); border-radius: 18px;
+  background: var(--card); text-align: center; max-width: 22rem;
+  box-shadow: var(--shadow-card);
 }
 .pair-card svg { width: 220px; height: 220px; }
-.pair-card .pair-code { font-size: 1.05rem; padding: .25rem .6rem; }
+.pair-card .pair-code {
+  font-size: 1.1rem; padding: .3rem .7rem;
+  letter-spacing: .08em; font-weight: 700;
+}
+
+/* ── Two-column Quests layout (form ⋮ board) ─────────────────────────────── */
+.quests-grid { display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; align-items: start; }
+.quests-make {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; padding: 1.1rem 1.2rem;
+}
+.quests-board .board-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: .25rem;
+}
+.quests-board .board-head .count { color: var(--stone); font-weight: 600; font-size: .9rem; }
+@media (max-width: 760px) { .quests-grid { grid-template-columns: 1fr; } }
+
+/* Empty-state hint — opportunity, never failure. */
+.empty {
+  text-align: center; padding: 1.6rem 1rem; color: var(--stone);
+  font-size: .92rem;
+}
+.empty .glyph { font-size: 1.8rem; display: block; margin-bottom: .4rem; opacity: .8; }
+.empty strong { color: var(--royal); }

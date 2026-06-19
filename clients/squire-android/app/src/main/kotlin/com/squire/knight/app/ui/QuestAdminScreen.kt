@@ -41,6 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.squire.app.ui.components.GoldPill
+import com.squire.app.ui.components.Medallion
 import com.squire.app.ui.components.SectionTitle
 import com.squire.knight.app.data.KnightApiAdapter
 import com.squire.sdk.model.CadenceKind
@@ -262,17 +264,19 @@ internal fun QuestAdminScreen(
                     ) {
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            Medallion(null, lib.title)
                             Column(Modifier.weight(1f)) {
                                 Text(lib.title, fontWeight = FontWeight.SemiBold)
                                 Text(
-                                    "${lib.category} · ${lib.reward} ★ · ${if (lib.cadence == "weekly") lib.days.joinToString("/") else "Daily"}",
+                                    "${lib.category} · ${if (lib.cadence == "weekly") lib.days.joinToString("/") else "Daily"}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
+                            GoldPill(lib.reward.toInt())
                             OutlinedButton(onClick = {
                                 create(
                                     CreateQuestReq(
@@ -310,17 +314,19 @@ internal fun QuestAdminScreen(
                 ) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        Medallion(null, q.title)
                         Column(Modifier.weight(1f)) {
                             Text(q.title + if (q.active) "" else " (archived)", fontWeight = FontWeight.SemiBold)
                             Text(
-                                "${q.reward} ★ · ${q.cadenceLabel} · ${q.assignmentLabel}",
+                                "${q.cadenceLabel} · ${q.assignmentLabel}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                        GoldPill(q.reward.toInt())
                         if (q.active) {
                             OutlinedButton(onClick = { scope.launch { runCatching { adapter.archiveQuest(q.id) }; tick++ } }) {
                                 Text("Archive")

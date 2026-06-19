@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.squire.app.ui.components.Medallion
 import com.squire.app.ui.components.SectionTitle
 import com.squire.knight.app.data.KnightApiAdapter
 import com.squire.pairing.PairQr
@@ -176,9 +177,10 @@ internal fun MemberAdminScreen(
                 ) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        Medallion(m.displayName.take(1).uppercase())
                         Column(Modifier.weight(1f)) {
                             Text(m.displayName + if (m.user == selfUser) " (you)" else "", fontWeight = FontWeight.SemiBold)
                             Text(m.role.value + if (m.active) "" else " · inactive", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

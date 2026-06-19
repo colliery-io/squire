@@ -35,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.squire.app.ui.components.GoldPill
+import com.squire.app.ui.components.Medallion
 import com.squire.app.ui.components.SectionTitle
 import com.squire.knight.app.data.KnightApiAdapter
 import com.squire.sdk.model.AchBasisKind
@@ -256,13 +258,15 @@ internal fun AchievementAdminScreen(
                 ) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        Medallion("🛡")
                         Column(Modifier.weight(1f)) {
                             Text(a.name + if (a.active) "" else " (archived)", fontWeight = FontWeight.SemiBold)
-                            Text("${a.summary} · +${a.bonus} ★", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(a.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                        if (a.bonus > 0) GoldPill(a.bonus.toInt())
                         if (a.active) {
                             OutlinedButton(onClick = { scope.launch { runCatching { adapter.archiveAchievement(a.id) }; tick++ } }) { Text("Archive") }
                         }
