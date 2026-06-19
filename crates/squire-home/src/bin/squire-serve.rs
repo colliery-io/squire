@@ -67,25 +67,35 @@ async fn serve_main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // detected host zone on first run, respected thereafter — so "midnight" is the family's midnight.
     let timezone = ensure_timezone(&store);
 
-    // Register-or-load: bootstrap the first admin only if the household has none yet.
+    // Register-or-load: bootstrap the first admin only if the household has none yet. With
+    // `SQUIRE_ADMIN_SECRET` set we bootstrap headlessly (scripts / the old flow); WITHOUT it we start
+    // anyway and let the operator create the admin in the browser via the Keep's first-run register
+    // form (SQUIRE-T-0091) — so a double-clickable launch needs no terminal or env vars.
     let first_run = !has_admin(&store);
     if first_run {
-        let admin_name = std::env::var("SQUIRE_ADMIN_NAME").unwrap_or_else(|_| "Admin".to_string());
-        let admin_secret = std::env::var("SQUIRE_ADMIN_SECRET").map_err(|_| {
-            format!(
-                "first run for household '{}': set SQUIRE_ADMIN_SECRET (and optionally \
-                 SQUIRE_ADMIN_NAME) to bootstrap the admin Knight",
-                handle.0
-            )
-        })?;
-        let resp = identity
-            .register(RegisterHouseholdReq {
-                household_name: handle.0.clone(),
-                admin_name: admin_name.clone(),
-                admin_secret,
-            })
-            .map_err(|e| format!("failed to bootstrap admin: {e:?}"))?;
-        println!("  Bootstrapped household '{}' with admin '{admin_name}' (UserId {}).", handle.0, resp.admin.0);
+        match std::env::var("SQUIRE_ADMIN_SECRET") {
+            Ok(admin_secret) => {
+                let admin_name =
+                    std::env::var("SQUIRE_ADMIN_NAME").unwrap_or_else(|_| "Admin".to_string());
+                let resp = identity
+                    .register(RegisterHouseholdReq {
+                        household_name: handle.0.clone(),
+                        admin_name: admin_name.clone(),
+                        admin_secret,
+                    })
+                    .map_err(|e| format!("failed to bootstrap admin: {e:?}"))?;
+                println!(
+                    "  Bootstrapped household '{}' with admin '{admin_name}' (UserId {}).",
+                    handle.0, resp.admin.0
+                );
+            }
+            Err(_) => {
+                println!(
+                    "  First run — no admin yet. Open the Keep below and use \
+                     \"First run? Create the admin Knight\" to set up your account."
+                );
+            }
+        }
     }
 
     // Advertise the real LAN IP in the pairing QR (the Keep reads `SQUIRE_PAIR_HOST`), so phones
