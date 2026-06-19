@@ -252,10 +252,10 @@
         <button type="submit">Generate pairing QR</button>
       </form>
       <p id="pair-error" class="error" hidden></p>
-      <div id="pair-result" hidden>
+      <div id="pair-result" class="pair-card" hidden>
         <div id="pair-qr"></div>
         <p class="sub">Scan from the Squire/Knight app, or enter this code manually:</p>
-        <p><code id="pair-code"></code></p>
+        <p><code id="pair-code" class="pair-code"></code></p>
         <p class="sub" id="pair-expiry"></p>
       </div>
     </section>
@@ -273,7 +273,8 @@
         <label>Id <input name="id" inputmode="numeric" required /></label>
         <button type="submit">View log</button>
       </form>
-      <pre id="log-output"></pre>
+      <p class="sub" id="log-hint">Pick a scope + id to trace how a balance or streak was reached — the raw event log for that quest or reward.</p>
+      <pre id="log-output" hidden></pre>
     </section>
 
     <!-- Household settings (ADR SQUIRE-A-0011 / T-0068): the timezone that sets local midnight. -->
