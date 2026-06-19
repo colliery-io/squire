@@ -31,7 +31,7 @@ test("adjust a balance inline with a required reason (V2)", async ({ page }) => 
   await login(page);
   const row = page.locator("#squire-balances li", { hasText: "Gawain" });
   await expect(row).toBeVisible();
-  await row.locator("button.adjust").click();
+  await row.getByRole("button", { name: "Adjust" }).click();
   // Apply is disabled until a reason is typed (the engine 400s a blank reason).
   await expect(row.locator("button.apply-adjust")).toBeDisabled();
   await row.locator("input.adjust-amount").fill("10");
@@ -39,8 +39,10 @@ test("adjust a balance inline with a required reason (V2)", async ({ page }) => 
   await expect(row.locator("button.apply-adjust")).toBeEnabled();
   await page.screenshot({ path: `${SCREENS}/review-02-adjust-inline.png`, fullPage: true });
   await row.locator("button.apply-adjust").click();
-  // The balance reflects the adjustment after the queue refreshes.
-  await expect(page.locator("#squire-balances li", { hasText: "Gawain" })).toContainText("10 pts");
+  // The balance reflects the adjustment after the queue refreshes (shown as a coin pill now).
+  await expect(
+    page.locator("#squire-balances li", { hasText: "Gawain" }).locator(".coin .amt"),
+  ).toHaveText("10");
 });
 
 test("approve a claim still works (V3 — no regression)", async ({ page }) => {
