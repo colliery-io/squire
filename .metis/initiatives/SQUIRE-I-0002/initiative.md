@@ -39,13 +39,15 @@ over LAN**, with a QR onramp for first install.
 2. **Server startup-pull** — [[SQUIRE-T-0087]] (active): `squire-serve` fetches the latest APK from
    `squire` into its updates dir on startup (+ schedule), derives the manifest, offline-tolerant.
    Removes the last manual publish step.
-3. **QR click-to-install** — the Keep renders a QR encoding the LAN APK URL so a new phone scans →
-   downloads → installs. (Ticket when started.)
-4. **Cross-platform server binaries + server self-update** — CI builds the server for
-   macOS/Windows/Linux into `squire`; the running server swaps itself to a newer build.
-   (Ticket when started.)
-5. **Android background sync/update** — a foreground service keeps sync + update polling alive while
-   backgrounded. (Ticket when started.)
+3. **QR click-to-install** — ✅ [[SQUIRE-T-0088]]: the Keep's Pair tab renders a QR of the LAN APK URL.
+4. **Cross-platform server binaries + server self-update** — ✅ [[SQUIRE-T-0089]]: CI builds the server
+   for macOS/Windows/Linux into `squire`; the running server self-replaces from there.
+5. **Background update checks** — ✅ [[SQUIRE-T-0090]]: a WorkManager job checks for upgrades while
+   backgrounded and notifies (chosen over a foreground service; background state-sync is a follow-up).
+
+**All five workstreams implemented** (v0.7.3 ships the full APK + cross-platform server binary set).
+Remaining = runtime validation that needs devices/two releases (server self-replace, the Android
+background firing) + relaunching the operator's running prod onto the new binary.
 
 ## Open questions
 
