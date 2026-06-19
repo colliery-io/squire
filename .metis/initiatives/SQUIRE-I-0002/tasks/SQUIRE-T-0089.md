@@ -55,4 +55,13 @@ that installed once stays current automatically.
 
 ## Status Updates
 
-- Implementing: cross-platform CI matrix first, then the self_update module + version alignment.
+- ✅ CI cross-platform server build PROVEN: `release-server.yml` matrix built squire-serve for all 4
+  targets and published `squire-serve-0.7.2-<target>.{tar.gz,zip}` to the v0.7.2 Release (SQLite
+  bundled → no system deps; no Windows/macOS issues).
+- ✅ Self-update implemented (`updater::maybe_self_update`, `self_update` crate): silent, best-effort,
+  re-execs on update; skipped for dev builds (exe under `target/`) and `SQUIRE_SELF_UPDATE=off`. Runs
+  before the tokio runtime (blocking HTTP can't nest in tokio) — `squire-serve` main restructured.
+  Server version aligned to the release tag (0.1.0 → 0.7.3).
+- Verified locally: builds; restructured main starts + serves (`/health` 200); dev build correctly
+  skips self-update (no panic). Full self-replace exercises once two real releases exist.
+- Cutting v0.7.3 (APK versionCode 7 + version-aligned 0.7.3 server binaries) to publish the aligned set.
