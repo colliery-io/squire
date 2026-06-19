@@ -30,11 +30,11 @@ redeploy; see the OTA work in [[SQUIRE-T-0085]]) and assumes a single operator o
 
 Two forces shape delivery:
 - **At-home topology**: phones live on the home LAN; the home computer runs the server
-  (`squire-serve`). We already serve APKs over LAN with content-hash OTA detection (A-0012 builds on
+  (`squire-serve`). We already serve APKs over LAN with content-hash OTA detection (builds on
   [[SQUIRE-T-0085]]).
 - **Distribute to others**: the binaries (phone APK *and* the self-updating server) must be fetchable
   by people we don't control — so they cannot require a token to a private repo. The source repo
-  (`colliery-io/squire`) is and should remain **private**.
+  (`colliery-io/squire-core`) is and should remain **private**.
 
 The intent (operator's words): the computer app should self-update *and* keep the phone APKs current
 for LAN distribution; a new phone installs via a QR "click to install"; the running app does in-place
@@ -45,24 +45,24 @@ upgrades and runs in the background.
 Adopt a **GitHub-releases delivery model split across two repos**, with the home server as the LAN
 distribution hub:
 
-1. **Source private, artifacts public.** Keep `colliery-io/squire` private. Create a separate
-   **public** repo `colliery-io/squire-dist` that holds *only* signed release artifacts (the phone
+1. **Source private, artifacts public.** Keep `colliery-io/squire-core` private. Create a separate
+   **public** repo `colliery-io/squire` that holds *only* signed release artifacts (the phone
    APK and the cross-platform server binaries). No source, no history.
 2. **CI builds + signs on a version tag** in the private repo and publishes the artifacts to a
-   **Release in `squire-dist`** (cross-repo via a scoped PAT). Release signing keys live as encrypted
+   **Release in `squire`** (cross-repo via a scoped PAT). Release signing keys live as encrypted
    Actions secrets, never in the repo.
 3. **The home server is the LAN distributor.** On startup (and on a schedule) `squire-serve` pulls the
-   latest phone APK from `squire-dist` Releases into its updates dir, derives the manifest, and serves
+   latest phone APK from `squire` Releases into its updates dir, derives the manifest, and serves
    it over LAN exactly as today (content-hash OTA + the `/app/*` endpoints). Offline-tolerant: if the
    pull fails it serves whatever is already present.
 4. **Phones never touch GitHub.** Initial install is a **QR** the Keep renders, encoding the LAN APK
    URL (`/app/squire-<code>.apk`); in-place upgrades flow from the LAN server (existing PackageInstaller
    path). A backgrounded foreground service keeps sync + update polling alive.
-5. **The server self-updates too.** `squire-serve` checks `squire-dist` for a newer server binary for
+5. **The server self-updates too.** `squire-serve` checks `squire` for a newer server binary for
    its platform, downloads, and swaps itself in — so a household that installed once stays current
    without manual intervention, and keeps its phone APKs current as a side effect of (3).
 
-Unauthenticated reads from `squire-dist` are what make "distribute to others" work: any household's
+Unauthenticated reads from `squire` are what make "distribute to others" work: any household's
 server and any QR scan can fetch without credentials.
 
 ## Alternatives Analysis
