@@ -1,7 +1,7 @@
 name: Release phone APK
 
 # Build + sign the Squire phone APK on a version tag and publish it to the PUBLIC distribution
-# repo (colliery-io/squire-dist), per ADR SQUIRE-A-0012. Home servers + the install QR pull the
+# repo (colliery-io/squire), per ADR SQUIRE-A-0012. Home servers + the install QR pull the
 # artifact from there unauthenticated; the source repo stays private.
 #
 # Required repository secrets (set with `gh secret set` — see .github/RELEASING.md):
@@ -9,7 +9,7 @@ name: Release phone APK
 #   SIGNING_STORE_PASSWORD  keystore store password
 #   SIGNING_KEY_PASSWORD    signing key password
 #   SIGNING_KEY_ALIAS       signing key alias (e.g. "squire")
-#   DIST_REPO_TOKEN         PAT with contents:write on colliery-io/squire-dist
+#   DIST_REPO_TOKEN         PAT with contents:write on colliery-io/squire
 
 on:
   push:
@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 env:
-  DIST_REPO: colliery-io/squire-dist
+  DIST_REPO: colliery-io/squire
 
 jobs:
   apk:
