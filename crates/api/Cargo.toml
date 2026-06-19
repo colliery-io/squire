@@ -12,6 +12,9 @@ axum = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Content-hash for OTA update detection (SQUIRE-T-0085): SHA-256 of the published APK, injected into
+# the /app/manifest response so a same-version rebuild still propagates.
+sha2 = "0.10"
 # OpenAPI 3 contract emission from the Rust types (SQUIRE-T-0031 / ADR SQUIRE-A-0009).
 utoipa = { version = "5", features = ["axum_extras"] }
 

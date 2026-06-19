@@ -180,8 +180,9 @@ internal fun PlayerHomeHost(
 
     // Server-distributed update check (SQUIRE-T-0051).
     var update by remember(session) { mutableStateOf<UpdateInfo?>(null) }
+    val updateContext = LocalContext.current
     LaunchedEffect(session) {
-        update = UpdateChecker.check(session.baseUrl, "squire", BuildConfig.VERSION_CODE)
+        update = UpdateChecker.check(updateContext, session.baseUrl, "squire", BuildConfig.VERSION_CODE)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {

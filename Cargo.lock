@@ -36,6 +36,7 @@ dependencies = [
  "identity",
  "serde",
  "serde_json",
+ "sha2",
  "store",
  "tempfile",
  "tokio",
