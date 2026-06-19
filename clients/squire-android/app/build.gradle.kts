@@ -91,5 +91,7 @@ dependencies {
 
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    // Background update checks (SQUIRE-T-0090): periodic, OS-scheduled, battery-friendly.
+    implementation(libs.androidx.work.runtime.ktx)
     ksp(libs.room.compiler)
 }

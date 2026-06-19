@@ -1,5 +1,8 @@
 package com.squire.app
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.squire.app.data.RoomOutbox
 import com.squire.app.data.RoomStateCache
+import com.squire.app.bg.UpdateCheckWorker
 import com.squire.app.data.SquireApiAdapter
 import com.squire.app.data.db.SquireDb
 import com.squire.app.ui.PlayerHomeScreen
@@ -68,13 +72,20 @@ class MainActivity : ComponentActivity() {
 
         val sessionStore = SessionStore(this)
         val discovery = NsdDiscovery(this)
+        val appCtx = applicationContext
+
+        // Background app-update checks (SQUIRE-T-0090): run while paired, even when backgrounded.
+        if (sessionStore.load() != null) UpdateCheckWorker.schedule(appCtx)
+        maybeRequestNotificationPermission()
 
         setContent {
             SquireTheme {
                 var session by remember { mutableStateOf(sessionStore.load()) }
                 val current = session
-                val onSessionChanged: (Session) -> Unit = { s -> sessionStore.save(s); session = s }
-                val onForget: () -> Unit = { sessionStore.clear(); session = null }
+                val onSessionChanged: (Session) -> Unit =
+                    { s -> sessionStore.save(s); session = s; UpdateCheckWorker.schedule(appCtx) }
+                val onForget: () -> Unit =
+                    { sessionStore.clear(); session = null; UpdateCheckWorker.cancel(appCtx) }
 
                 when {
                     current == null -> PairingScreen(
@@ -96,6 +107,16 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    /** Ask for POST_NOTIFICATIONS on Android 13+ so the background update check can notify. */
+    private fun maybeRequestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
         }
     }
 

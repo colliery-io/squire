@@ -6,6 +6,8 @@
     <!-- In-app update install (SQUIRE-T-0059): download the LAN APK and hand it to the system
          installer without bouncing through the browser. First use prompts a one-time per-app grant. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Background update-available notification (SQUIRE-T-0090); runtime-requested on Android 13+. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:icon="@mipmap/ic_launcher"
