@@ -19,12 +19,22 @@ use std::path::PathBuf;
 use domain_core::contract::{HouseholdHandle, RegisterHouseholdReq};
 
 use squire_home::{
-    ensure_timezone, env_u16, has_admin, local_lan_ip, open_household, serve, signing_key,
-    spawn_apk_sync, TOKEN_TTL_MS,
+    ensure_timezone, env_u16, has_admin, local_lan_ip, maybe_self_update, open_household, serve,
+    signing_key, spawn_apk_sync, TOKEN_TTL_MS,
 };
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Self-update BEFORE the async runtime: `self_update` uses blocking HTTP, and nesting a runtime
+    // inside tokio panics. Re-execs into the new binary if it updated (does not return); no-op for a
+    // `cargo run` dev build or when SQUIRE_SELF_UPDATE=off.
+    maybe_self_update();
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(serve_main())
+}
+
+async fn serve_main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let data_dir: PathBuf = std::env::var_os("SQUIRE_DATA_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| {

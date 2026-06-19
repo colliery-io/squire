@@ -25,6 +25,9 @@ use store::SystemClock;
 mod apk_sync;
 pub use apk_sync::spawn_apk_sync;
 
+mod updater;
+pub use updater::maybe_self_update;
+
 /// Standard token lifetime: 24h.
 pub const TOKEN_TTL_MS: i64 = 24 * 60 * 60 * 1000;
 
