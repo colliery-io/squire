@@ -11,13 +11,13 @@
 //! the loopback **Keep** and the LAN **api** over it, plus a best-effort mDNS advert (T-0047).
 
 use std::net::{IpAddr, SocketAddr, UdpSocket};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use api::AppState;
 use keep::KeepState;
 
-use domain_core::contract::{config_keys, HouseholdHandle, Repository, Role};
+use domain_core::contract::{config_keys, HouseholdHandle, RegisterHouseholdReq, Repository, Role};
 use identity::{Identity, ProdIdentity, SharedStore, TokenSigner};
 use store::tenant::{Backend, Provisioner};
 use store::SystemClock;
@@ -32,6 +32,104 @@ pub use updater::maybe_self_update;
 pub const TOKEN_TTL_MS: i64 = 24 * 60 * 60 * 1000;
 
 type BoxErr = Box<dyn std::error::Error + Send + Sync>;
+
+/// Run the persistent home server end to end: resolve the data + OTA dirs, open (provision-if-absent)
+/// the household, seed the timezone, optionally bootstrap the admin, advertise the LAN address, start
+/// the background APK sync, and serve the api + Keep until shut down. Shared by the headless
+/// `squire-serve` binary and the native desktop app (SQUIRE-T-0092) so both run an identical server.
+pub async fn run_home_server() -> Result<(), BoxErr> {
+    let data_dir: PathBuf = std::env::var_os("SQUIRE_DATA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("squire"));
+
+    // OTA app-update dir (SQUIRE-T-0051/0085): default to `<data_dir>/updates` and create it, so the
+    // `/app/*` endpoints are always available without setting `SQUIRE_APK_DIR`. An explicit env var
+    // still wins. Dropping a new APK + manifest there is picked up live (read per request).
+    let apk_dir: PathBuf = std::env::var_os("SQUIRE_APK_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| data_dir.join("updates"));
+    let _ = std::fs::create_dir_all(&apk_dir);
+    std::env::set_var("SQUIRE_APK_DIR", &apk_dir);
+
+    let api_port = env_u16("API_PORT", 8080);
+    let keep_port = env_u16("KEEP_PORT", 4920);
+    let handle =
+        HouseholdHandle(std::env::var("SQUIRE_HOUSEHOLD").unwrap_or_else(|_| "home".to_string()));
+
+    // Stable signing key (generated + persisted on first run) — paired tokens survive restarts.
+    let key = signing_key(&data_dir)?;
+
+    // Provision-if-absent + open (NEVER wiped). Idempotent on an existing store.
+    let (store, identity) = open_household(&data_dir, &handle, &key, TOKEN_TTL_MS)?;
+
+    // Onboarding (ADR A-0011): ensure a household timezone is set.
+    let timezone = ensure_timezone(&store);
+
+    // Register-or-load: bootstrap the first admin only if none yet. With `SQUIRE_ADMIN_SECRET` set we
+    // bootstrap headlessly; without it we start anyway and the operator creates the admin in the
+    // browser via the Keep's first-run register form (SQUIRE-T-0091).
+    let first_run = !has_admin(&store);
+    if first_run {
+        match std::env::var("SQUIRE_ADMIN_SECRET") {
+            Ok(admin_secret) => {
+                let admin_name =
+                    std::env::var("SQUIRE_ADMIN_NAME").unwrap_or_else(|_| "Admin".to_string());
+                let resp = identity
+                    .register(RegisterHouseholdReq {
+                        household_name: handle.0.clone(),
+                        admin_name: admin_name.clone(),
+                        admin_secret,
+                    })
+                    .map_err(|e| format!("failed to bootstrap admin: {e:?}"))?;
+                println!(
+                    "  Bootstrapped household '{}' with admin '{admin_name}' (UserId {}).",
+                    handle.0, resp.admin.0
+                );
+            }
+            Err(_) => {
+                println!(
+                    "  First run — no admin yet. Open the Keep and use \"First run? Create the \
+                     admin Knight\" to set up your account."
+                );
+            }
+        }
+    }
+
+    // Advertise the real LAN IP in the pairing QR (the Keep reads `SQUIRE_PAIR_HOST`).
+    let lan_host = std::env::var("SQUIRE_PAIR_HOST").ok().or_else(|| {
+        let detected = local_lan_ip().map(|ip| ip.to_string());
+        if let Some(ip) = &detected {
+            std::env::set_var("SQUIRE_PAIR_HOST", ip);
+        }
+        detected
+    });
+
+    println!("════════════════════════════════════════════════════════════════════");
+    println!("  Squire home server — persistent, data in {}", data_dir.display());
+    println!(
+        "  Household:               {}{}",
+        handle.0,
+        if first_run { " (newly bootstrapped)" } else { " (loaded)" }
+    );
+    println!("  Timezone:                {timezone}   ← daily quests reset at this local midnight");
+    if let Some(apk) = std::env::var_os("SQUIRE_APK_DIR") {
+        println!("  App updates (OTA):       {}", PathBuf::from(apk).display());
+    }
+    println!("  Keep (parent, loopback): http://127.0.0.1:{keep_port}");
+    match &lan_host {
+        Some(h) => println!("  LAN api (phones):        http://{h}:{api_port}   ← phones pair here (QR + mDNS)"),
+        None => {
+            println!("  LAN api (phones):        http://0.0.0.0:{api_port}");
+            println!("  (could not detect a LAN IP — set SQUIRE_PAIR_HOST=<this computer's IP>)");
+        }
+    }
+    println!("════════════════════════════════════════════════════════════════════");
+
+    // Keep the LAN-served phone APK current from the public dist repo (SQUIRE-T-0087 / A-0012).
+    spawn_apk_sync(apk_dir);
+
+    serve(store, identity, handle, api_port, keep_port).await
+}
 
 /// **Provision-if-absent** + open the tenant store on a SQLite dir, and build the shared
 /// single-writer [`ProdIdentity`] over it. Provisioning is idempotent (migrations skip already-
