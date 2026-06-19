@@ -1,0 +1,60 @@
+---
+id: native-desktop-app-tauri-window
+level: task
+title: "Native desktop app: Tauri window hosting the Keep instead of a browser"
+short_code: "SQUIRE-T-0092"
+created_at: 2026-06-19T20:28:58.503865+00:00
+updated_at: 2026-06-19T20:28:58.503865+00:00
+parent: SQUIRE-I-0002
+blocked_by: []
+archived: false
+
+tags:
+  - "#task"
+  - "#phase/active"
+
+
+exit_criteria_met: false
+initiative_id: SQUIRE-I-0002
+---
+
+# Native desktop app: Tauri window hosting the Keep instead of a browser
+
+## Parent Initiative
+
+[[SQUIRE-I-0002]] — make the operator UI a native app, not a browser tab.
+
+## Objective
+
+Run the Keep in a native OS window (Tauri v2, WKWebView/WebView2/WebKitGTK) instead of opening a
+browser — reusing the existing Keep web UI as-is.
+
+## What shipped (first cut)
+
+- **Refactor**: lifted the server startup from the `squire-serve` bin into `squire_home::run_home_server()`
+  so the headless binary and the desktop app run an identical server (the bin is now a thin
+  self-update + runtime wrapper).
+- **`crates/squire-desktop`** (Tauri v2): embeds the home server on a background tokio runtime and
+  opens a native window at the loopback Keep once it's listening. Loads the external loopback URL
+  (`WebviewUrl::External`) so the whole Keep — UI, `/api`, cookies — is served by the embedded server
+  (no CORS/origin split, no bundled-frontend rewrite). Crest icon set generated from the SVG.
+
+## Acceptance Criteria
+
+- [x] A Tauri app embeds the server + shows the Keep in a native window (no browser).
+- [x] Builds and launches; the embedded Keep serves (`/health` 200) and the window points at it.
+- [ ] Bundled `.app`/`.dmg` (cargo tauri build) and wired into the installer.
+- [ ] Desktop-app self-update + window polish (menus, single-instance, quit stops the server).
+
+## Follow-ups
+
+- `cargo tauri build` → `Squire.app`/`.dmg`; publish to the dist repo; make `install.sh` install the
+  native app instead of the browser-launcher `.app`.
+- CI: build/publish `squire-desktop` per platform; give it its own self-update (like squire-serve).
+- Polish: app menu, quit-stops-embedded-server, single-instance guard.
+
+## Status Updates
+
+- First cut done + verified: `cargo build -p squire-desktop` green; launched with throwaway
+  ports/data — process + embedded server up, `/health` 200, native window created. Bundling +
+  installer integration are the next step.
