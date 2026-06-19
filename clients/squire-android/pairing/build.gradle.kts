@@ -7,7 +7,7 @@ plugins {
 
 // Shared device-pairing module (ADR SQUIRE-A-0010): Keystore-backed session storage, the /pair
 // exchange over the generated SDK, NSD host discovery, QR parsing + a ZXing scan screen. Used by
-// both :app (Squire) and :knight-app (Knight) so the pairing flow lives in one place.
+// :app (the single Squire + Knight app) so the pairing flow lives in one place.
 android {
     namespace = "com.squire.pairing"
     compileSdk = 34

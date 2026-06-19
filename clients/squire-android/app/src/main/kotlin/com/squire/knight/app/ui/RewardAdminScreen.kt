@@ -35,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.squire.app.ui.components.GoldPill
+import com.squire.app.ui.components.Medallion
 import com.squire.app.ui.components.SectionTitle
 import com.squire.knight.app.data.KnightApiAdapter
 import com.squire.sdk.model.AvailabilityKind
@@ -207,13 +209,15 @@ internal fun RewardAdminScreen(
                     ) {
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            Medallion(null, r.name, reward = true)
                             Column(Modifier.weight(1f)) {
                                 Text(r.name, fontWeight = FontWeight.SemiBold)
                                 Text(libSummary(r), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                            GoldPill(r.cost.toInt())
                             OutlinedButton(onClick = { create(libToReq(r)) }) { Text("Import") }
                         }
                     }
@@ -233,13 +237,15 @@ internal fun RewardAdminScreen(
                 ) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        Medallion(null, r.name, reward = true)
                         Column(Modifier.weight(1f)) {
                             Text(r.name + if (r.active) "" else " (archived)", fontWeight = FontWeight.SemiBold)
-                            Text("${r.cost} ★ · ${r.summary}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(r.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                        GoldPill(r.cost.toInt())
                         if (r.active) {
                             OutlinedButton(onClick = { scope.launch { runCatching { adapter.archiveItem(r.id) }; tick++ } }) { Text("Archive") }
                         }

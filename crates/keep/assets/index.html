@@ -8,15 +8,21 @@
 </head>
 <body>
   <header>
-    <h1>⚔️ The Keep</h1>
-    <p class="sub">Squire household admin · local only</p>
+    <span class="emblem" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2.6 L19.2 5.2 V11 C19.2 16 15.9 19.6 12 21.4 C8.1 19.6 4.8 16 4.8 11 V5.2 Z" fill="#F1C15C" stroke="#A97822" stroke-width="1"/><path d="M9 12 l2 2 4-4.2" stroke="#5A3D8E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+    </span>
+    <div>
+      <h1>The Keep</h1>
+      <p class="sub">Squire household admin · local only</p>
+    </div>
   </header>
 
   <main>
     <!-- Operator login. The Keep is operated by a Knight; the acting Knight is stamped as the
          author/actor of every committed change (audit). This is a same-machine admin surface. -->
     <section id="login">
-      <h2>Sign in</h2>
+      <h2><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2.6 L19 5 V11 C19 15.6 16 19 12 20.6 C8 19 5 15.6 5 11 V5 Z" stroke="#5A3D8E" stroke-width="1.7"/></svg></span>Sign in</h2>
+      <p class="sub">Enter the Keep to author quests and review your squires' adventures.</p>
       <form id="login-form" method="post" action="/login">
         <label>Knight id <input name="user" inputmode="numeric" required /></label>
         <label>Secret <input name="secret" type="password" required /></label>
@@ -35,26 +41,28 @@
       </details>
     </section>
 
-    <!-- Authenticated shell. Later Keep tasks (T-0026..T-0030) mount authoring, the review queue,
-         member admin, and the log inspector here. -->
+    <!-- Authenticated shell. Tabs mount authoring, the review queue, member admin, and the log. -->
     <section id="shell" hidden>
-      <p>Signed in as <strong id="who"></strong>.</p>
+      <div id="who-row">
+        <span class="who-chip">Signed in as <span id="who"></span></span>
+      </div>
       <nav class="tabs" id="tabs">
-        <a class="tab" data-tab="quests" href="#quests">Quests</a>
-        <a class="tab" data-tab="review" href="#review">Review</a>
-        <a class="tab" data-tab="rewards" href="#rewards">Rewards</a>
-        <a class="tab" data-tab="achievements" href="#achievements">Achievements</a>
-        <a class="tab" data-tab="members" href="#members">Members</a>
-        <a class="tab" data-tab="pair" href="#pair">Pair</a>
-        <a class="tab" data-tab="log" href="#log">Log</a>
-        <a class="tab" data-tab="settings" href="#settings">Settings</a>
+        <a class="tab" data-tab="quests" href="#quests"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Quests</a>
+        <a class="tab" data-tab="review" href="#review"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 12l2.3 2.3L16 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Review</a>
+        <a class="tab" data-tab="rewards" href="#rewards"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 9h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9Z" stroke="currentColor" stroke-width="1.6"/><path d="M3 6h18v3H3zM12 6v14" stroke="currentColor" stroke-width="1.6"/></svg>Rewards</a>
+        <a class="tab" data-tab="achievements" href="#achievements"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3 L18 5.4 V11 C18 15 15.3 18 12 19.4 C8.7 18 6 15 6 11 V5.4 Z" stroke="currentColor" stroke-width="1.6"/></svg>Achievements</a>
+        <a class="tab" data-tab="members" href="#members"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Members</a>
+        <a class="tab" data-tab="pair" href="#pair"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><path d="M13 4h7v7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Pair</a>
+        <a class="tab" data-tab="log" href="#log"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 4h14M5 9h14M5 14h10M5 19h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Log</a>
+        <a class="tab" data-tab="settings" href="#settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="8" r="2.4" stroke="currentColor" stroke-width="1.6"/><circle cx="16" cy="16" r="2.4" stroke="currentColor" stroke-width="1.6"/><path d="M4 8h2m4 0h10M4 16h8m4 0h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Settings</a>
       </nav>
     </section>
 
     <!-- Cross-Squire review queue (SQUIRE-T-0029): one screen, approvable in place. -->
     <section id="review-panel" hidden>
-      <h2 id="review">Review queue</h2>
-      <p id="review-empty" hidden>Nothing pending. 🎉</p>
+      <h2 id="review"><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#5A3D8E" stroke-width="1.7"/><path d="M8.5 12l2.3 2.3L16 9" stroke="#5A3D8E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Review queue</h2>
+      <p class="sub">Bless your squires' completed quests and reward requests.</p>
+      <p id="review-empty" class="empty" hidden><span class="glyph">🌟</span>All caught up — <strong>nothing awaits your blessing</strong>.</p>
       <h3>Claims</h3>
       <ul id="claim-queue"></ul>
       <h3>Redemption requests</h3>
@@ -66,65 +74,76 @@
     <!-- Quest authoring (SQUIRE-T-0026). A minimal create form (daily / all squires / each
          assignee); the JSON API behind it supports the full cadence/assignment/completion shape. -->
     <section id="quests-panel" hidden>
-      <h2 id="quests">Quests</h2>
-      <form id="quest-form">
-        <label>Title <input name="title" required /></label>
-        <label>Reward (points) <input name="reward" type="number" min="0" value="5" required /></label>
-        <label>Category (optional) <input name="category" placeholder="e.g. Bedroom" /></label>
+      <h2 id="quests"><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" rx="2" stroke="#5A3D8E" stroke-width="1.7"/><path d="M8 8h8M8 12h8M8 16h5" stroke="#5A3D8E" stroke-width="1.7" stroke-linecap="round"/></svg></span>Quests</h2>
+      <p class="sub">Post adventures to the board. Archived quests are kept for history, never deleted.</p>
+      <div class="quests-grid">
+        <div class="quests-make">
+          <form id="quest-form">
+            <label>Title <input name="title" required /></label>
+            <label>Reward (points) <input name="reward" type="number" min="0" value="5" required /></label>
+            <label>Category (optional) <input name="category" placeholder="e.g. Bedroom" /></label>
 
-        <label>How often
-          <select name="cadence" id="quest-cadence">
-            <option value="Daily">Every day</option>
-            <option value="Weekly">Weekly — pick days</option>
-            <option value="OneOff">One-time</option>
-          </select>
-        </label>
-        <fieldset id="quest-weekly-fields" hidden>
-          <legend>Days</legend>
-          <label><input type="checkbox" name="wd" value="Mon" /> Mon</label>
-          <label><input type="checkbox" name="wd" value="Tue" /> Tue</label>
-          <label><input type="checkbox" name="wd" value="Wed" /> Wed</label>
-          <label><input type="checkbox" name="wd" value="Thu" /> Thu</label>
-          <label><input type="checkbox" name="wd" value="Fri" /> Fri</label>
-          <label><input type="checkbox" name="wd" value="Sat" /> Sat</label>
-          <label><input type="checkbox" name="wd" value="Sun" /> Sun</label>
-        </fieldset>
-        <label id="quest-due-label" hidden>Due date (optional) <input name="due" type="date" /></label>
+            <label>How often
+              <select name="cadence" id="quest-cadence">
+                <option value="Daily">Every day</option>
+                <option value="Weekly">Weekly — pick days</option>
+                <option value="OneOff">One-time</option>
+              </select>
+            </label>
+            <fieldset id="quest-weekly-fields" hidden>
+              <legend>Days</legend>
+              <label><input type="checkbox" name="wd" value="Mon" /> Mon</label>
+              <label><input type="checkbox" name="wd" value="Tue" /> Tue</label>
+              <label><input type="checkbox" name="wd" value="Wed" /> Wed</label>
+              <label><input type="checkbox" name="wd" value="Thu" /> Thu</label>
+              <label><input type="checkbox" name="wd" value="Fri" /> Fri</label>
+              <label><input type="checkbox" name="wd" value="Sat" /> Sat</label>
+              <label><input type="checkbox" name="wd" value="Sun" /> Sun</label>
+            </fieldset>
+            <label id="quest-due-label" hidden>Due date (optional) <input name="due" type="date" /></label>
 
-        <label>Completion
-          <select name="completion">
-            <option value="EachAssignee">Each assignee does their own</option>
-            <option value="Race">First to finish wins (one payout)</option>
-          </select>
-        </label>
+            <label>Completion
+              <select name="completion">
+                <option value="EachAssignee">Each assignee does their own</option>
+                <option value="Race">First to finish wins (one payout)</option>
+              </select>
+            </label>
 
-        <fieldset>
-          <legend>Assign to</legend>
-          <label><input type="radio" name="assign" value="all" checked /> All squires (incl. ones added later)</label>
-          <label><input type="radio" name="assign" value="some" /> Specific squires</label>
-          <div id="quest-squires" class="checks" hidden></div>
-        </fieldset>
+            <fieldset>
+              <legend>Assign to</legend>
+              <label><input type="radio" name="assign" value="all" checked /> All squires (incl. ones added later)</label>
+              <label><input type="radio" name="assign" value="some" /> Specific squires</label>
+              <div id="quest-squires" class="checks" hidden></div>
+            </fieldset>
 
-        <label><input name="auto_approve" type="checkbox" /> Auto-approve (skip review)</label>
-        <label><input name="repeat_day" type="checkbox" /> Can be earned multiple times per day</label>
-        <button type="submit">Add quest</button>
-      </form>
-      <p id="quest-error" class="error" hidden></p>
+            <label><input name="auto_approve" type="checkbox" /> Auto-approve (skip review)</label>
+            <label><input name="repeat_day" type="checkbox" /> Can be earned multiple times per day</label>
+            <button type="submit">Post to the board</button>
+          </form>
+          <p id="quest-error" class="error" hidden></p>
 
-      <details id="library">
-        <summary>📚 Add from the starter library</summary>
-        <p class="sub">Common chores, ready to import for all squires. Edit or archive them afterwards.</p>
-        <p id="library-error" class="error" hidden></p>
-        <div id="library-list"></div>
-      </details>
+          <details id="library">
+            <summary>📚 Add from the starter library</summary>
+            <p class="sub">Common chores, ready to import for all squires. Edit or archive them afterwards.</p>
+            <p id="library-error" class="error" hidden></p>
+            <div id="library-list"></div>
+          </details>
+        </div>
 
-      <ul id="quest-list"></ul>
+        <div class="quests-board">
+          <div class="board-head">
+            <h3 style="margin:0;">On the board</h3>
+          </div>
+          <ul id="quest-list"></ul>
+        </div>
+      </div>
     </section>
 
     <!-- Item authoring (SQUIRE-T-0027 / enriched T-0036). Availability is Once or Repeatable only
          (A-0006); an optional achievement gate (RedeemableItem.gate) locks the reward until earned. -->
     <section id="items-panel" hidden>
-      <h2 id="items">Rewards</h2>
+      <h2 id="items"><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 9h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9Z" stroke="#5A3D8E" stroke-width="1.7"/><path d="M3 6h18v3H3z" stroke="#5A3D8E" stroke-width="1.7"/><path d="M12 6v14" stroke="#5A3D8E" stroke-width="1.7"/></svg></span>Reward vault</h2>
+      <p class="sub">Treasures your squires can redeem with the points they've earned.</p>
       <form id="item-form">
         <label>Name <input name="name" required /></label>
         <label>Description (optional) <input name="description" placeholder="e.g. 30 extra minutes of games" /></label>
@@ -157,7 +176,8 @@
     <!-- Achievement authoring (SQUIRE-T-0027 / enriched T-0036). The full Criterion surface:
          Streak (scope + length + basis), TotalCompletions (scope + count), PointsEarned (total). -->
     <section id="achievements-panel" hidden>
-      <h2 id="achievements">Achievements</h2>
+      <h2 id="achievements"><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 3 L18 5.4 V11 C18 15 15.3 18 12 19.4 C8.7 18 6 15 6 11 V5.4 Z" stroke="#5A3D8E" stroke-width="1.7"/></svg></span>Achievements</h2>
+      <p class="sub">Milestones that celebrate effort — each can award bonus points and unlock gated rewards.</p>
       <form id="achievement-form">
         <label>Name <input name="name" required /></label>
         <label>Criterion
@@ -224,7 +244,8 @@
     <!-- Member administration (SQUIRE-T-0028). Add Knights/Squires; the minted token provisions a
          phone. De/reactivate is archive-not-delete. -->
     <section id="members-panel" hidden>
-      <h2 id="members">Members</h2>
+      <h2 id="members"><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="#5A3D8E" stroke-width="1.7"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="#5A3D8E" stroke-width="1.7" stroke-linecap="round"/></svg></span>Members</h2>
+      <p class="sub">The Knights and Squires of your household.</p>
       <form id="member-form">
         <label>Name <input name="display_name" required /></label>
         <label>Role
@@ -244,7 +265,8 @@
     <!-- Device pairing (ADR SQUIRE-A-0010 / T-0045): mint a one-time code + QR for a member's phone.
          The phone scans the QR (or types the code) and exchanges it at the LAN api's POST /pair. -->
     <section id="pair-panel" hidden>
-      <h2 id="pair">Pair a device</h2>
+      <h2 id="pair"><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1" stroke="#5A3D8E" stroke-width="1.7"/><rect x="13" y="13" width="7" height="7" rx="1" stroke="#5A3D8E" stroke-width="1.7"/><path d="M13 4h7v7" stroke="#5A3D8E" stroke-width="1.7" stroke-linecap="round"/></svg></span>Pair a device</h2>
+      <p class="sub">Hand a squire's phone its credentials with a one-time code.</p>
       <form id="pair-form">
         <label>Member
           <select name="user" id="pair-member"></select>
@@ -262,7 +284,7 @@
 
     <!-- Read-only event-log inspector (SQUIRE-T-0030): trace how a balance/streak was reached. -->
     <section id="log-panel" hidden>
-      <h2 id="log">Event log</h2>
+      <h2 id="log"><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M5 4h14M5 9h14M5 14h10M5 19h10" stroke="#5A3D8E" stroke-width="1.7" stroke-linecap="round"/></svg></span>Event log</h2>
       <form id="log-form">
         <label>Scope
           <select name="scope">
@@ -279,7 +301,7 @@
 
     <!-- Household settings (ADR SQUIRE-A-0011 / T-0068): the timezone that sets local midnight. -->
     <section id="settings-panel" hidden>
-      <h2 id="settings">Settings</h2>
+      <h2 id="settings"><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="8" r="2.4" stroke="#5A3D8E" stroke-width="1.7"/><circle cx="16" cy="16" r="2.4" stroke="#5A3D8E" stroke-width="1.7"/><path d="M4 8h2m4 0h10M4 16h8m4 0h4" stroke="#5A3D8E" stroke-width="1.7" stroke-linecap="round"/></svg></span>Settings</h2>
       <form id="settings-form">
         <label>Household timezone
           <select name="timezone" id="settings-tz"></select>

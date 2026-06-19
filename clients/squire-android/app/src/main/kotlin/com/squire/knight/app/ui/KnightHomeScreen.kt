@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +30,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -41,8 +45,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.squire.app.ui.components.GoldPill
+import com.squire.app.ui.components.Medallion
 import com.squire.app.ui.components.SectionTitle
 import com.squire.app.ui.components.StatusChip
+import com.squire.app.ui.theme.SquireGold
 import com.squire.app.ui.theme.SquireTheme
 import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.HouseholdReview
@@ -80,8 +86,17 @@ fun KnightHomeScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
+          Column {
             TopAppBar(
-                title = { Text("🛡 The Round Table", style = MaterialTheme.typography.titleLarge) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(color = MaterialTheme.colorScheme.secondary, shape = CircleShape) {
+                            Text("🛡", modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text("The Round Table", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
@@ -102,6 +117,8 @@ fun KnightHomeScreen(
                     }
                 },
             )
+            HorizontalDivider(thickness = 3.dp, color = SquireGold)
+          }
         },
     ) { padding ->
         when (state) {
@@ -400,6 +417,7 @@ private fun PendingClaimRow(claim: PendingClaim, squireName: String, onApprove: 
     ReviewCard(
         title = claim.questTitle,
         subtitle = "$squireName · day ${claim.on}",
+        leading = { Medallion(null, claim.questTitle) },
         trailing = { StatusChip("Quest", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer) },
         onApprove = onApprove,
         onReject = onReject,
@@ -411,6 +429,7 @@ private fun PendingRequestRow(request: PendingRequest, squireName: String, onApp
     ReviewCard(
         title = request.itemName,
         subtitle = "$squireName · ${request.cost} ★",
+        leading = { Medallion(null, request.itemName, reward = true) },
         trailing = { StatusChip("Reward", MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) },
         onApprove = onApprove,
         onReject = onReject,
@@ -422,6 +441,7 @@ private fun PendingRequestRow(request: PendingRequest, squireName: String, onApp
 private fun ReviewCard(
     title: String,
     subtitle: String,
+    leading: @Composable () -> Unit,
     trailing: @Composable () -> Unit,
     onApprove: () -> Unit,
     onReject: () -> Unit,
@@ -437,6 +457,8 @@ private fun ReviewCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                leading()
+                Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(title, fontWeight = FontWeight.SemiBold)
                     Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
