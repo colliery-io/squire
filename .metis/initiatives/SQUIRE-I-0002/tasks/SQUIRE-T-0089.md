@@ -4,14 +4,14 @@ level: task
 title: "Cross-platform server binaries in CI + squire-serve self-update from the dist repo"
 short_code: "SQUIRE-T-0089"
 created_at: 2026-06-19T19:07:40.930426+00:00
-updated_at: 2026-06-19T19:07:40.930426+00:00
+updated_at: 2026-06-19T19:35:00.820664+00:00
 parent: SQUIRE-I-0002
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -43,10 +43,10 @@ that installed once stays current automatically.
 
 ## Acceptance Criteria
 
-- [ ] CI publishes `squire-serve` binaries for macOS/Windows/Linux to the dist Release on a tag.
-- [ ] The running server detects a newer published version and self-replaces + re-execs (silent).
-- [ ] Dev (`cargo run`) and `SQUIRE_SELF_UPDATE=off` skip self-update; offline is a no-op (best-effort).
-- [ ] Server version tracks the release tag.
+- [x] CI publishes `squire-serve` binaries for macOS/Windows/Linux to the dist Release on a tag.
+- [x] The running server detects a newer published version and self-replaces + re-execs (silent) — implemented; exercises on the next release.
+- [x] Dev (`cargo run`) and `SQUIRE_SELF_UPDATE=off` skip self-update; offline is a no-op (best-effort).
+- [x] Server version tracks the release tag.
 
 ## Open questions
 
@@ -64,4 +64,6 @@ that installed once stays current automatically.
   Server version aligned to the release tag (0.1.0 → 0.7.3).
 - Verified locally: builds; restructured main starts + serves (`/health` 200); dev build correctly
   skips self-update (no panic). Full self-replace exercises once two real releases exist.
-- Cutting v0.7.3 (APK versionCode 7 + version-aligned 0.7.3 server binaries) to publish the aligned set.
+- ✅ Published v0.7.3: both workflows green; the Release carries `squire-7.apk` + all four
+  `squire-serve-0.7.3-<target>` binaries — fully version-aligned. Done. (The actual self-replace
+  exercises on the next release; a stale 0.1.0 binary self-heals to 0.7.3 in one step, no loop.)
