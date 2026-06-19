@@ -43,8 +43,10 @@ browser — reusing the existing Keep web UI as-is.
 
 - [x] A Tauri app embeds the server + shows the Keep in a native window (no browser).
 - [x] Builds and launches; the embedded Keep serves (`/health` 200) and the window points at it.
-- [ ] Bundled `.app`/`.dmg` (cargo tauri build) and wired into the installer.
-- [ ] Desktop-app self-update + window polish (menus, single-instance, quit stops the server).
+- [x] Bundled `Squire.app` (`cargo tauri build`), published to the dist Release, and `install.sh`
+  installs the native app on macOS (verified: one-liner installs a real Mach-O `.app`).
+- [ ] Desktop-app self-update + window polish (menus, single-instance, quit stops the server);
+  cross-platform Tauri builds in CI (Intel mac / Windows / Linux native apps).
 
 ## Follow-ups
 
