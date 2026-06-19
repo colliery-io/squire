@@ -51,6 +51,7 @@ pub(crate) fn clock_from_store(store: &SharedStore) -> LocalClock {
 }
 
 pub mod achievements;
+pub mod app_install;
 pub mod config;
 pub mod inspector;
 pub mod items;
@@ -415,6 +416,8 @@ pub fn router(state: Arc<KeepState>) -> Router {
         .route("/api/members/{id}/active", post(members::set_active))
         // Device pairing (ADR A-0010): mint a one-time code + QR for a chosen member.
         .route("/api/pair/codes", post(pair::mint_pair_code))
+        // New-phone install QR — points at the LAN api's APK (SQUIRE-T-0088 / ADR A-0012).
+        .route("/api/app/install", get(app_install::app_install))
         // ── Cross-Squire review queue + redeem + adjust (SQUIRE-T-0029) ─────────
         .route("/api/review", get(review::get_review))
         .route("/api/review/claim", post(review::review_claim))

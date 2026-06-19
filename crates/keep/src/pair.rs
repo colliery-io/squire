@@ -58,7 +58,7 @@ fn auth_status(err: AuthError) -> StatusCode {
 
 /// The api host/port to advertise in the QR. Configurable so a real deployment can publish the
 /// computer's LAN IP; defaults suit the emulator demo (`10.0.2.2` is the emulator's host loopback).
-fn advertised_addr() -> (String, u16) {
+pub(crate) fn advertised_addr() -> (String, u16) {
     let host = std::env::var("SQUIRE_PAIR_HOST").unwrap_or_else(|_| "10.0.2.2".to_string());
     let port = std::env::var("SQUIRE_PAIR_PORT")
         .ok()
