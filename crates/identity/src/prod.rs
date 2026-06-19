@@ -95,6 +95,16 @@ pub struct ProdIdentity {
     counter: Mutex<u128>,
 }
 
+/// The highest user id currently in `store` (the id high-water mark), or 0 if empty / unreadable.
+/// Used to seed the `shared_local` id counter so restarts don't reuse ids and clobber members.
+fn max_user_id(store: &SharedStore) -> u128 {
+    store
+        .lock()
+        .ok()
+        .map(|s| s.snapshot().users.iter().map(|u| u.id.0).max().unwrap_or(0))
+        .unwrap_or(0)
+}
+
 impl ProdIdentity {
     /// The **production local api** identity: writes through the SAME [`SharedStore`] the api
     /// handlers hold, bound to `handle`, so identity and handler writes serialize on one
@@ -105,12 +115,18 @@ impl ProdIdentity {
         handle: HouseholdHandle,
         token_ttl_ms: i64,
     ) -> Self {
+        // Seed the id counter from the store's existing high-water mark, NOT 0. The counter is
+        // in-memory, so it resets on every process start; seeding from 0 means the first post-restart
+        // `add_member` allocates UserId(1) and overwrites an existing member (this corrupted a live
+        // household). Seeding from max(existing user id) keeps ids monotonic across restarts. Empty
+        // store → 0, so a first-run `register` still bootstraps the admin as UserId(1).
+        let seed = max_user_id(&store);
         Self {
             tenancy: Tenancy::Shared { handle, store },
             signer,
             clock: SystemClock,
             token_ttl_ms,
-            counter: Mutex::new(0),
+            counter: Mutex::new(seed),
         }
     }
 
@@ -145,6 +161,9 @@ impl ProdIdentity {
     }
 
     /// Next value of the deterministic monotonic counter (fresh user ids + hosted handle suffixes).
+    /// In `shared_local` the counter is seeded from the store's id high-water mark at construction
+    /// (see [`max_user_id`]); `local`/`hosted` still start at 0 (registry/multi-tenant shapes used
+    /// by tests + hosting, where the production restart-collision path doesn't apply).
     fn next(&self) -> u128 {
         let mut c = self.counter.lock().expect("ProdIdentity counter poisoned");
         *c += 1;
