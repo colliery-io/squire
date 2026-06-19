@@ -4,14 +4,14 @@ level: task
 title: "Server startup-pull: fetch latest APK from squire into the OTA updates dir"
 short_code: "SQUIRE-T-0087"
 created_at: 2026-06-19T17:49:00.945627+00:00
-updated_at: 2026-06-19T17:49:00.945627+00:00
+updated_at: 2026-06-19T18:33:49.760110+00:00
 parent: SQUIRE-I-0002
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -46,10 +46,10 @@ LAN serving (`/app/*` + server-injected sha256) picks it up. Removes the last ma
 
 ## Acceptance Criteria
 
-- [ ] On startup, `squire-serve` fetches the latest `squire` APK into the updates dir + writes the manifest.
-- [ ] No release / offline → logged, server still serves existing artifacts, no crash.
-- [ ] Already-present version → no re-download.
-- [ ] `/app/manifest` then advertises the pulled version with the injected sha256.
+- [x] On startup, `squire-serve` fetches the latest `squire` APK into the updates dir + writes the manifest.
+- [x] No release / offline → logged, server still serves existing artifacts, no crash.
+- [x] Already-present version → no re-download.
+- [x] `/app/manifest` then advertises the pulled version with the injected sha256.
 
 ## Status Updates
 
@@ -59,5 +59,7 @@ LAN serving (`/app/*` + server-injected sha256) picks it up. Removes the last ma
   `SQUIRE_APK_SYNC=off` / `SQUIRE_DIST_REPO` configurable.
 - Verified: unit test (asset-name parsing) green; graceful path smoke-tested — no release yet →
   logs `HTTP 404`, server stays healthy (`/health` + `/app/manifest` 200).
-- PENDING happy-path: needs a real Release in `colliery-io/squire` (via CI on a tag, or a one-off seed)
-  to confirm the actual pull + manifest + served sha256. Task stays active until that's checked.
+- ✅ HAPPY-PATH VERIFIED end-to-end: tagged `v0.7.2` → CI built+signed `squire-6.apk` → published to
+  the public `colliery-io/squire` Release → `squire-serve` pulled it (`apk-sync: pulled squire-6.apk
+  (v0.7.2, 2191283 bytes)`) → `/app/manifest` served the matching injected sha256 (`82e87927…`).
+  Unauthenticated download returns 200. Done.
