@@ -12,7 +12,11 @@ identity = { path = "../identity" }
 # that composes them). No cycle: api/keep do not depend on this crate.
 api = { path = "../api" }
 keep = { path = "../keep" }
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+# Server-side APK pull from the public dist repo (SQUIRE-T-0087 / ADR SQUIRE-A-0012): fetch the
+# latest release asset over HTTPS. rustls to avoid a system OpenSSL/libssl dependency.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde_json = "1"
 # Best-effort mDNS/DNS-SD advertisement of `_squire._tcp` so phones discover the api without a
 # typed IP (ADR SQUIRE-A-0010 / NFR-6, SQUIRE-T-0047). Opt-out via SQUIRE_MDNS=off.
 libmdns = "0.9"

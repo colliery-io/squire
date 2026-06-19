@@ -53,4 +53,11 @@ LAN serving (`/app/*` + server-injected sha256) picks it up. Removes the last ma
 
 ## Status Updates
 
-- Implementing: add reqwest-based fetch in squire-home, spawn from squire-serve main.
+- Implemented: `apk_sync` module (reqwest/rustls, serde_json) fetches the latest `colliery-io/squire`
+  release, downloads the `squire-<N>.apk` asset into the updates dir (atomic temp+rename, idempotent),
+  and writes the manifest. Spawned from `squire-serve` as a non-blocking 6h refresh loop;
+  `SQUIRE_APK_SYNC=off` / `SQUIRE_DIST_REPO` configurable.
+- Verified: unit test (asset-name parsing) green; graceful path smoke-tested — no release yet →
+  logs `HTTP 404`, server stays healthy (`/health` + `/app/manifest` 200).
+- PENDING happy-path: needs a real Release in `colliery-io/squire` (via CI on a tag, or a one-off seed)
+  to confirm the actual pull + manifest + served sha256. Task stays active until that's checked.
