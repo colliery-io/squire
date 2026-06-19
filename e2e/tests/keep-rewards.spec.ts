@@ -51,7 +51,7 @@ test("archive a reward (R3)", async ({ page }) => {
   await page.click("#item-form button[type=submit]");
   const row = page.locator("#item-list li", { hasText: "Temporary treat" });
   await row.getByRole("button", { name: "Archive" }).click();
-  await expect(page.locator("#item-list")).toContainText("(archived)");
+  await expect(row).toContainText("archived");
 });
 
 test("a newly added achievement appears in the reward gate dropdown (R4)", async ({ page }) => {
