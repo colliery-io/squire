@@ -20,7 +20,7 @@ use domain_core::contract::{HouseholdHandle, RegisterHouseholdReq};
 
 use squire_home::{
     ensure_timezone, env_u16, has_admin, local_lan_ip, open_household, serve, signing_key,
-    TOKEN_TTL_MS,
+    spawn_apk_sync, TOKEN_TTL_MS,
 };
 
 #[tokio::main]
@@ -35,11 +35,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // `/app/*` endpoints are always available without setting `SQUIRE_APK_DIR`. An explicit env var
     // still wins. Dropping a new APK + manifest there is picked up live (read per request) — no
     // relaunch needed.
-    if std::env::var_os("SQUIRE_APK_DIR").is_none() {
-        let apk_dir = data_dir.join("updates");
-        let _ = std::fs::create_dir_all(&apk_dir);
-        std::env::set_var("SQUIRE_APK_DIR", &apk_dir);
-    }
+    let apk_dir: PathBuf = std::env::var_os("SQUIRE_APK_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| data_dir.join("updates"));
+    let _ = std::fs::create_dir_all(&apk_dir);
+    std::env::set_var("SQUIRE_APK_DIR", &apk_dir);
 
     let api_port = env_u16("API_PORT", 8080);
     let keep_port = env_u16("KEEP_PORT", 4920);
@@ -109,6 +109,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         println!("  Next: open the Keep, sign in as the admin, add members, and pair devices.");
     }
     println!("════════════════════════════════════════════════════════════════════");
+
+    // Keep the LAN-served phone APK current from the public dist repo (SQUIRE-T-0087 / A-0012).
+    // Background + best-effort: never blocks the serve loop or fails startup.
+    spawn_apk_sync(apk_dir);
 
     serve(store, identity, handle, api_port, keep_port).await
 }
