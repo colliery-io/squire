@@ -1,1 +1,0 @@
-{"default":{"identifier":"default","description":"Core desktop capability for the Squire window.","local":true,"windows":["*"],"permissions":["core:default"]}}
