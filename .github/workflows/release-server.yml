@@ -1,0 +1,79 @@
+name: Release server binaries
+
+# Build the squire-serve home server for macOS / Windows / Linux and publish the binaries to the
+# PUBLIC dist repo (colliery-io/squire), per ADR SQUIRE-A-0012. Households run these and the server
+# self-updates from here. SQLite is bundled (libsqlite3-sys `bundled`), so the builds need no system
+# deps and compile natively on each runner.
+#
+# Triggers: a `v*` tag (alongside the APK), or manual dispatch against an existing tag (for testing
+# the builds without cutting a new release). Uses secrets.DIST_REPO_TOKEN to publish across repos.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build + attach server binaries to (e.g. v0.7.2)"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  DIST_REPO: colliery-io/squire
+
+jobs:
+  server:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,  target: x86_64-unknown-linux-gnu, ext: tar.gz }
+          - { os: macos-latest,   target: aarch64-apple-darwin,     ext: tar.gz }
+          - { os: macos-latest,   target: x86_64-apple-darwin,      ext: tar.gz }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc,   ext: zip }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build squire-serve (release)
+        run: cargo build --release -p squire-home --bin squire-serve --target ${{ matrix.target }}
+
+      - name: Package
+        id: pkg
+        shell: bash
+        run: |
+          VER="${{ steps.tag.outputs.tag }}"; VER="${VER#v}"
+          NAME="squire-serve-$VER-${{ matrix.target }}"
+          OUT="$RUNNER_TEMP/$NAME.${{ matrix.ext }}"
+          if [ "${{ matrix.ext }}" = "zip" ]; then
+            BINDIR="target/${{ matrix.target }}/release"
+            ( cd "$BINDIR" && 7z a "$OUT" squire-serve.exe >/dev/null )
+          else
+            BINDIR="target/${{ matrix.target }}/release"
+            tar -czf "$OUT" -C "$BINDIR" squire-serve
+          fi
+          echo "asset=$OUT" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to the dist repo
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          # The APK workflow usually creates the release; create-if-missing makes this order-independent.
+          gh release create "$TAG" --repo "$DIST_REPO" --title "Squire ${TAG#v}" \
+            --notes "Automated release ${TAG}." 2>/dev/null || true
+          gh release upload "$TAG" "${{ steps.pkg.outputs.asset }}" --repo "$DIST_REPO" --clobber
