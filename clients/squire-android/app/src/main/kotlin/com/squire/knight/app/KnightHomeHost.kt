@@ -111,8 +111,9 @@ internal fun KnightHomeHost(
 
     // Server-distributed update check (SQUIRE-T-0051): one app now, so the manifest key is "squire".
     var update by remember(session) { mutableStateOf<UpdateInfo?>(null) }
+    val updateContext = LocalContext.current
     LaunchedEffect(session) {
-        update = UpdateChecker.check(session.baseUrl, "squire", BuildConfig.VERSION_CODE)
+        update = UpdateChecker.check(updateContext, session.baseUrl, "squire", BuildConfig.VERSION_CODE)
     }
 
     // The Squire currently being "assumed" (id + display name), or null for the review home.
