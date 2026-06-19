@@ -76,7 +76,7 @@
     rewards: () => { loadCatalog("items", "item-list"); loadRewardsLibrary(); },
     achievements: () => { loadAchScopeQuests(); loadCatalog("achievements", "achievement-list"); loadAchLibrary(); },
     members: () => loadMembers(),
-    pair: () => loadPairMembers(),
+    pair: () => { loadPairMembers(); loadInstallQr(); },
     log: () => {},
     settings: () => loadSettings(),
   };
@@ -453,6 +453,33 @@
       const who = await res.json();
       enterShell(who, "Admin");
     });
+  }
+
+  // ── New-phone install QR (T-0088 / ADR A-0012) ───────────────────────────────
+  // Show a QR that downloads + installs the current APK from the LAN api. Degrades to a note
+  // when no build is published yet.
+  async function loadInstallQr() {
+    const card = document.getElementById("install-card");
+    const none = document.getElementById("install-none");
+    if (!card || !none) return;
+    try {
+      const res = await fetch("/api/app/install");
+      if (!res.ok) throw new Error("install endpoint");
+      const a = await res.json();
+      if (!a.available) {
+        card.hidden = true;
+        none.hidden = false;
+        return;
+      }
+      document.getElementById("install-qr").innerHTML = a.qr_svg || "";
+      document.getElementById("install-meta").textContent =
+        `Squire v${a.version_name} · ${a.url}`;
+      card.hidden = false;
+      none.hidden = true;
+    } catch {
+      card.hidden = true;
+      none.hidden = false;
+    }
   }
 
   // ── Device pairing (ADR A-0010 / T-0045) ─────────────────────────────────────

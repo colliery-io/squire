@@ -266,6 +266,12 @@
          The phone scans the QR (or types the code) and exchanges it at the LAN api's POST /pair. -->
     <section id="pair-panel" hidden>
       <h2 id="pair"><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1" stroke="#5A3D8E" stroke-width="1.7"/><rect x="13" y="13" width="7" height="7" rx="1" stroke="#5A3D8E" stroke-width="1.7"/><path d="M13 4h7v7" stroke="#5A3D8E" stroke-width="1.7" stroke-linecap="round"/></svg></span>Pair a device</h2>
+      <div id="install-card" class="pair-card" hidden>
+        <p class="sub"><strong>New phone?</strong> Scan to install the Squire app over your home Wi-Fi, then pair it below.</p>
+        <div id="install-qr"></div>
+        <p class="sub" id="install-meta"></p>
+      </div>
+      <p id="install-none" class="sub" hidden>No app build published yet — the install QR appears here once a release is available.</p>
       <p class="sub">Hand a squire's phone its credentials with a one-time code.</p>
       <form id="pair-form">
         <label>Member
