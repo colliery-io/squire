@@ -4,14 +4,14 @@ level: task
 title: "Dollars end-to-end on the currency model: per-chore $, payout, Keep + phone UI, child $ owed"
 short_code: "SQUIRE-T-0099"
 created_at: 2026-06-20T03:26:30.190+00:00
-updated_at: 2026-06-20T03:26:30.190+00:00
+updated_at: 2026-06-20T13:11:33.487895+00:00
 parent: SQUIRE-I-0001
-blocked_by: ["SQUIRE-T-0098"]
+blocked_by: [SQUIRE-T-0098]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false

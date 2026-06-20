@@ -42,6 +42,7 @@ fn quest(
         description: None,
         category: None,
         reward,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Daily),
         assignment,
         completion,

@@ -76,6 +76,7 @@ fn seed_quest_and_item(store: &Arc<Mutex<store::Store<SystemClock>>>) {
         description: None,
         category: None,
         reward: 5,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Daily),
         assignment: Assignment::AllSquires, // every Squire in the household, by role
         completion: Completion::EachAssignee,

@@ -29,6 +29,7 @@ diesel::table! {
         description -> Nullable<Text>,
         category -> Nullable<Text>,
         reward -> BigInt,
+        cash -> BigInt,
         cadence_kind -> Text,
         cadence_due -> Nullable<BigInt>,
         cadence_weekdays -> Nullable<Text>,

@@ -54,7 +54,7 @@ fn submit(
         // Auto-approval is a system commit (actor = None), snapshotting the current reward.
         // The just-minted `CompletionClaimed` isn't in `snap` yet, so the unlock evaluation
         // (which joins approvals to their claim via `claim_meta`) gets it via `pending`.
-        changes.extend(approval_events(snap, &[claimed], claim_id, squire, on, quest.reward, None, at));
+        changes.extend(approval_events(snap, &[claimed], claim_id, squire, on, quest.reward, quest.cash, &quest.title, None, at));
     }
     Ok(changes)
 }
@@ -84,7 +84,7 @@ fn review(
                 // Another assignee already won this occurrence.
                 return Err(DomainError::OccurrenceTaken);
             }
-            Ok(approval_events(snap, &[], claim_id, squire, on, quest.reward, Some(actor), at))
+            Ok(approval_events(snap, &[], claim_id, squire, on, quest.reward, quest.cash, &quest.title, Some(actor), at))
         }
         Decision::Reject { reason } => Ok(vec![Change::Append(Event::CompletionRejected {
             claim_id,
@@ -100,6 +100,7 @@ fn review(
 /// an auto-approve / system commit. After the approval, append any `AchievementUnlocked
 /// { squire, .. }` (+ bonus) for this Squire's criteria that the approval newly satisfies —
 /// evaluated against the POST-approval log, as of the claim's `on` date (T-0006).
+#[allow(clippy::too_many_arguments)]
 fn approval_events(
     snap: &Snapshot,
     pending: &[Event],
@@ -107,6 +108,8 @@ fn approval_events(
     squire: UserId,
     on: Date,
     points: Points,
+    cash: Points,
+    cash_reason: &str,
     actor: Option<UserId>,
     at: Timestamp,
 ) -> Vec<Change> {
@@ -117,6 +120,21 @@ fn approval_events(
     projected.extend(pending.iter().cloned());
     projected.push(approval.clone());
     let mut changes = vec![Change::Append(approval)];
+    // Real-money reward (SQUIRE-T-0099): a chore with `cash` set accrues dollars to the Squire at
+    // approval, modeled as a coupled `Adjusted{Cash, +cash}` (the engine stays currency-agnostic —
+    // `balance_in(Cash)` sums it). Emitted in the same change set as the approval, which is itself
+    // idempotent (a claim approves once), so no double-credit; the command_id traces to the claim.
+    if cash > 0 {
+        changes.push(Change::Append(Event::Adjusted {
+            command_id: CommandId(claim_id.0),
+            squire,
+            actor,
+            currency: Currency::Cash,
+            amount: cash as i64,
+            reason: cash_reason.to_string(),
+            at,
+        }));
+    }
     changes.extend(crate::achievements::unlocks_after(snap, squire, &projected, on, at));
     changes
 }

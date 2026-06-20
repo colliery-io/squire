@@ -72,6 +72,7 @@ fn daily_quest(id: u128, reward: u32) -> Quest {
         description: None,
         category: None,
         reward,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Daily),
         assignment: Assignment::AllSquires,
         completion: Completion::EachAssignee,

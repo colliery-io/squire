@@ -112,6 +112,7 @@ fn seed_quest_and_item(state: &Arc<AppState>) {
         description: None,
         category: None,
         reward: 5,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Daily),
         assignment: Assignment::AllSquires,
         completion: Completion::EachAssignee,
