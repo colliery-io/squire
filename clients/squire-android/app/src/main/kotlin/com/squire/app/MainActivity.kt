@@ -199,10 +199,11 @@ internal fun PlayerHomeHost(
         }
     }
 
-    // Server-distributed update check (SQUIRE-T-0051).
+    // Server-distributed update check (SQUIRE-T-0051); re-runnable from the menu (SQUIRE-T-0094).
     var update by remember(session) { mutableStateOf<UpdateInfo?>(null) }
+    var checkNonce by remember(session) { mutableStateOf(0) }
     val updateContext = LocalContext.current
-    LaunchedEffect(session) {
+    LaunchedEffect(session, checkNonce) {
         update = UpdateChecker.check(updateContext, session.baseUrl, "squire", BuildConfig.VERSION_CODE)
     }
 
@@ -223,6 +224,7 @@ internal fun PlayerHomeHost(
                 },
                 onRedeem = viewModel::requestRedemption,
                 onForget = onForget,
+                onCheckUpdate = { checkNonce++ },
             )
         }
     }
