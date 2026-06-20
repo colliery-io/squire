@@ -59,6 +59,7 @@ import com.squire.app.ui.theme.SquireTheme
 import com.squire.core.PlayerUiState
 import com.squire.sdk.model.BadgeView
 import com.squire.sdk.model.ClaimStateKind
+import com.squire.sdk.model.GoalView
 import com.squire.sdk.model.ClaimStatus
 import com.squire.sdk.model.LockReasonKind
 import com.squire.sdk.model.QuestCard
@@ -248,6 +249,15 @@ private fun ReadyContent(
             items(view.streaks, key = { "s" + it.name }) { StreakCardRow(it, onClick = { detail = streakDetail(it) }) }
         }
 
+        // Achievements not yet earned — so the child can see everything there is to unlock, not just
+        // in-progress streaks (SQUIRE-T-0094 #3).
+        val goals = view.goals.orEmpty()
+        if (goals.isNotEmpty()) {
+            item { Spacer(Modifier.height(2.dp)) }
+            item { SectionTitle("🎯 Goals to unlock") }
+            items(goals, key = { "g" + it.id }) { GoalCardRow(it, onClick = { detail = goalDetail(it) }) }
+        }
+
         item { Spacer(Modifier.height(2.dp)) }
         item { SectionTitle("Recent activity") }
         if (view.myClaims.isEmpty() && view.myRequests.isEmpty()) {
@@ -352,6 +362,28 @@ private fun BadgeCardRow(badge: BadgeView, onClick: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Text(badge.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             GoldPill(badge.bonus)
+        }
+    }
+}
+
+@Composable
+private fun GoalCardRow(goal: GoalView, onClick: () -> Unit) {
+    QuestCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Medallion("🎯")
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(goal.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    goal.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (goal.bonus > 0) {
+                Spacer(Modifier.width(8.dp))
+                GoldPill(goal.bonus)
+            }
         }
     }
 }
@@ -529,6 +561,16 @@ private fun badgeDetail(b: BadgeView) = DetailContent(
         if (b.bonus > 0) add("Bonus" to "+${b.bonus} coins")
         add("Earned" to "✓ Yes")
     },
+)
+
+private fun goalDetail(g: GoalView) = DetailContent(
+    icon = "🎯",
+    title = g.name,
+    lines = buildList {
+        add("How to earn it" to g.description)
+        if (g.bonus > 0) add("Reward" to "+${g.bonus} coins")
+    },
+    note = "Not unlocked yet — keep going!",
 )
 
 /** A parchment card wrapper for quests/rewards/streaks. */

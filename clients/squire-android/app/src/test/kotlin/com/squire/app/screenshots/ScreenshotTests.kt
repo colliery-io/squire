@@ -19,6 +19,7 @@ import com.squire.knight.app.ui.RewardAdminScreen
 import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.AchievementSummaryDto
 import com.squire.sdk.model.BadgeView
+import com.squire.sdk.model.GoalView
 import com.squire.sdk.model.ClaimState
 import com.squire.sdk.model.ClaimStateKind
 import com.squire.sdk.model.ClaimStatus
@@ -105,6 +106,10 @@ class ScreenshotTests {
             myRequests = emptyList(),
             streaks = listOf(StreakView(name = "Room Master", current = 3, best = 5, alive = true, nextMilestone = 7)),
             badges = emptyList(),
+            goals = listOf(
+                GoalView(id = 7L, name = "Best Friends", description = "Complete 10 chores together", bonus = 25),
+                GoalView(id = 8L, name = "Century", description = "Earn 100 coins", bonus = 0),
+            ),
         )
         paparazzi.snapshot {
             SquireTheme {

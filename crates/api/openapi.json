@@ -1892,6 +1892,32 @@
           "reject"
         ]
       },
+      "GoalView": {
+        "type": "object",
+        "description": "An achievement the Squire has **not yet earned**, shown as a \"goal to unlock\" on the child home\n(SQUIRE-T-0094 #3) — so every available achievement, not only streaks, is visible to work toward.",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "bonus"
+        ],
+        "properties": {
+          "bonus": {
+            "$ref": "#/components/schemas/u32",
+            "description": "The bonus coins awarded when it unlocks."
+          },
+          "description": {
+            "type": "string",
+            "description": "How to earn it, in kid-friendly words — e.g. \"Complete 10 chores\" or \"Earn 100 coins\"."
+          },
+          "id": {
+            "$ref": "#/components/schemas/AchievementId"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "HouseholdHandle": {
         "type": "string",
         "description": "Opaque handle a paired device presents to route to its household (and, hosted, to\nselect the schema — ADR SQUIRE-A-0002). Established at registration/pairing."
@@ -2639,6 +2665,13 @@
           },
           "generated_at": {
             "$ref": "#/components/schemas/Timestamp"
+          },
+          "goals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoalView"
+            },
+            "description": "Achievements not yet earned — \"goals to unlock\" on the child home (SQUIRE-T-0094 #3), so every\navailable achievement (not only the in-progress streaks) is visible to work toward.\n`#[serde(default)]` so an older server's payload still deserializes."
           },
           "my_claims": {
             "type": "array",
