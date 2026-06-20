@@ -341,7 +341,7 @@ pub fn request_resolved(snap: &Snapshot, request_id: RequestId) -> bool {
 pub fn command_already_applied(snap: &Snapshot, command_id: CommandId) -> bool {
     snap.events.iter().any(|e| match e {
         Event::ItemRedeemed { command_id: Some(c), .. } if *c == command_id => true,
-        Event::PointsAdjusted { command_id: c, .. } if *c == command_id => true,
+        Event::Adjusted { command_id: c, .. } if *c == command_id => true,
         _ => false,
     })
 }

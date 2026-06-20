@@ -22,10 +22,11 @@ pub enum Event {
     ItemRedeemed       { request_id: Option<RequestId>, command_id: Option<CommandId>, squire: UserId, actor: Option<UserId>, item_id: ItemId, cost: Points, at: Timestamp },
     /// Emitted by the engine when a Squire first meets a criterion — sticky thereafter.
     AchievementUnlocked{ squire: UserId, id: AchievementId, bonus: Points, at: Timestamp },
-    /// Knight override / correction targeting a Squire's balance. `command_id` is the
-    /// idempotency key (always present: minted by the Knight's outbox, or by the Keep for
-    /// a local adjustment) so a replay is deduped from the log.
-    PointsAdjusted     { command_id: CommandId, squire: UserId, actor: Option<UserId>, amount: i64, reason: String, at: Timestamp },
+    /// Knight override / correction targeting a Squire's balance in a given `currency`
+    /// (SQUIRE-A-0013; was `PointsAdjusted`, implicitly Coins). `command_id` is the idempotency key
+    /// (always present: minted by the Knight's outbox, or by the Keep for a local adjustment) so a
+    /// replay is deduped from the log. A grant is `+`, a correction/payout is `−`.
+    Adjusted           { command_id: CommandId, squire: UserId, actor: Option<UserId>, currency: Currency, amount: i64, reason: String, at: Timestamp },
     /// Squire-initiated, via the API. Reviewed exactly like a completion claim —
     /// it never spends on its own; approval emits `ItemRedeemed`.
     RedemptionRequested{ request_id: RequestId, squire: UserId, item_id: ItemId, at: Timestamp },

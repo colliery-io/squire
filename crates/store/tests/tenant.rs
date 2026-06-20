@@ -5,7 +5,7 @@
 //! `Mutex` (cargo runs test fns concurrently and they share the one database) and cleaned up
 //! after each scenario.
 
-use domain_core::contract::{Change, Event, Repository, Role, Timestamp, User, UserId};
+use domain_core::contract::{Change, Currency, Event, Repository, Role, Timestamp, User, UserId};
 
 use store::tenant::{Backend, ProvisionError, Provisioner};
 use store::SystemClock;
@@ -60,10 +60,11 @@ fn seed_batch(n: u128) -> Vec<Change> {
             display_name: format!("user-{n}"),
             active: true,
         }),
-        Change::Append(Event::PointsAdjusted {
+        Change::Append(Event::Adjusted {
             command_id: domain_core::contract::CommandId(n),
             squire: UserId(n),
             actor: None,
+            currency: Currency::Coins,
             amount: (n as i64) * 10,
             reason: format!("seed-{n}"),
             at: Timestamp(1_000 * n as i64),

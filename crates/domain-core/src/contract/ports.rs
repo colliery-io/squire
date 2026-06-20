@@ -34,7 +34,11 @@ pub trait Engine {
 
 /// Pure derivations over a snapshot, each scoped to one Squire.
 pub trait Projections {
+    /// The Squire's **coin** balance (back-compat shorthand for `balance_in(.., Currency::Coins)`).
     fn balance(snap: &Snapshot, squire: UserId) -> i64;
+    /// The Squire's balance in `currency` (SQUIRE-A-0013). Raw signed total over the log; callers
+    /// floor per `currency.policy().floors_at_zero`.
+    fn balance_in(snap: &Snapshot, squire: UserId, currency: Currency) -> i64;
     fn quests_due(snap: &Snapshot, squire: UserId, on: Date) -> Vec<QuestId>;
     fn current_streak(snap: &Snapshot, squire: UserId, scope: &Scope, basis: StreakBasis, asof: Date) -> u32;
     fn is_unlocked(snap: &Snapshot, squire: UserId, id: AchievementId) -> bool;

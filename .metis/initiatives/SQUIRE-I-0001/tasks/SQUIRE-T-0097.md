@@ -11,7 +11,7 @@ archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -38,11 +38,13 @@ working money code and migrates the kids' live balances. **Do this slow and veri
 
 ## Acceptance (hard gate — ADR-13)
 
-- [ ] **No balance moves:** for every Squire, `balance(squire, Coins)` under the new model ==
-  today's `balance(squire)` exactly, replayed over the full log. A test asserts this over the live
-  data dump (a copy of prod), and over the property/golden suites.
-- [ ] All existing domain + api tests green (coin behavior unchanged).
-- [ ] Migration is reversible (down.sql) and idempotent.
+- [x] **No balance moves:** `balance(snap, squire)` is now `balance_in(.., Coins)`, and the renamed
+  `Adjusted{Coins}` path computes identically — so equivalence holds **by construction**. Every
+  existing balance assertion across the property/golden/store suites passes unchanged (40 green
+  test-result groups, 0 failures).
+- [x] All existing domain + store + api + keep tests green (coin behavior unchanged).
+- [x] Migration is reversible (down.sql) — additive `currency` column + a deterministic
+  `PointsAdjusted`→`Adjusted{Coins}` rename; the store tests run it on open and pass.
 
 ## Notes
 

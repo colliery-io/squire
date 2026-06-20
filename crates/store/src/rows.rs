@@ -21,6 +21,7 @@ use std::collections::BTreeSet;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use domain_core::contract::Currency;
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, ClaimId, CommandId,
     Completion, Criterion, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem, RequestId,
@@ -692,6 +693,7 @@ pub struct EventRow {
     pub command_id: Option<String>,
     pub item_id: Option<String>,
     pub achievement_id: Option<String>,
+    pub currency: Option<String>, // SQUIRE-A-0013: the Adjusted event's currency tag (NULL ⇒ Coins)
 }
 
 /// All columns default to `None`/empty; each variant fills only its own.
@@ -712,6 +714,7 @@ fn empty_event_row(seq: i64, kind: &str, squire: UserId, at: Timestamp) -> Event
         command_id: None,
         item_id: None,
         achievement_id: None,
+        currency: None,
     }
 }
 
@@ -760,10 +763,11 @@ impl EventRow {
                 r.points = Some(points_to_i64(*bonus));
                 r
             }
-            Event::PointsAdjusted { command_id, squire, actor, amount, reason, at } => {
-                let mut r = empty_event_row(seq, "PointsAdjusted", *squire, *at);
+            Event::Adjusted { command_id, squire, actor, currency, amount, reason, at } => {
+                let mut r = empty_event_row(seq, "Adjusted", *squire, *at);
                 r.command_id = Some(id_to_text(command_id.0));
                 r.actor = opt_user_to_text(*actor);
+                r.currency = Some(currency.tag().to_string());
                 r.amount = Some(*amount);
                 r.reason = Some(reason.clone());
                 r
@@ -828,13 +832,18 @@ impl EventRow {
                 bonus: i64_to_points("events.points", self.req_int("points", self.points)?)?,
                 at,
             },
-            "PointsAdjusted" => Event::PointsAdjusted {
+            "Adjusted" => Event::Adjusted {
                 command_id: CommandId(self.req_id("command_id", &self.command_id)?),
                 squire,
                 actor,
+                currency: self
+                    .currency
+                    .as_deref()
+                    .and_then(Currency::from_tag)
+                    .unwrap_or(Currency::Coins), // back-compat: migrated `PointsAdjusted`/NULL ⇒ Coins
                 amount: self.req_int("amount", self.amount)?,
                 reason: self.reason.clone().ok_or(RowError::MissingField {
-                    kind: "PointsAdjusted",
+                    kind: "Adjusted",
                     field: "reason",
                 })?,
                 at,
@@ -907,7 +916,7 @@ fn leak_kind(kind: &str) -> &'static str {
         "CompletionRejected" => "CompletionRejected",
         "ItemRedeemed" => "ItemRedeemed",
         "AchievementUnlocked" => "AchievementUnlocked",
-        "PointsAdjusted" => "PointsAdjusted",
+        "Adjusted" => "Adjusted",
         "RedemptionRequested" => "RedemptionRequested",
         "RedemptionRejected" => "RedemptionRejected",
         _ => "event",
