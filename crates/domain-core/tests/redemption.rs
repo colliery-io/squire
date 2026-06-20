@@ -31,9 +31,9 @@ fn bal(repo: &InMemoryRepository, squire: u128) -> i64 {
 }
 /// Seed a Squire's balance directly (bypasses the engine) for setup.
 fn seed_points(repo: &mut InMemoryRepository, squire: u128, amount: i64, cmd: u128) {
-    repo.seed(&[Change::Append(Event::PointsAdjusted {
+    repo.seed(&[Change::Append(Event::Adjusted {
         command_id: CommandId(cmd), squire: UserId(squire), actor: Some(UserId(2)),
-        amount, reason: "seed".into(), at: Timestamp(0),
+        currency: Currency::Coins, amount, reason: "seed".into(), at: Timestamp(0),
     })]);
 }
 fn adjust(cmd: u128, squire: u128, amount: i64) -> Command {

@@ -14,8 +14,8 @@ use axum::http::StatusCode;
 use axum::Json;
 
 use domain_core::contract::{
-    Achievement, Change, Command, Criterion, Date, DomainError, Event, Points, Quest, Scope, Snapshot,
-    Timestamp, UserId,
+    Achievement, Change, Command, Criterion, Currency, Date, DomainError, Event, Points, Quest, Scope,
+    Snapshot, Timestamp, UserId,
 };
 use domain_core::contract::{
     AdjustmentView, ClaimState, ClaimStatus, GoalView, QuestCard, RedemptionState,
@@ -241,7 +241,9 @@ fn adjustments(snap: &Snapshot, squire: UserId) -> Vec<AdjustmentView> {
         .iter()
         .rev()
         .filter_map(|e| match e {
-            Event::PointsAdjusted { squire: s, amount, reason, at, .. } if *s == squire => {
+            // Coin adjustments only, for now — the child's coin activity feed (T-0098/0099 will carry
+            // the currency so dollar grants/payouts show too).
+            Event::Adjusted { squire: s, currency: Currency::Coins, amount, reason, at, .. } if *s == squire => {
                 Some(AdjustmentView { amount: *amount, reason: reason.clone(), at: *at })
             }
             _ => None,
@@ -324,7 +326,7 @@ fn badges(snap: &Snapshot, squire: UserId) -> Vec<domain_core::contract::BadgeVi
     out
 }
 
-/// `Proj::balance` returns an `i64` (only `PointsAdjusted` can take it negative); the display
+/// `Proj::balance` returns an `i64` (only `Adjusted` can take it negative); the display
 /// balance clamps to `>= 0` and into [`Points`].
 fn clamp_balance(raw: i64) -> Points {
     raw.max(0) as Points

@@ -26,10 +26,11 @@ fn apply_then_snapshot_round_trips() {
     repo.apply(Some(UserId(9)), &[Change::PutUser(kid)]).unwrap();
     repo.apply(
         Some(UserId(2)),
-        &[Change::Append(Event::PointsAdjusted {
+        &[Change::Append(Event::Adjusted {
             command_id: CommandId(1),
             squire: UserId(1),
             actor: Some(UserId(2)),
+            currency: Currency::Coins,
             amount: 5,
             reason: "seed".into(),
             at: Timestamp(0),

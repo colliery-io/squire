@@ -9,7 +9,7 @@ use diesel::sqlite::SqliteConnection;
 
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, ClaimId, CommandId,
-    Completion, Criterion, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem, Repository,
+    Completion, Criterion, Currency, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem, Repository,
     Role, Schedule, Scope, Snapshot, StreakBasis, Timestamp, User, UserId,
 };
 
@@ -154,10 +154,11 @@ fn sample_events() -> Vec<Event> {
             cost: 50 as Points,
             at: Timestamp(3_000),
         },
-        Event::PointsAdjusted {
+        Event::Adjusted {
             command_id: CommandId(201),
             squire: UserId(2),
             actor: Some(UserId(1)),
+            currency: Currency::Coins,
             amount: -10,
             reason: "spilled".into(),
             at: Timestamp(4_000),

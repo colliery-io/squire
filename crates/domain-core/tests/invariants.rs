@@ -231,7 +231,7 @@ fn snapshot_for_squire(repo: &InMemoryRepository, squire: UserId) -> Snapshot {
         Event::CompletionRejected { squire: s, claim_id, .. } => *s == squire || own_claims.contains(&claim_id.0),
         Event::ItemRedeemed { squire: s, .. } => *s == squire,
         Event::AchievementUnlocked { squire: s, .. } => *s == squire,
-        Event::PointsAdjusted { squire: s, .. } => *s == squire,
+        Event::Adjusted { squire: s, .. } => *s == squire,
         Event::RedemptionRequested { squire: s, .. } => *s == squire,
         Event::RedemptionRejected { squire: s, .. } => *s == squire,
     });
@@ -260,7 +260,7 @@ proptest! {
                 Event::CompletionRejected { claim_id, .. } => *rejected.entry(claim_id.0).or_default() += 1,
                 Event::RedemptionRequested { request_id, .. } => *requested.entry(request_id.0).or_default() += 1,
                 Event::ItemRedeemed { command_id: Some(c), .. } => *by_command.entry(c.0).or_default() += 1,
-                Event::PointsAdjusted { command_id, .. } => *by_command.entry(command_id.0).or_default() += 1,
+                Event::Adjusted { command_id, .. } => *by_command.entry(command_id.0).or_default() += 1,
                 _ => {}
             }
         }
@@ -311,7 +311,7 @@ proptest! {
         for sid in [1u128, 2, 3] {
             let has_negative_adjust = events.iter().any(|e| matches!(
                 e,
-                Event::PointsAdjusted { squire, amount, .. } if squire.0 == sid && *amount < 0
+                Event::Adjusted { squire, amount, .. } if squire.0 == sid && *amount < 0
             ));
             if !has_negative_adjust {
                 let bal = Proj::balance(&snap, UserId(sid));

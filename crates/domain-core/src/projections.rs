@@ -15,15 +15,21 @@ pub struct Proj;
 
 impl Projections for Proj {
     fn balance(snap: &Snapshot, squire: UserId) -> i64 {
-        // Per-Squire sum over the log; pending claims/requests contribute nothing. Derived,
-        // never stored (AR-3). Only `PointsAdjusted` can take it negative.
+        Self::balance_in(snap, squire, Currency::Coins)
+    }
+
+    fn balance_in(snap: &Snapshot, squire: UserId, currency: Currency) -> i64 {
+        // Per-Squire sum over the log in one currency; pending claims/requests contribute nothing.
+        // Derived, never stored (AR-3). Only `Adjusted` (−) can take a balance negative. The
+        // quest/redeem/achievement flows are the COINS path (per `Currency` policy); every currency
+        // also accrues via `Adjusted{currency}` (grants, payouts, currency-tagged earnings).
         snap.events
             .iter()
             .map(|e| match e {
-                Event::CompletionApproved { squire: s, points, .. } if *s == squire => *points as i64,
-                Event::ItemRedeemed { squire: s, cost, .. } if *s == squire => -(*cost as i64),
-                Event::AchievementUnlocked { squire: s, bonus, .. } if *s == squire => *bonus as i64,
-                Event::PointsAdjusted { squire: s, amount, .. } if *s == squire => *amount,
+                Event::CompletionApproved { squire: s, points, .. } if *s == squire && currency == Currency::Coins => *points as i64,
+                Event::ItemRedeemed { squire: s, cost, .. } if *s == squire && currency == Currency::Coins => -(*cost as i64),
+                Event::AchievementUnlocked { squire: s, bonus, .. } if *s == squire && currency == Currency::Coins => *bonus as i64,
+                Event::Adjusted { squire: s, currency: c, amount, .. } if *s == squire && *c == currency => *amount,
                 _ => 0,
             })
             .sum()

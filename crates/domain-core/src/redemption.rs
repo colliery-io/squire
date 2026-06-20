@@ -142,10 +142,11 @@ fn adjust(
     if reason.trim().is_empty() {
         return Err(DomainError::InvalidDefinition);
     }
-    Ok(vec![Change::Append(Event::PointsAdjusted {
+    Ok(vec![Change::Append(Event::Adjusted {
         command_id,
         squire,
         actor: Some(actor),
+        currency: Currency::Coins, // adjust-by-currency arrives in SQUIRE-T-0098; today's path is Coins
         amount,
         reason,
         at: clock.now(),

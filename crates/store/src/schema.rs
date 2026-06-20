@@ -104,6 +104,7 @@ diesel::table! {
         command_id -> Nullable<Text>,
         item_id -> Nullable<Text>,
         achievement_id -> Nullable<Text>,
+        currency -> Nullable<Text>,
     }
 }
 

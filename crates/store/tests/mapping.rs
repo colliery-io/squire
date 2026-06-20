@@ -18,7 +18,7 @@ use diesel::sqlite::SqliteConnection;
 
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, ClaimId, CommandId,
-    Completion, Criterion, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem, RequestId,
+    Completion, Criterion, Currency, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem, RequestId,
     Role, Scope, Schedule, StreakBasis, Timestamp, User, UserId, Weekday,
 };
 use store::rows::{AchievementRow, Audit, EventRow, ItemRow, QuestRow, UserRow};
@@ -289,10 +289,11 @@ fn arb_event() -> impl Strategy<Value = Event> {
             ".*",
             ts.clone()
         )
-            .prop_map(|(cmd, s, actor, amount, reason, at)| Event::PointsAdjusted {
+            .prop_map(|(cmd, s, actor, amount, reason, at)| Event::Adjusted {
                 command_id: CommandId(cmd),
                 squire: s,
                 actor,
+                currency: Currency::Coins,
                 amount,
                 reason,
                 at,
@@ -745,10 +746,11 @@ fn db_round_trip_events_all_variants() {
             bonus: 50,
             at: Timestamp(5_000),
         },
-        Event::PointsAdjusted {
+        Event::Adjusted {
             command_id: CommandId(9),
             squire: UserId(100),
             actor: Some(UserId(1)),
+            currency: Currency::Coins,
             amount: -25,
             reason: "correction".into(),
             at: Timestamp(6_000),
