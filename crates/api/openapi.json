@@ -2821,6 +2821,9 @@
           "balance": {
             "$ref": "#/components/schemas/u32"
           },
+          "cash_balance": {
+            "$ref": "#/components/schemas/u32"
+          },
           "display_name": {
             "type": "string"
           },

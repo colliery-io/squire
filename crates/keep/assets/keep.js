@@ -214,9 +214,19 @@
       const av = el("span", "medallion avatar-green", (s.display_name || "?").slice(0, 1).toUpperCase());
       const info = el("div", "grow");
       info.appendChild(el("div", "card-title", s.display_name));
-      info.appendChild(el("div", "card-meta", "Squire"));
+      const owed = Number(s.cash_balance || 0);
+      info.appendChild(el("div", "card-meta", owed > 0 ? `Squire · $${owed} owed` : "Squire"));
       const coin = coinPill(s.balance);
       const adj = el("button", "btn-sm btn-ghost", "Adjust");
+      // Pay out real money owed (SQUIRE-T-0099): a negative Cash adjust. Only shown when $ is owed.
+      let pay = null;
+      if (owed > 0) {
+        pay = el("button", "btn-sm btn-ghost", `Pay $${owed}`);
+        pay.addEventListener("click", () => {
+          if (!confirm(`Mark $${owed} paid to ${s.display_name}? This clears what's owed.`)) return;
+          reviewAction("/api/adjust", { command_id: Date.now(), squire: s.squire, currency: "Cash", amount: -owed, reason: "Paid out" });
+        });
+      }
       // Inline adjust editor (T-0080): amount (±) + a required reason; Apply stays disabled until the
       // reason is non-blank (the engine 400s an empty reason).
       adj.addEventListener("click", () => {
@@ -250,6 +260,7 @@
         reason.focus();
       });
       li.append(av, info, coin, adj);
+      if (pay) li.appendChild(pay);
       sqs.appendChild(li);
     }
   }
@@ -606,6 +617,7 @@
       if (!q.active) meta.push("archived");
       li.appendChild(cardBody(q.title, meta));
       if (q.auto_approve) li.appendChild(el("span", "chip chip-auto", "Auto"));
+      if (Number(q.cash) > 0) li.appendChild(el("span", "chip", `$${Number(q.cash)}`));
       li.appendChild(coinPill(q.reward));
       if (q.active) {
         const btn = el("button", "archive", "Archive");
@@ -662,6 +674,7 @@
         description: null,
         category: category || null,
         reward: Number(fd.get("reward")),
+        cash: Number(fd.get("cash")) || 0,
         cadence,
         assignment,
         completion: fd.get("completion") || "EachAssignee",

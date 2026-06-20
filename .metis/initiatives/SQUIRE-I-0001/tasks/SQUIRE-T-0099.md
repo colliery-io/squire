@@ -44,3 +44,13 @@ in [[SQUIRE-T-0095]]. Mostly UI once the model exists (the engine is currency-ag
 - [ ] Adding a *third* currency later needs no engine/projection change (the model's promise).
 
 Realizes [[SQUIRE-T-0095]] (which can be closed once this ships).
+
+## Progress
+
+- **Domain + store DONE (committed `99298af`):** `Quest.cash` + `quests.cash` migration; approval
+  emits a coupled `Adjusted{Cash, +cash}` (reason = quest title) so `balance_in(Cash)` accrues it;
+  `CreateQuestReq.cash` → authoring; openapi regen; cash-accrual tests green (49 groups).
+- **Payout:** no new endpoint — it's `/admin/adjust` (api) / `/api/adjust` (Keep) with `currency=Cash,
+  amount<0` (both already take `currency` from T-0098). Floor-at-zero handled by the balance projection.
+- **Remaining (UI):** Keep quest form `$` field + show `$` balances + payout; phone quest form `$` +
+  child `$` balance display + dollar activity + parent payout. Then APK + server redeploy.
