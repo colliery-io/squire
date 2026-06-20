@@ -4,14 +4,14 @@ level: task
 title: "Hazards: negative behaviors that deduct coins/progress"
 short_code: "SQUIRE-T-0096"
 created_at: 2026-06-20T02:05:00.755604+00:00
-updated_at: 2026-06-20T02:05:00.755604+00:00
+updated_at: 2026-06-20T02:35:10.852688+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -62,6 +62,17 @@ activity display (negative styling), notification on apply.
 
 ## Status
 
-Direction approved. Ready to design the concrete domain model (`Hazard` def + `DefineHazard` /
-`ApplyHazard` / `ArchiveHazard` + penalty event) and sequence against [[SQUIRE-T-0095]]. The more
-self-contained of the two (mirrors quest authoring) — a good candidate to build first.
+**Built (lean design — no new event-sourced type / DB migration):**
+- Deductions reuse the existing audited `AdjustPoints` (negative amount + reason, floored at zero).
+- Catalog stored as one shared household **config** value (key `hazards`), edited on both surfaces.
+- **Phase A** (committed): `AdjustmentView` + `StateView.adjustments` projection → child "Recent
+  activity" shows grants (+green) and penalties (−red) with the reason (also fixes the grant-
+  visibility gap).
+- **Backend** (committed): `Hazard` DTO + api `GET/PUT /admin/hazards` + Keep `GET/PUT /api/hazards`.
+- **Phone** (committed): `HazardAdminScreen` under the ⋮ menu — define/remove + tap-to-apply (kid
+  picker → negative adjust).
+- **Keep** (committed): Hazards tab — catalog editor + apply.
+- v0.7.6 (versionCode 10) built; staged to prod's OTA (`squire-10.apk`, manifest → 10).
+
+**Pending:** operator runs the prod server restart to load the new binary (hazards endpoints +
+adjustments projection + embedded Keep tab), then verifies on the phone + the Keep.
