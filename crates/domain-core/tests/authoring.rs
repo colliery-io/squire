@@ -22,6 +22,7 @@ fn daily_quest(id: u128, assignment: Assignment) -> Quest {
         description: None,
         category: None,
         reward: 10,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Daily),
         assignment,
         completion: Completion::EachAssignee,

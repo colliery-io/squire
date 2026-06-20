@@ -62,6 +62,7 @@ fn test_state() -> (Arc<AppState>, tempfile::TempDir, Date) {
         description: None,
         category: None,
         reward: 5,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Daily),
         assignment: Assignment::Squires(assignees),
         completion: Completion::EachAssignee,

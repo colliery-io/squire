@@ -28,6 +28,7 @@ fn quest(q: QuestSpec) -> Quest {
         description: None,
         category: None,
         reward: q.reward,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Daily),
         assignment: q.assignment,
         completion: q.completion,
@@ -263,6 +264,38 @@ fn approving_a_claim_that_completes_a_criterion_unlocks_and_credits_bonus() {
             if *squire == UserId(1) && *id == AchievementId(900) && *bonus == 50
     ));
     assert!(unlocked, "approval emits the AchievementUnlocked event");
+}
+
+/// A quest with real-money `cash` set accrues dollars to the Squire on approval (SQUIRE-T-0099),
+/// tracked as a separate currency: the coin balance gets `reward`, the Cash balance gets `cash`.
+#[test]
+fn approving_a_cash_quest_accrues_dollars_separately() {
+    let mut r = repo();
+    let mut q = each(10, 10, false, false);
+    q.cash = 5; // $5 chore
+    r.seed(&[Change::PutQuest(q)]);
+    run(&mut r, submit(1, 1, 10, 0)).unwrap();
+    run(&mut r, approve(2, 1)).unwrap();
+
+    let snap = r.snapshot();
+    assert_eq!(Proj::balance_in(&snap, UserId(1), Currency::Coins), 10, "coins = reward");
+    assert_eq!(Proj::balance_in(&snap, UserId(1), Currency::Cash), 5, "cash = the dollar award");
+    // The cash accrual is one Adjusted{Cash} carrying the quest title as its reason.
+    let cash_credit = snap.events.iter().any(|e| matches!(
+        e, Event::Adjusted { squire, currency: Currency::Cash, amount, .. }
+            if *squire == UserId(1) && *amount == 5
+    ));
+    assert!(cash_credit, "approval emits an Adjusted{{Cash}} for the dollar reward");
+}
+
+/// A quest with no cash (`cash = 0`) accrues no dollars — the Cash balance stays zero.
+#[test]
+fn approving_a_cashless_quest_accrues_no_dollars() {
+    let mut r = repo();
+    r.seed(&[Change::PutQuest(each(10, 10, false, false))]);
+    run(&mut r, submit(1, 1, 10, 0)).unwrap();
+    run(&mut r, approve(2, 1)).unwrap();
+    assert_eq!(Proj::balance_in(&r.snapshot(), UserId(1), Currency::Cash), 0, "no cash quest ⇒ no dollars");
 }
 
 /// The full reject → re-claim → approve cycle: a rejected claim credits nothing and re-opens the

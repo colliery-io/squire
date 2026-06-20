@@ -85,6 +85,7 @@ fn sample_quest() -> Quest {
         description: Some("the keep".into()),
         category: Some(Category("chores".into())),
         reward: 5 as Points,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Weekly {
             days: std::collections::BTreeSet::from([
                 domain_core::contract::Weekday::Mon,

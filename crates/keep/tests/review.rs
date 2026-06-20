@@ -45,6 +45,7 @@ fn keep() -> (Arc<KeepState>, u128, String, tempfile::TempDir) {
                 description: None,
                 category: None,
                 reward: 5,
+                cash: 0,
                 cadence: Cadence::Recurring(Schedule::Daily),
                 assignment: Assignment::AllSquires,
                 completion: Completion::EachAssignee,

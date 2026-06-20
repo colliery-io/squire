@@ -116,6 +116,7 @@ fn commit_applies_a_change_through_the_single_writer() {
         description: None,
         category: None,
         reward: 5,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Daily),
         assignment: Assignment::AllSquires,
         completion: Completion::EachAssignee,

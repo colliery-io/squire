@@ -28,6 +28,7 @@ fn daily_quest(id: u128, reward: Points, category: Option<&str>) -> Quest {
         description: None,
         category: category.map(|c| Category(c.into())),
         reward,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Daily),
         assignment: Assignment::AllSquires,
         completion: Completion::EachAssignee,

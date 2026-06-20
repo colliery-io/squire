@@ -91,6 +91,9 @@ pub struct CreateQuestReq {
     pub id: Option<QuestId>,
     pub title: String,
     pub reward: i64,
+    /// Real-money award in whole dollars (SQUIRE-T-0099); omitted ⇒ 0 (no cash), back-compat.
+    #[serde(default)]
+    pub cash: i64,
     /// Optional free-text grouping (e.g. "Bedroom").
     pub category: Option<String>,
     pub cadence: CadenceKind,
@@ -183,6 +186,7 @@ pub async fn create_quest(
         description: None,
         category: req.category.filter(|c| !c.is_empty()).map(domain_core::contract::Category),
         reward: req.reward.max(0) as u32,
+        cash: req.cash.max(0) as u32,
         cadence,
         assignment,
         completion: req.completion.into(),

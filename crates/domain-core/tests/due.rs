@@ -19,6 +19,7 @@ fn base() -> Quest {
         description: None,
         category: None,
         reward: 10,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Daily),
         assignment: Assignment::AllSquires,
         completion: Completion::EachAssignee,

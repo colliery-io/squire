@@ -1887,6 +1887,11 @@
           "cadence": {
             "$ref": "#/components/schemas/CadenceKind"
           },
+          "cash": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Real-money award in whole dollars (SQUIRE-T-0099); omitted ⇒ 0 (no cash), back-compat."
+          },
           "category": {
             "type": [
               "string",

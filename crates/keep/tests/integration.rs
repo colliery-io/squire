@@ -55,6 +55,7 @@ fn quest(id: u128) -> Quest {
         description: None,
         category: None,
         reward: 5,
+        cash: 0,
         cadence: Cadence::Recurring(Schedule::Daily),
         assignment: Assignment::AllSquires,
         completion: Completion::EachAssignee,

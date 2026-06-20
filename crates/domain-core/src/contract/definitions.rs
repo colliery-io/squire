@@ -16,7 +16,8 @@ pub struct Quest {
     pub title: String,
     pub description: Option<String>,
     pub category: Option<Category>, // powers category-scoped streaks + UI grouping
-    pub reward: Points,             // base award; snapshotted at approval time
+    pub reward: Points,             // base coin award; snapshotted at approval time
+    pub cash: Points,               // real-money award in whole dollars (0 = none); accrues on approval (SQUIRE-T-0099)
     pub cadence: Cadence,
     pub assignment: Assignment,     // which Squires this quest is for (always ≥ 1)
     pub completion: Completion,     // each assignee does their own, vs. first-to-win
