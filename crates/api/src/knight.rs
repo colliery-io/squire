@@ -25,9 +25,9 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
-    ClaimId, Clock, Command, CommandId, Date, Decision, Event, HouseholdReview, ItemId, ItemOption,
-    PendingClaim, PendingRequest, Projections, QuestId, QuestOption, Repository, RequestId, Role,
-    Snapshot, SquireSummary, StateView, UserId,
+    ClaimId, Clock, Command, CommandId, Date, Decision, Event, Hazard, HouseholdReview, ItemId,
+    ItemOption, PendingClaim, PendingRequest, Projections, QuestId, QuestOption, Repository,
+    RequestId, Role, Snapshot, SquireSummary, StateView, UserId,
 };
 use domain_core::Proj;
 
@@ -278,6 +278,67 @@ pub async fn adjust(
     };
     // Replay of the same `command_id` → empty change set → still success (one adjustment).
     handle_command(&state, None, cmd).map_err(domain_status)?;
+    Ok(Ack::ok())
+}
+
+/// Config key holding the household's hazard catalog (a JSON array of [`Hazard`]).
+const HAZARDS_KEY: &str = "hazards";
+
+/// `GET /admin/hazards` (Knight-only) — the household's hazard catalog (shared config); empty if
+/// unset (SQUIRE-T-0096).
+#[utoipa::path(
+    get,
+    path = "/admin/hazards",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant")),
+    responses(
+        (status = 200, description = "The hazard catalog", body = Vec<Hazard>),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+    ),
+)]
+pub async fn list_hazards(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(_principal): RequireKnight,
+) -> Json<Vec<Hazard>> {
+    let raw = state.store.lock().expect("store mutex poisoned").get_setting(HAZARDS_KEY);
+    let hazards = raw
+        .and_then(|s| serde_json::from_str::<Vec<Hazard>>(&s).ok())
+        .unwrap_or_default();
+    Json(hazards)
+}
+
+/// `PUT /admin/hazards` (Knight-only) — replace the household's hazard catalog; blank-named entries
+/// are dropped. Stored as one config value, so the phone and the Keep edit the same list.
+#[utoipa::path(
+    put,
+    path = "/admin/hazards",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant")),
+    request_body = Vec<Hazard>,
+    responses(
+        (status = 200, description = "Saved", body = Ack),
+        (status = 400, description = "Malformed catalog"),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+    ),
+)]
+pub async fn set_hazards(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(principal): RequireKnight,
+    Json(hazards): Json<Vec<Hazard>>,
+) -> Result<Json<Ack>, StatusCode> {
+    let cleaned: Vec<Hazard> =
+        hazards.into_iter().filter(|h| !h.name.trim().is_empty()).collect();
+    let json = serde_json::to_string(&cleaned).map_err(|_| StatusCode::BAD_REQUEST)?;
+    state
+        .store
+        .lock()
+        .expect("store mutex poisoned")
+        .set_setting(HAZARDS_KEY, &json, Some(principal.user))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Ack::ok())
 }
 

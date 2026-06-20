@@ -221,6 +221,109 @@
         ]
       }
     },
+    "/admin/hazards": {
+      "get": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`GET /admin/hazards` (Knight-only) — the household's hazard catalog (shared config); empty if\nunset (SQUIRE-T-0096).",
+        "operationId": "list_hazards",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The hazard catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Hazard"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`PUT /admin/hazards` (Knight-only) — replace the household's hazard catalog; blank-named entries\nare dropped. Stored as one config value, so the phone and the Keep edit the same list.",
+        "operationId": "set_hazards",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Hazard"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ack"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed catalog"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/admin/items": {
       "get": {
         "tags": [
@@ -1936,6 +2039,28 @@
           },
           "name": {
             "type": "string"
+          }
+        }
+      },
+      "Hazard": {
+        "type": "object",
+        "description": "A named penalty in the household's **hazard catalog** (SQUIRE-T-0096) — a negative behavior a\nparent can apply with one tap. Applying it deducts `penalty` coins via a negative `AdjustPoints`\n(reason = `name`, balance floored at zero). The catalog is shared household config, not a\nper-Squire event, so both the phone and the Keep edit the same list.",
+        "required": [
+          "name",
+          "penalty"
+        ],
+        "properties": {
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "penalty": {
+            "$ref": "#/components/schemas/u32"
           }
         }
       },
