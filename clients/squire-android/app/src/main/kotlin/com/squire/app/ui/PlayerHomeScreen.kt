@@ -1,6 +1,7 @@
 package com.squire.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -196,8 +198,11 @@ private fun ReadyContent(
     onRedeem: (itemId: Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Tap any quest / reward / streak / badge card to see its full details (SQUIRE-T-0094 #8).
+    var detail by remember { mutableStateOf<DetailContent?>(null) }
+    Box(modifier) {
     LazyColumn(
-        modifier = modifier,
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -218,7 +223,7 @@ private fun ReadyContent(
             // Keys are namespaced ("q"/"i"/"s") because quest/item ids share one LazyColumn and a
             // QuestId can numerically equal an ItemId — an un-namespaced key would collide (caught by
             // the screenshot harness, SQUIRE-T-0070).
-            items(view.questsToday, key = { "q" + it.questId }) { QuestCardRow(it, onMarkDone) }
+            items(view.questsToday, key = { "q" + it.questId }) { QuestCardRow(it, onMarkDone, onClick = { detail = questDetail(it) }) }
         }
 
         item { Spacer(Modifier.height(2.dp)) }
@@ -226,7 +231,7 @@ private fun ReadyContent(
         if (view.rewards.isEmpty()) {
             item { EmptyHint("No rewards in the shop yet — ask a grown-up! 🛒") }
         } else {
-            items(view.rewards, key = { "i" + it.itemId }) { RewardCardRow(it, view.balance, onRedeem) }
+            items(view.rewards, key = { "i" + it.itemId }) { RewardCardRow(it, view.balance, onRedeem, onClick = { detail = rewardDetail(it) }) }
         }
 
         // Earned achievements — the payoff, distinct from in-progress streaks (SQUIRE-T-0079).
@@ -234,13 +239,13 @@ private fun ReadyContent(
         if (badges.isNotEmpty()) {
             item { Spacer(Modifier.height(2.dp)) }
             item { SectionTitle("🏅 Badges") }
-            items(badges, key = { "b" + it.id }) { BadgeCardRow(it) }
+            items(badges, key = { "b" + it.id }) { BadgeCardRow(it, onClick = { detail = badgeDetail(it) }) }
         }
 
         if (view.streaks.isNotEmpty()) {
             item { Spacer(Modifier.height(2.dp)) }
             item { SectionTitle("Streaks") }
-            items(view.streaks, key = { "s" + it.name }) { StreakCardRow(it) }
+            items(view.streaks, key = { "s" + it.name }) { StreakCardRow(it, onClick = { detail = streakDetail(it) }) }
         }
 
         item { Spacer(Modifier.height(2.dp)) }
@@ -252,16 +257,19 @@ private fun ReadyContent(
             items(view.myRequests, key = { "r" + it.requestId }) { RequestRow(it) }
         }
     }
+        detail?.let { DetailDialog(it) { detail = null } }
+    }
 }
 
 @Composable
-private fun QuestCardRow(quest: QuestCard, onMarkDone: (Long) -> Unit) {
+private fun QuestCardRow(quest: QuestCard, onMarkDone: (Long) -> Unit, onClick: () -> Unit) {
     QuestCard(
         accent = when (quest.status) {
             QuestStatus.CompletedToday -> MaterialTheme.colorScheme.tertiary  // green
             QuestStatus.Pending        -> MaterialTheme.colorScheme.primary   // royal
             else                       -> MaterialTheme.colorScheme.secondary // gold
         },
+        onClick = onClick,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Medallion(quest.icon, quest.title)
@@ -300,8 +308,8 @@ private fun QuestCardRow(quest: QuestCard, onMarkDone: (Long) -> Unit) {
 }
 
 @Composable
-private fun RewardCardRow(reward: RewardCard, balance: Int, onRedeem: (Long) -> Unit) {
-    QuestCard(accent = MaterialTheme.colorScheme.secondary) {
+private fun RewardCardRow(reward: RewardCard, balance: Int, onRedeem: (Long) -> Unit, onClick: () -> Unit) {
+    QuestCard(accent = MaterialTheme.colorScheme.secondary, onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Medallion(reward.icon, reward.name, reward = true)
             Spacer(Modifier.width(12.dp))
@@ -337,8 +345,8 @@ private fun RewardCardRow(reward: RewardCard, balance: Int, onRedeem: (Long) -> 
 }
 
 @Composable
-private fun BadgeCardRow(badge: BadgeView) {
-    QuestCard {
+private fun BadgeCardRow(badge: BadgeView, onClick: () -> Unit) {
+    QuestCard(onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Medallion("🏅")
             Spacer(Modifier.width(12.dp))
@@ -349,8 +357,8 @@ private fun BadgeCardRow(badge: BadgeView) {
 }
 
 @Composable
-private fun StreakCardRow(streak: StreakView) {
-    QuestCard {
+private fun StreakCardRow(streak: StreakView, onClick: () -> Unit) {
+    QuestCard(onClick = onClick) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text("🏅 ${streak.name}", style = MaterialTheme.typography.titleMedium)
@@ -426,16 +434,115 @@ private fun RecentCard(title: String, subtitle: String?, chipText: String, conta
     }
 }
 
+/** Content for the tap-to-open detail dialog (SQUIRE-T-0094 #8). */
+private data class DetailContent(
+    val icon: String?,
+    val title: String,
+    val lines: List<Pair<String, String>>,
+    val note: String? = null,
+)
+
+@Composable
+private fun DetailDialog(content: DetailContent, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                content.icon?.let {
+                    Text(it, style = MaterialTheme.typography.headlineSmall)
+                    Spacer(Modifier.width(10.dp))
+                }
+                Text(content.title, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column {
+                content.lines.forEach { (label, value) ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(value, fontWeight = FontWeight.Medium)
+                    }
+                }
+                content.note?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+    )
+}
+
+private fun questDetail(q: QuestCard) = DetailContent(
+    icon = q.icon,
+    title = q.title,
+    lines = buildList {
+        add("Reward" to "${q.reward} coins")
+        q.category?.let { add("Category" to it) }
+        add(
+            "Status" to when (q.status) {
+                QuestStatus.Available -> "Ready to do"
+                QuestStatus.Pending -> "Waiting for a grown-up"
+                QuestStatus.CompletedToday -> "Done today 🎉"
+                QuestStatus.TakenByOther -> "Taken by someone else"
+            },
+        )
+    },
+    note = "Tap “Done” on the quest when you’ve finished it.",
+)
+
+private fun rewardDetail(r: RewardCard) = DetailContent(
+    icon = r.icon,
+    title = r.name,
+    lines = buildList {
+        add("Cost" to "${r.cost} coins")
+        val lock = r.lock
+        add(
+            "Status" to when {
+                lock?.kind == LockReasonKind.OutOfStock -> "Out of stock"
+                lock?.kind == LockReasonKind.NeedsAchievement -> "Locked — needs ${lock.name ?: "an achievement"}"
+                r.affordable -> "You can get this now!"
+                else -> "Keep saving"
+            },
+        )
+    },
+)
+
+private fun streakDetail(s: StreakView) = DetailContent(
+    icon = "🔥",
+    title = s.name,
+    lines = buildList {
+        add("Current streak" to "${s.current} day${if (s.current == 1) "" else "s"}")
+        add("Best ever" to "${s.best}")
+        s.nextMilestone?.let { add("Next milestone" to "$it days") }
+        add("Status" to if (s.alive) "Going strong 🔥" else "Broken — start again!")
+    },
+)
+
+private fun badgeDetail(b: BadgeView) = DetailContent(
+    icon = "🏅",
+    title = b.name,
+    lines = buildList {
+        if (b.bonus > 0) add("Bonus" to "+${b.bonus} coins")
+        add("Earned" to "✓ Yes")
+    },
+)
+
 /** A parchment card wrapper for quests/rewards/streaks. */
 @Composable
 private fun QuestCard(
     accent: Color = MaterialTheme.colorScheme.outlineVariant,
+    onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
     ) {
         Row(modifier = Modifier.height(IntrinsicSize.Min)) {
             Box(Modifier.width(4.dp).fillMaxHeight().background(accent))
