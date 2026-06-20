@@ -326,8 +326,8 @@ private fun RewardCardRow(reward: RewardCard, balance: Int, onRedeem: (Long) -> 
                 }
                 reward.affordable -> Button(onClick = { onRedeem(reward.itemId) }) { Text("Redeem") }
                 else -> StatusChip(
-                    // Show how close the child is, not a flat "Need more ★".
-                    "${(reward.cost - balance).coerceAtLeast(1)} more ★",
+                    // Show how close the child is, not a flat "Need more coins".
+                    "${(reward.cost - balance).coerceAtLeast(1)} more coins",
                     MaterialTheme.colorScheme.surfaceVariant,
                     MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -376,7 +376,7 @@ private fun ClaimRow(claim: ClaimStatus) {
     val st = claim.state
     when (st.state) {
         ClaimStateKind.Approved -> RecentCard(
-            claim.questTitle, null, "✓ +${st.points ?: 0} ★",
+            claim.questTitle, null, "✓ +${st.points ?: 0} coins",
             MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer,
         )
         ClaimStateKind.Rejected -> RecentCard(
@@ -393,7 +393,7 @@ private fun ClaimRow(claim: ClaimStatus) {
 @Composable
 private fun RequestRow(request: RedemptionStatus) {
     val st = request.state
-    val cost = "${request.cost} ★"
+    val cost = "${request.cost} coins"
     when (st.state) {
         RedemptionStateKind.Approved -> RecentCard(
             request.itemName, null, "✓ Redeemed · $cost",

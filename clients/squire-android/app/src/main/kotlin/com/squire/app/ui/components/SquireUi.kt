@@ -56,7 +56,8 @@ fun GoldPill(amount: Int, large: Boolean = false) {
     }
 }
 
-/** The minted gold disc used inside coin pills and medallions. */
+/** The minted gold coin used inside coin pills and medallions — a plain disc with an inner ring
+ *  (no star), so the single in-app currency reads unambiguously as "coins" (SQUIRE-T-0094). */
 @Composable
 private fun Coin(size: androidx.compose.ui.unit.Dp) {
     androidx.compose.foundation.layout.Box(
@@ -67,7 +68,12 @@ private fun Coin(size: androidx.compose.ui.unit.Dp) {
             .border(1.5.dp, Color(0xFFA9781F), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Text("★", color = Color(0xFF7A5A12), fontSize = (size.value * 0.52f).sp)
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .size(size * 0.6f)
+                .clip(CircleShape)
+                .border(1.dp, Color(0xFFA9781F).copy(alpha = 0.55f), CircleShape),
+        )
     }
 }
 
