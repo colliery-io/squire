@@ -69,8 +69,8 @@ private data class AchLibrary(val achievements: List<LibraryAch> = emptyList())
 /**
  * Native achievement authoring for a Knight (SQUIRE-T-0072): create milestones (streak / total /
  * points, scoped Any or a category), import from the bundled starter library, and archive — over the
- * LAN api's `RequireKnight` `/admin/achievements` endpoints. (Quest-scoped achievements stay on the
- * Keep for now.) Styled to the "playful quest" theme.
+ * LAN api's `RequireKnight` `/admin/achievements` endpoints. Scope: Any chore, a category, or one
+ * specific quest (SQUIRE-T-0094 #4). Styled to the "playful quest" theme.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -106,8 +106,10 @@ internal fun AchievementAdminScreen(
     // ── create-form state ──
     var name by remember { mutableStateOf("") }
     var criterion by remember { mutableStateOf("Streak") } // Streak | TotalCompletions | PointsEarned
-    var achScope by remember { mutableStateOf("Any") }     // Any | Category
+    var achScope by remember { mutableStateOf("Any") }     // Any | Category | Quest
     var category by remember { mutableStateOf("") }
+    var scopeQuestId by remember { mutableStateOf<Long?>(null) }
+    var quests by remember { mutableStateOf<List<Pair<Long, String>>>(emptyList()) }
     var length by remember { mutableStateOf("7") }
     var basis by remember { mutableStateOf("CalendarDays") }
     var count by remember { mutableStateOf("10") }
@@ -115,8 +117,15 @@ internal fun AchievementAdminScreen(
     var bonus by remember { mutableStateOf("10") }
     var formError by remember { mutableStateOf<String?>(null) }
 
+    // Quests to pick from when scoping an achievement/streak to one specific quest (SQUIRE-T-0094 #4).
+    LaunchedEffect(Unit) {
+        if (initialAchievements != null) return@LaunchedEffect
+        runCatching { adapter.listQuests() }
+            .onSuccess { list -> quests = list.filter { it.active }.map { it.id to it.title } }
+    }
+
     fun resetForm() {
-        name = ""; criterion = "Streak"; achScope = "Any"; category = ""
+        name = ""; criterion = "Streak"; achScope = "Any"; category = ""; scopeQuestId = null
         length = "7"; basis = "CalendarDays"; count = "10"; total = "100"; bonus = "10"; formError = null
     }
 
@@ -133,6 +142,7 @@ internal fun AchievementAdminScreen(
         if (name.isBlank()) { formError = "Add a name."; return }
         val usesScope = criterion != "PointsEarned"
         if (usesScope && achScope == "Category" && category.isBlank()) { formError = "Enter a category for the scope."; return }
+        if (usesScope && achScope == "Quest" && scopeQuestId == null) { formError = "Pick a quest for the scope."; return }
         val req = when (criterion) {
             "PointsEarned" -> {
                 val t = total.toLongOrNull(); if (t == null || t < 1) { formError = "Points must be at least 1."; return }
@@ -140,11 +150,11 @@ internal fun AchievementAdminScreen(
             }
             "TotalCompletions" -> {
                 val c = count.toLongOrNull(); if (c == null || c < 1) { formError = "Count must be at least 1."; return }
-                baseReq(name, AchCriterionKind.TotalCompletions, scopeKind(achScope), category, bonusN, count = c)
+                baseReq(name, AchCriterionKind.TotalCompletions, scopeKind(achScope), category, bonusN, count = c, questId = scopeQuestId)
             }
             else -> {
                 val l = length.toLongOrNull(); if (l == null || l < 1) { formError = "Length must be at least 1."; return }
-                baseReq(name, AchCriterionKind.Streak, scopeKind(achScope), category, bonusN, length = l, basis = AchBasisKind.valueOf(basis))
+                baseReq(name, AchCriterionKind.Streak, scopeKind(achScope), category, bonusN, length = l, basis = AchBasisKind.valueOf(basis), questId = scopeQuestId)
             }
         }
         formError = null
@@ -192,9 +202,21 @@ internal fun AchievementAdminScreen(
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 ChoiceChip("Any chore", achScope == "Any") { achScope = "Any" }
                                 ChoiceChip("A category", achScope == "Category") { achScope = "Category" }
+                                ChoiceChip("A specific quest", achScope == "Quest") { achScope = "Quest" }
                             }
                             if (achScope == "Category") {
                                 OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category (e.g. Bedroom)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            }
+                            if (achScope == "Quest") {
+                                if (quests.isEmpty()) {
+                                    Text("No quests yet — create a quest first, then scope to it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                } else {
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        quests.forEach { (id, title) ->
+                                            ChoiceChip(title, scopeQuestId == id) { scopeQuestId = id }
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -277,7 +299,11 @@ internal fun AchievementAdminScreen(
     }
 }
 
-private fun scopeKind(s: String) = if (s == "Category") AchScopeKind.Category else AchScopeKind.Any
+private fun scopeKind(s: String) = when (s) {
+    "Category" -> AchScopeKind.Category
+    "Quest" -> AchScopeKind.Quest
+    else -> AchScopeKind.Any
+}
 
 private fun baseReq(
     name: String,
@@ -289,6 +315,7 @@ private fun baseReq(
     basis: AchBasisKind? = null,
     count: Long? = null,
     total: Long? = null,
+    questId: Long? = null,
 ) = CreateAchievementReq(
     bonus = bonus,
     criterion = criterion,
@@ -299,7 +326,7 @@ private fun baseReq(
     id = null,
     length = length,
     scopeCategory = if (scope == AchScopeKind.Category) category?.trim() else null,
-    scopeQuest = null,
+    scopeQuest = if (scope == AchScopeKind.Quest) questId else null,
     total = total,
 )
 
