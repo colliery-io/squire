@@ -22,6 +22,10 @@ initiative_id: NULL
 
 # ADR-15: Cloud platform choices — compute/edge, auth, onboarding
 
+> **⚠ Partially superseded by [[SQUIRE-A-0016]] (2026-06-20):** decisions **#1 Compute (EC2)** and
+> **#2 Edge/TLS (Caddy)** are replaced by *home server + Cloudflare Tunnel ($0)* after a cost pass.
+> Decisions **#3 Auth (extend ProdIdentity)** and **#4 Onboarding (provisioned/invite)** REMAIN IN FORCE.
+
 ## Context
 
 [[SQUIRE-I-0003]] (hosted multi-tenant, AWS free-tier, known families) had four secondary decisions

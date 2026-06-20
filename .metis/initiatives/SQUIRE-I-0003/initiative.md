@@ -1,7 +1,7 @@
 ---
 id: hosted-multi-tenant-cloud
 level: initiative
-title: "Hosted multi-tenant cloud deployment (AWS free-tier)"
+title: "Hosted multi-tenant deployment (home server via Cloudflare Tunnel, ~$0)"
 short_code: "SQUIRE-I-0003"
 created_at: 2026-06-20T18:10:44.430485+00:00
 updated_at: 2026-06-20T18:49:12.052393+00:00
@@ -19,14 +19,20 @@ estimated_complexity: M
 initiative_id: hosted-multi-tenant-cloud
 ---
 
-# Hosted multi-tenant cloud deployment (AWS free-tier)
+# Hosted multi-tenant deployment (home server via Cloudflare Tunnel, ~$0)
+
+> **Hosting decided ([[SQUIRE-A-0016]]):** run on the **existing home Mac** (the always-up launchd
+> service), exposed via **Cloudflare Tunnel** (outbound-only; free TLS/DNS/DDoS) — **~$0 infra**, no
+> public IP or inbound ports. This superseded the earlier AWS-EC2/Caddy framing after a cost pass
+> (~$13/mo → $0). The stack is provider-neutral, so a later move to Hetzner/Lightsail is a deployment
+> swap, not a rewrite.
 
 ## Context
 
 Today Squire ships as a **self-hosted LAN appliance**: one `squire-serve` per household, phones paired
 by QR + mDNS over the local network, the Keep on loopback. This initiative hosts **today's product**
-(no feature changes) **multi-tenant in the cloud** so multiple known families run on shared AWS infra,
-reachable over the internet — keeping the self-hosted path intact as a deployment variant.
+(no feature changes) **multi-tenant over the internet** so multiple known families run on one shared
+`squire-serve` — keeping the LAN path intact as a variant.
 
 **Explicitly NOT in scope:** Play Store / mass-market launch, open public signup at scale, COPPA-as-a-
 launch-gate, Cognito-at-50k-MAU. This is "run what we have, for known families, in the cloud."
@@ -45,10 +51,11 @@ internet-reachability, and deploy/ops**, not new domain work:
 
 **Goals**
 - One cloud-hosted `squire-serve` serving **many tenants** (households), isolated per [[SQUIRE-A-0002]].
-- Reachable over the **internet with TLS**; phones pair to a **cloud endpoint** (no LAN/mDNS).
+- Reachable over the **internet with TLS** via Cloudflare Tunnel; phones pair to a **fixed cloud
+  hostname** (no LAN/mDNS).
 - **Accounts**: parent = account, owns a tenant; provisioned/invite onboarding (not open signup).
-- Stays **on AWS free-tier** for the MVP; cost-guardrailed.
-- **Self-hosted LAN mode preserved** — cloud is a runtime mode, not a replacement.
+- **~$0 infra** (home Mac + Cloudflare Tunnel); no public IP/inbound ports.
+- **LAN mode preserved** — internet hosting is a runtime mode, not a replacement.
 
 **Non-Goals**
 - Play Store / app-store distribution (sideload via the existing dist repo stays).
@@ -56,19 +63,22 @@ internet-reachability, and deploy/ops**, not new domain work:
 - HA / multi-region (single-box MVP; scale path noted).
 - New product features (this is lift-and-host of today's behavior).
 
-## Architecture (free-tier topology)
+## Architecture ($0 home-hosted topology — [[SQUIRE-A-0016]])
 
 ```
 Phone (sideloaded APK) ──HTTPS──┐
-                                ├─> [Caddy auto-TLS]  ── squire-serve (multi-tenant, X-Household)
-Parent browser (the Keep) ──────┘   on EC2 t4g.micro          │
-                                                               ▼
-                                          data store: SQLite-on-EBS  *or*  RDS Postgres  (DECISION)
-  S3 (dist mirror + backups) · SSM (secrets) · CloudWatch (logs/alarms) · SES (account email)
+Parent browser (the Keep) ──────┴─> Cloudflare edge (TLS/DNS/DDoS)
+                                         │  Tunnel (outbound-only from the Mac — no inbound ports/IP)
+                                         ▼
+                              squire-serve (multi-tenant, X-Household) on the HOME MAC (launchd)
+                                         │
+                                         ▼
+                              per-tenant SQLite on local disk ([[SQUIRE-A-0014]])
+   offsite backup: per-tenant export ([[SQUIRE-T-0012]]) → Cloudflare R2 (free, S3-compatible)
 ```
-One always-on EC2 + (optional) one RDS both fit in 750h/mo. Caddy on the box = free Let's Encrypt TLS,
-avoiding ALB/CloudFront cost. The api's existing `X-Household` routing makes one process serve all
-tenants; per-tenant single-writer is `SQUIRE-T-0024`.
+`cloudflared` on the Mac dials out to Cloudflare; CF terminates TLS and routes the hostname → the tunnel
+→ `squire-serve` on loopback. No EC2/EBS/ALB/Caddy/Route53/SSM. The api's `X-Household` routing makes one
+process serve all tenants; per-tenant single-writer is [[SQUIRE-T-0024]].
 
 ## Detailed Design — the two work lists
 
@@ -112,9 +122,9 @@ tenants; per-tenant single-writer is `SQUIRE-T-0024`.
 
 | Decision | Resolution | ADR |
 |---|---|---|
-| **Data store** ✅ | SQLite-per-tenant on EBS (MVP); Postgres/RDS = scale path | [[SQUIRE-A-0014]] |
-| **Compute** ✅ | EC2 t4g.micro (free-tier) + Caddy on the box | [[SQUIRE-A-0015]] |
-| **Edge / TLS** ✅ | Caddy auto-TLS (Let's Encrypt), reverse-proxy to loopback | [[SQUIRE-A-0015]] |
+| **Data store** ✅ | SQLite-per-tenant on local disk; Postgres = scale path | [[SQUIRE-A-0014]] |
+| **Compute** ✅ | **Home Mac** (existing launchd service) — *was EC2* | [[SQUIRE-A-0016]] (supersedes A-0015 #1) |
+| **Edge / TLS** ✅ | **Cloudflare Tunnel** (outbound-only, free TLS/DNS) — *was Caddy* | [[SQUIRE-A-0016]] (supersedes A-0015 #2) |
 | **Auth** ✅ | Extend `ProdIdentity` (add email verify + password reset) | [[SQUIRE-A-0015]] |
 | **Onboarding** ✅ | Provisioned / invite (not open signup) | [[SQUIRE-A-0015]] |
 
@@ -125,26 +135,30 @@ All load-bearing decisions are locked → ready to **decompose into tasks** (Pha
 - **RDS free-tier cliff** at 12 months (data decision).
 - **Single EC2 = SPOF**; no HA on free-tier (acceptable MVP; note scale-out).
 - **Pairing trust over the internet** — code TTL/entropy + endpoint auth matter more than on LAN.
-- **t4g.micro = 1GB RAM** — watch under many tenants + PG pool.
-- **Backup/restore drills** — must be exercised, not assumed.
-- Cost creep past free-tier — billing alarms are mandatory, not optional.
+- **Availability = home power + ISP + the Mac** ([[SQUIRE-A-0016]]) — no HA; an outage takes all tenants
+  down. Acceptable for known families; the trigger to move to a rented box.
+- **Hosting other families' data on a personal machine** — we're the data controller; fine for known
+  families, a consideration before any wider audience.
+- **Backup/restore drills** — must be exercised, not assumed (offsite to R2, since the box is at home).
+- **Cloudflare + ISP dependency/ToS** — confirm low-traffic personal hosting is permitted.
 
 ## Implementation Plan
 
 ### Phase 1 — Cloud MVP (decomposed)
 | Task | What | Deps |
 |---|---|---|
-| [[SQUIRE-T-0100]] | Provision the box: EC2 + encrypted EBS, network (443/SSM), Route53, secrets, S3, **billing alarms**, deploy path | — |
-| [[SQUIRE-T-0101]] | Caddy auto-TLS reverse proxy (edge) | T-0100 |
+| [[SQUIRE-T-0100]] | Expose the home server: Cloudflare Tunnel (`cloudflared`) + DNS hostname + offsite backup target | — |
+| [[SQUIRE-T-0101]] | Cloudflare Tunnel config: hostname → loopback `squire-serve`, run as a service *(rescoped from Caddy)* | T-0100 |
 | [[SQUIRE-T-0024]] | Hosted multi-tenant concurrency: per-tenant shared store, single-writer-per-tenant (pulled from backlog) | — |
-| [[SQUIRE-T-0102]] | Cloud runtime mode: SSM/env config, mDNS off, per-tenant SQLite on EBS, loopback bind | — |
+| [[SQUIRE-T-0102]] | Cloud runtime mode: config, mDNS off, per-tenant SQLite on local disk, loopback bind | — |
 | [[SQUIRE-T-0103]] | Accounts + provisioned onboarding: ProdIdentity verify/reset, token revocation, invite tenant | T-0102 |
 | [[SQUIRE-T-0104]] | Internet pairing + phone cloud config: cloud-endpoint QR (drop mDNS), code hardening | T-0103 |
 | [[SQUIRE-T-0105]] | **Tenant-isolation hardening + cross-tenant leakage tests** (security gate) | T-0024 |
-| [[SQUIRE-T-0106]] | Backups + restore drill: S3 per-tenant export + EBS snapshots, rehearsed restore | T-0100, T-0102 |
+| [[SQUIRE-T-0106]] | Backups + restore drill: per-tenant export → Cloudflare R2, rehearsed restore | T-0102 |
 
-**Critical path:** T-0100→T-0101 (infra/edge) ‖ T-0024→T-0102→T-0103→T-0104 (server/auth/pairing);
-T-0105 gates launch; T-0106 before any real data. The two infra/code tracks run in parallel.
+**Critical path:** the server/auth track dominates — T-0024→T-0102→T-0103→T-0104; the tunnel
+(T-0100→T-0101) is a quick parallel setup. T-0105 gates launch; T-0106 before any real data.
+*Much smaller infra surface than the AWS framing* — `cloudflared` + R2, not a provisioned box.
 
 ### Phase 2 — Hardening (not yet decomposed)
 Rate limiting, deeper observability/alarms, deploy automation, per-tenant export/**delete**.

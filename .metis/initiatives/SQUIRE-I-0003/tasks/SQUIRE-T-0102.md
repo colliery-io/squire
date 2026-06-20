@@ -1,7 +1,7 @@
 ---
 id: cloud-runtime-mode-for-squire
 level: task
-title: "Cloud runtime mode for squire-serve: SSM/env config, mDNS off, per-tenant SQLite on EBS, loopback bind"
+title: "Cloud runtime mode for squire-serve: SSM/env config, mDNS off, per-tenant SQLite on local disk, loopback bind"
 short_code: "SQUIRE-T-0102"
 created_at: 2026-06-20T18:45:14.736770+00:00
 updated_at: 2026-06-20T18:45:14.736770+00:00
@@ -24,19 +24,21 @@ The deployment/config layer that makes `squire-serve` run as a cloud service (vs
 Pairs with the concurrency core [[SQUIRE-T-0024]]; keep the LAN mode intact (cloud is a mode, not a fork).
 
 ## Scope
-- **Config from SSM/env**: data dir (the EBS mount), HMAC signing key, domain/advertised URL, log level.
-- **mDNS OFF** in cloud mode (no LAN discovery); **bind loopback** (Caddy is the public edge, [[SQUIRE-T-0101]]).
-- **Per-tenant SQLite on the EBS data path** ([[SQUIRE-A-0014]]): one file per tenant under the mounted
-  volume; WAL + server-appropriate durability pragmas (vs. appliance defaults).
-- Drop/adapt LAN-only bits in cloud mode: apk-sync N/A; pairing advertises the **cloud URL** not a LAN IP
+- **Config from env/local file** (macOS keychain or a config file — no SSM): data dir, HMAC signing key,
+  advertised hostname, log level.
+- **mDNS OFF** in internet mode (no LAN discovery); **bind loopback** (Cloudflare Tunnel is the public
+  edge, [[SQUIRE-T-0101]]).
+- **Per-tenant SQLite on the local data dir** ([[SQUIRE-A-0014]]): one file per tenant on the home Mac's
+  disk; WAL + server-appropriate durability pragmas (vs. appliance defaults).
+- Drop/adapt LAN-only bits: apk-sync N/A; pairing advertises the **cloud hostname** not a LAN IP
   (feeds [[SQUIRE-T-0104]]).
-- Structured logs to stdout (CloudWatch picks them up); `/health` + a readiness signal.
+- Structured logs to stdout/file (the launchd log we already capture); `/health` + a readiness signal.
 
 ## Acceptance
-- [ ] A documented cloud-mode launch (env/SSM) brings squire-serve up: loopback bind, mDNS off, data on
-  the EBS path, config from SSM.
+- [ ] A documented internet-mode launch brings squire-serve up: loopback bind, mDNS off, config from
+  env/local file.
 - [ ] LAN appliance mode still works unchanged (no regression).
-- [ ] Per-tenant SQLite files created under the EBS mount; durability pragmas set + verified.
+- [ ] Per-tenant SQLite files created under the local data dir; durability pragmas set + verified.
 - [ ] Builds on / coexists with [[SQUIRE-T-0024]] (shared per-tenant store).
 
 ## Notes

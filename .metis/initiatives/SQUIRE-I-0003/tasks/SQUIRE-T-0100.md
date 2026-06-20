@@ -1,7 +1,7 @@
 ---
 id: provision-the-cloud-box-ec2-t4g
 level: task
-title: "Provision the cloud box: EC2 t4g.micro + encrypted EBS, network, secrets, billing alarms, deploy path"
+title: "Expose the home server via Cloudflare Tunnel: cloudflared + DNS hostname + offsite backup target"
 short_code: "SQUIRE-T-0100"
 created_at: 2026-06-20T18:45:03.724063+00:00
 updated_at: 2026-06-20T18:45:03.724063+00:00
@@ -18,34 +18,32 @@ exit_criteria_met: false
 initiative_id: SQUIRE-I-0003
 ---
 
-# Provision the cloud box
+# Expose the home server via Cloudflare Tunnel
 
-Stand up the single free-tier host per [[SQUIRE-A-0015]] (EC2+Caddy) + [[SQUIRE-A-0014]] (SQLite on EBS).
-Foundation for everything else in [[SQUIRE-I-0003]].
+Per [[SQUIRE-A-0016]] — make the existing home `squire-serve` reachable over the internet at ~$0, with
+no public IP or inbound ports. *(Rescoped from "provision an AWS box" after the cost pass.)*
 
 ## Scope
-- **EC2 t4g.micro** (Graviton, free 12mo), Amazon Linux 2023; instance **IAM role** (SSM, S3, CloudWatch).
-- **Encrypted EBS** data volume mounted for the per-tenant SQLite files (separate from root).
-- **Network**: security group **443 in only**; **no open 22** — shell via **SSM Session Manager**.
-- **Route 53** hosted zone + a domain/subdomain → the instance (Elastic IP so it's stable).
-- **Secrets**: SSM Parameter Store — HMAC token-signing key, any service creds.
-- **S3** bucket (private, versioned) for backups + a dist mirror.
-- **Billing + free-tier usage alarms** (hard requirement) + a basic CloudWatch log group + CPU/disk alarms.
-- **Deploy path**: how `squire-serve` lands + updates — reuse the self-update-from-dist mechanism
-  ([[SQUIRE-A-0012]]) under the launchd-equivalent (systemd unit on Linux) or SSM run-command.
-
-## Approach
-- Prefer **IaC (Terraform)** committed to the repo over click-ops, so the box is reproducible/teardownable.
-- systemd service unit for `squire-serve` (RunAtLoad/Restart=always — the Linux analog of the macOS
-  LaunchAgent we built), self-update + (no apk-sync needed in cloud) on.
+- **Cloudflare account + zone/domain** (a domain on Cloudflare, ~$10/yr, or a CF-provided hostname).
+- **`cloudflared`** installed on the home Mac, run as a managed service (launchd) alongside `squire-serve`
+  — outbound-only connection to Cloudflare.
+- **Tunnel route**: `https://<hostname>` → the tunnel → `squire-serve` on **loopback** (the api port).
+  (Server loopback-bind is [[SQUIRE-T-0102]].)
+- **DNS** record (CF) for the hostname → the tunnel.
+- **Offsite backup target**: a **Cloudflare R2** bucket (free tier, S3-compatible) for per-tenant exports
+  (consumed by [[SQUIRE-T-0106]]) — the box is at home, so backups MUST be offsite.
+- **Secrets/config** stay local (file / macOS keychain) — no SSM.
+- Confirm **Cloudflare + ISP ToS** allow this low-traffic personal hosting.
 
 ## Acceptance
-- [ ] `terraform apply` (or documented click-ops) yields a reachable host with 443-only ingress, SSM
-  shell, encrypted EBS mounted at the data path, Elastic IP + DNS.
-- [ ] Billing + free-tier alarms active and tested (alert fires).
-- [ ] `squire-serve` runs under systemd (restart-on-crash, start-on-boot) and self-updates from dist.
-- [ ] Secrets resolved from SSM at runtime (no secrets in the image/AMI).
-- [ ] Teardown documented (no orphaned paid resources).
+- [ ] `https://<hostname>/health` returns 200 via the tunnel (valid CF TLS), with **no inbound ports
+  opened** on the home network / no public IP exposed.
+- [ ] `cloudflared` runs as a service that survives reboot + restarts on failure (like the squire-serve
+  launchd unit).
+- [ ] An R2 bucket exists + credentials are available to the backup job.
+- [ ] Tunnel only reaches `squire-serve` loopback (no other local services exposed).
 
 ## Notes
-Blocks [[SQUIRE-T-0101]] (Caddy) and [[SQUIRE-T-0106]] (backups need the S3 bucket + EBS).
+Tiny infra surface vs the old AWS plan — `cloudflared` + R2. Blocks [[SQUIRE-T-0101]] (tunnel routing
+config) and feeds [[SQUIRE-T-0106]] (R2 backups). Provider-neutral: a later move to Hetzner/Lightsail
+re-points DNS/tunnel + copies the files ([[SQUIRE-A-0016]]).

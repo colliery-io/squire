@@ -1,12 +1,12 @@
 ---
 id: backups-restore-drill-scheduled-s3
 level: task
-title: "Backups + restore drill: scheduled S3 per-tenant export + EBS snapshots, rehearsed restore"
+title: "Backups + restore drill: per-tenant export → Cloudflare R2 (offsite), rehearsed restore"
 short_code: "SQUIRE-T-0106"
 created_at: 2026-06-20T18:45:35.480074+00:00
 updated_at: 2026-06-20T18:45:35.480074+00:00
 parent: SQUIRE-I-0003
-blocked_by: ["SQUIRE-T-0100", "SQUIRE-T-0102"]
+blocked_by: ["SQUIRE-T-0102"]
 archived: false
 
 tags:
@@ -18,26 +18,29 @@ exit_criteria_met: false
 initiative_id: SQUIRE-I-0003
 ---
 
-# Backups + restore drill
+# Backups + restore drill (offsite to R2)
 
-[[SQUIRE-A-0014]] makes durability **our** responsibility (SQLite on single-AZ EBS). This task makes the
-backup story real *and rehearsed* — the ADR calls the restore drill mandatory, not optional.
+[[SQUIRE-A-0014]] makes durability ours; [[SQUIRE-A-0016]] puts the box **at home**, so backups **must be
+offsite** — a home disk/power loss can't be the only copy. *(Target shifted S3 → Cloudflare R2; the
+export logic is identical.)*
 
 ## Scope
-- **Scheduled per-tenant export to S3** (reuse [[SQUIRE-T-0012]] single-file export): each tenant's SQLite
-  → versioned S3 object on a schedule; verify integrity post-upload.
-- **EBS volume snapshots** on a schedule (whole-box point-in-time); lifecycle/retention policy.
-- **Encryption**: S3 SSE + encrypted EBS snapshots.
-- **Restore drill**: a documented, *executed* procedure — pick a tenant, restore its file from S3 into a
-  scratch instance, boot squire-serve, verify the household + balances match. Time it.
+- **Scheduled per-tenant export to Cloudflare R2** (reuse [[SQUIRE-T-0012]] single-file export): each
+  tenant's SQLite → versioned R2 object on a schedule; integrity-check post-upload.
+- **A second offsite copy** is cheap insurance (R2 lifecycle/versioning, or a periodic copy elsewhere) —
+  there's no EBS-snapshot equivalent now that the box is a home Mac (a local Time Machine copy is a nice
+  on-site adjunct but is NOT the offsite backup).
+- **Encryption**: R2 SSE; consider client-side encrypt before upload (home box → third-party storage).
+- **Restore drill**: documented + *executed* — pull a tenant's file from R2 onto a scratch machine, boot
+  squire-serve, verify household + balances match. Time it (record RTO).
 - Alarm on backup failure / staleness (no successful export in N hours).
 
 ## Acceptance
-- [ ] Per-tenant exports land in S3 on schedule, versioned + integrity-checked.
-- [ ] EBS snapshots scheduled with retention.
+- [ ] Per-tenant exports land in R2 on schedule, versioned + integrity-checked + encrypted.
 - [ ] A **restore drill has been run** end-to-end and documented (RTO noted), not just scripted.
 - [ ] Backup-failure/staleness alarm fires on a forced failure.
 
 ## Notes
-Blocked by [[SQUIRE-T-0100]] (S3 + EBS) and [[SQUIRE-T-0102]] (per-tenant data layout). Reuses the existing
-export/import — low new code, high ops value.
+Blocked by [[SQUIRE-T-0102]] (per-tenant data layout); R2 bucket comes from [[SQUIRE-T-0100]]. Reuses the
+existing export/import — low new code, high ops value. Especially important under [[SQUIRE-A-0016]]
+(single home box = single point of loss without offsite backup).

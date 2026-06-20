@@ -1,7 +1,7 @@
 ---
 id: edge-caddy-auto-tls-reverse-proxy
 level: task
-title: "Edge: Caddy auto-TLS reverse proxy in front of squire-serve"
+title: "Cloudflare Tunnel routing config: hostname → loopback squire-serve, run as a service"
 short_code: "SQUIRE-T-0101"
 created_at: 2026-06-20T18:45:10.351729+00:00
 updated_at: 2026-06-20T18:45:10.351729+00:00
@@ -18,24 +18,26 @@ exit_criteria_met: false
 initiative_id: SQUIRE-I-0003
 ---
 
-# Edge: Caddy auto-TLS reverse proxy
+# Cloudflare Tunnel routing config
 
-Per [[SQUIRE-A-0015]] — Caddy terminates TLS and reverse-proxies to `squire-serve` on loopback. On top
-of [[SQUIRE-T-0100]].
+Per [[SQUIRE-A-0016]] — the tunnel *is* the edge; Cloudflare terminates TLS. *(Rescoped from "Caddy
+auto-TLS"; Caddy is dropped — kept only for a non-Cloudflare/self-hosted variant.)* On top of
+[[SQUIRE-T-0100]].
 
 ## Scope
-- Install Caddy on the box; systemd-managed.
-- Caddyfile: auto-HTTPS (Let's Encrypt) for the domain → `reverse_proxy 127.0.0.1:<api_port>`.
-- HTTP→HTTPS redirect; sensible timeouts; pass through `X-Household` + auth headers untouched.
-- Cert auto-renewal (Caddy handles it) + a renewal-failure alarm.
-- `squire-serve` binds **loopback only** (the public bind is Caddy) — coordinate with [[SQUIRE-T-0102]].
+- `cloudflared` **ingress config**: `<hostname>` → `http://127.0.0.1:<api_port>` (loopback); a catch-all
+  404 for everything else (only the api is exposed).
+- Pass through `X-Household` + auth headers untouched; sensible timeouts; websockets N/A.
+- Run `cloudflared` under launchd (start-on-boot, restart-on-fail) — mirror the squire-serve service.
+- Verify Cloudflare TLS/proxy settings (Full/strict not needed since origin is loopback-local to the
+  tunnel; confirm no double-encoding of headers).
+- Health-monitor the tunnel (alert if it disconnects).
 
 ## Acceptance
-- [ ] `https://<domain>/health` returns 200 with a valid LE cert; HTTP redirects to HTTPS.
-- [ ] A real `/state` request flows phone → Caddy(443) → squire-serve(loopback) with auth + `X-Household`
-  intact.
-- [ ] Cert renews automatically; a renewal failure raises an alarm.
-- [ ] squire-serve is NOT reachable except via Caddy (no public bind on the api port).
+- [ ] A real `/state` request flows phone → Cloudflare → tunnel → `squire-serve` loopback with auth +
+  `X-Household` intact.
+- [ ] Only the api hostname is routed; no other local port is reachable through the tunnel.
+- [ ] `cloudflared` auto-starts on boot + restarts on crash; a disconnect raises an alert.
 
 ## Notes
-Blocked by [[SQUIRE-T-0100]]. Pairs with [[SQUIRE-T-0102]] (loopback bind).
+Blocked by [[SQUIRE-T-0100]]. Pairs with [[SQUIRE-T-0102]] (squire-serve binds loopback).
