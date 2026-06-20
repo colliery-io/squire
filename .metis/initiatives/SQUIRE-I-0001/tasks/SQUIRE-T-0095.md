@@ -79,6 +79,27 @@ cash adjust.
 Building deliberately layer-by-layer; the migration touches the LIVE prod DB (the kids' balances), so
 it ships only once the whole thing is solid + tested — not piecemeal.
 
+## DIRECTION CHANGE (operator, 2026-06-19): generalize, don't parallel
+
+Operator foresees more currencies → build a generalized **Currency** model now, not a one-off `cash`
+parallel. Coins get folded in; dollars is the second entry; a third is just config.
+
+This turns the work from an *additive feature* into a **currency-system refactor** of the working coin
+code + a **data migration of the kids' live balances** — the riskiest class of change. So it needs a
+real design pass (likely an **ADR**) before any code:
+
+- **`Currency`** identity + per-currency **policy** (coins: spendable-in-shop, prices rewards;
+  dollars: not spendable, has *payout*; floor-at-zero for both) — the policy is the crux, since the
+  currencies are NOT symmetric.
+- Generic shapes: `Quest.rewards: {currency → amount}`; `CompletionApproved` snapshots an awarded map;
+  one `Adjusted {currency, amount, reason}` (today's `PointsAdjusted` becomes `Adjusted{Coins}`);
+  `ItemRedeemed.cost` stays Coins (rewards priced in coins); `balance(squire, currency)`.
+- **Migration of existing data:** every current coin event/field must map to `Coins` without changing
+  any balance. Design the store shape (currency column / rewards table) + a tested migration.
+- api/SDK/Keep/phone updated to the currency-keyed model.
+
 ## Status
 
-Active — building the domain + store foundation first.
+Active — **design first.** Next artifact: an ADR for the Currency model + the live-balance migration
+strategy, then a focused, well-tested build (it rewrites working money code on real data). Not to be
+rushed at the tail of a long session.
