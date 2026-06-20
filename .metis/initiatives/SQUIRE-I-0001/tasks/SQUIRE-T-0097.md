@@ -14,7 +14,7 @@ tags:
   - "#phase/completed"
 
 
-exit_criteria_met: false
+exit_criteria_met: true
 initiative_id: SQUIRE-I-0001
 ---
 
