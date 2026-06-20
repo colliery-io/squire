@@ -1,7 +1,7 @@
 ---
 id: cloud-runtime-mode-for-squire
 level: task
-title: "Cloud runtime mode for squire-serve: SSM/env config, mDNS off, per-tenant SQLite on local disk, loopback bind"
+title: "Internet runtime mode for squire-serve: env/local config, mDNS off, per-tenant SQLite on local disk, loopback bind"
 short_code: "SQUIRE-T-0102"
 created_at: 2026-06-20T18:45:14.736770+00:00
 updated_at: 2026-06-20T18:45:14.736770+00:00
