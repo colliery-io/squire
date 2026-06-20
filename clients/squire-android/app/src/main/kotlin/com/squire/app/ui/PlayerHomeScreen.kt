@@ -532,14 +532,26 @@ private fun rewardDetail(r: RewardCard) = DetailContent(
     lines = buildList {
         add("Cost" to "${r.cost} coins")
         val lock = r.lock
+        when (lock?.kind) {
+            LockReasonKind.NeedsAchievement -> add("Unlocks with" to "🏅 ${lock.name ?: "an achievement"}")
+            LockReasonKind.OutOfStock -> add("Stock" to "Out of stock")
+            null -> {}
+        }
         add(
-            "Status" to when {
-                lock?.kind == LockReasonKind.OutOfStock -> "Out of stock"
-                lock?.kind == LockReasonKind.NeedsAchievement -> "Locked — needs ${lock.name ?: "an achievement"}"
-                r.affordable -> "You can get this now!"
-                else -> "Keep saving"
+            "Can you get it now?" to when {
+                lock != null -> "Not yet — it's locked"
+                r.affordable -> "Yes! 🎉"
+                else -> "Not yet — keep saving"
             },
         )
+        r.lastRedeemed?.let { add("Last got it" to formatDate(it)) }
+    },
+    note = when {
+        r.lock?.kind == LockReasonKind.NeedsAchievement ->
+            "Earn the “${r.lock?.name}” badge to unlock this reward."
+        r.lock?.kind == LockReasonKind.OutOfStock -> "It's out of stock for now — check back later."
+        !r.affordable -> "Keep earning coins to afford this one!"
+        else -> "Ask a grown-up to redeem it for you."
     },
 )
 
@@ -548,11 +560,24 @@ private fun streakDetail(s: StreakView) = DetailContent(
     title = s.name,
     lines = buildList {
         add("Current streak" to "${s.current} day${if (s.current == 1) "" else "s"}")
-        add("Best ever" to "${s.best}")
-        s.nextMilestone?.let { add("Next milestone" to "$it days") }
-        add("Status" to if (s.alive) "Going strong 🔥" else "Broken — start again!")
+        add("Best ever" to "${s.best} day${if (s.best == 1) "" else "s"}")
+        s.nextMilestone?.let {
+            add("Next reward at" to "$it days")
+            add("Days to go" to "${(it - s.current).coerceAtLeast(0)}")
+        }
+        add("Status" to if (s.alive) "Going strong 🔥" else "Broken — start again")
+    },
+    note = when {
+        !s.alive -> "Do this today to start a fresh streak!"
+        s.nextMilestone != null ->
+            "Keep it going ${(s.nextMilestone!! - s.current).coerceAtLeast(1)} more day(s) to earn the next reward."
+        else -> "Keep the streak alive — do it every day!"
     },
 )
+
+/** Short "MMM d" date for a millisecond epoch (e.g. a reward's last-redeemed). */
+private fun formatDate(epochMs: Long): String =
+    java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault()).format(java.util.Date(epochMs))
 
 private fun badgeDetail(b: BadgeView) = DetailContent(
     icon = "🏅",
