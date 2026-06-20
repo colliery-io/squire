@@ -51,6 +51,15 @@ Domain (`Money` type, quest field, `MoneyEarned` / `MoneyPaidOut` events + comma
 (owed balance + history), api/SDK (state view + admin), Keep + phone authoring (money on a quest),
 parent payout UI, child display. A real feature — warrants its own initiative if it grows.
 
+## Decisions (operator-approved, 2026-06-19)
+
+- **Per-chore cash** in addition to coins (a quest can carry an optional money amount).
+- A **"paid out" settle action** for the parent that draws down the owed balance (audited).
+- **Kept separate from coins** — money is its own ledger, NOT spendable in the in-app shop.
+- Store integer **cents**; never floats. Show "$ owed" with a clearly non-coin visual.
+
 ## Status
 
-Captured. Needs a design pass with the operator before implementation (human-in-the-loop).
+Direction approved. Next: a short written design (events/commands, projections, settle flow, UI on
+both surfaces) for review before building. Larger than [[SQUIRE-T-0096]]; likely sequence hazards
+first, then this.

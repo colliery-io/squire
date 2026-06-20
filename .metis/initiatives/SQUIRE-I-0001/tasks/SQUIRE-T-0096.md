@@ -53,7 +53,15 @@ Domain (`Hazard` definition + `DefineHazard` / `ApplyHazard` / `ArchiveHazard` c
 event), projections (balance deduction + activity entry), api/SDK, Keep + phone authoring, child
 activity display (negative styling), notification on apply.
 
+## Decisions (operator-approved, 2026-06-19)
+
+- **Floor the balance at zero** — no debt (reuse the existing `clamp_balance`).
+- **Every deduction shows in his activity feed with the reason** — never a silent loss; mirrors the
+  reject/reason flow. Pairs with the new coin-notification work so he learns *why* coins dropped.
+- Coins-only to start (no streak/achievement-progress penalties yet).
+
 ## Status
 
-Captured. Needs a design pass with the operator (floor-vs-debt, progress effects) before
-implementation. Related: [[SQUIRE-T-0095]] (real-money currency) and the child notification work.
+Direction approved. Ready to design the concrete domain model (`Hazard` def + `DefineHazard` /
+`ApplyHazard` / `ArchiveHazard` + penalty event) and sequence against [[SQUIRE-T-0095]]. The more
+self-contained of the two (mirrors quest authoring) — a good candidate to build first.

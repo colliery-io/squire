@@ -11,10 +11,10 @@ archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
-exit_criteria_met: false
+exit_criteria_met: true
 initiative_id: SQUIRE-I-0001
 ---
 
@@ -70,3 +70,14 @@ Operator feedback after a day of real use. Grounded against the current code.
 - Rust tests green; Paparazzi goldens re-recorded and verified (the child-home golden shows coins,
   the ⋮ menu, "Done", and the Goals section).
 - Next: build the signed APK + publish OTA so all 8 reach the phones.
+- **Shipped to prod (v0.7.4 → v0.7.5):** built the APK, bumped versionCode 8→9, pushed through the
+  live prod server's OTA (manual drop into the updates dir, `SQUIRE_APK_SYNC=off` so it's durable).
+  Also **rebuilt + redeployed the prod server** (it was the pre-#3 binary) so the goals projection is
+  live. Operator verified on the phone: **goals show**, and the **dog-toy lock gate ("🔒 Best
+  Friends") shows** — the earlier "can't see streaks/gates" was purely the stale server, not a bug.
+- **Post-testing additions (v0.7.5):** richer reward/streak detail modals (unlock requirement, stock,
+  gettable-now, last-redeemed; streak days-to-go + nudge); a `CoinNotifyWorker` that posts a local
+  notification when his balance rises while the app is closed (the gofur-coins gap), with the
+  foreground app keeping the baseline so no double-notify.
+- **DONE.** All 8 day-1 items + the two post-testing items delivered and live on prod.
+- Spun off two new feature requests: [[SQUIRE-T-0095]] real-money rewards, [[SQUIRE-T-0096]] hazards.
