@@ -33,6 +33,19 @@ pub struct StateView {
     pub adjustments: Vec<AdjustmentView>,
 }
 
+/// A named penalty in the household's **hazard catalog** (SQUIRE-T-0096) — a negative behavior a
+/// parent can apply with one tap. Applying it deducts `penalty` coins via a negative `AdjustPoints`
+/// (reason = `name`, balance floored at zero). The catalog is shared household config, not a
+/// per-Squire event, so both the phone and the Keep edit the same list.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct Hazard {
+    pub name: String,
+    pub penalty: Points,
+    pub icon: Option<String>,
+}
+
 /// One point adjustment shown in the child's activity (SQUIRE-T-0096): a grant (`amount > 0`) or a
 /// hazard/penalty (`amount < 0`), with the grown-up's reason, newest first.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

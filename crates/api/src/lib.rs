@@ -59,6 +59,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/admin/review-redemption", post(knight::review_redemption))
         .route("/admin/redeem", post(knight::redeem))
         .route("/admin/adjust", post(knight::adjust))
+        .route("/admin/hazards", get(knight::list_hazards).put(knight::set_hazards))
         .route("/admin/mark-done", post(knight::mark_done))
         .route("/household-review", get(knight::household_review))
         .route("/admin/squire/{id}/state", get(knight::squire_state))
