@@ -11,10 +11,10 @@ archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
-exit_criteria_met: false
+exit_criteria_met: true
 initiative_id: SQUIRE-I-0001
 ---
 
@@ -37,7 +37,18 @@ Expose the [[SQUIRE-A-0013]] model across the trust boundary, on top of [[SQUIRE
 
 ## Acceptance
 
-- [ ] api tests green; openapi regenerated; SDK builds.
-- [ ] Coins-only payloads/behaviour unchanged for existing clients (back-compat verified).
+- [x] api tests green (40 groups); openapi.json regenerated (Currency, CurrencyBalance + currency
+  field); Kotlin SDK regenerates + the app + screenshot tests compile.
+- [x] Coins-only payloads/behaviour unchanged: `balance` stays the coin balance; `balances` +
+  `AdjustReq.currency` are `#[serde(default)]` so older clients are unaffected (verified by the app +
+  test compile and all balance assertions passing).
 
-Blocks [[SQUIRE-T-0099]].
+## Done
+
+- `Command::AdjustPoints { currency, .. }` threaded through engine + api `/admin/adjust` + Keep
+  `/api/adjust`.
+- `StateView.balances: Vec<CurrencyBalance>` (currency, floored balance, name, symbol); Coins always
+  present, dollars listed too.
+- openapi + SDK regenerated; committed `4595a1f`.
+
+**T-0098 complete.** Unblocks [[SQUIRE-T-0099]] (dollars end-to-end UI + Quest cash + payout).
