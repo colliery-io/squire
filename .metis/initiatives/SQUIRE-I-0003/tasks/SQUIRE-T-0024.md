@@ -5,18 +5,18 @@ title: "Concurrent hosted multi-tenant API: per-tenant shared store (single writ
 short_code: "SQUIRE-T-0024"
 created_at: 2026-06-17T10:57:50.777176+00:00
 updated_at: 2026-06-17T10:57:50.777176+00:00
-parent: 
+parent: SQUIRE-I-0003
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/backlog"
+  - "#phase/todo"
   - "#feature"
 
 
 exit_criteria_met: false
-initiative_id: NULL
+initiative_id: hosted-multi-tenant-cloud
 ---
 
 # Concurrent hosted multi-tenant API: per-tenant shared store (single writer per tenant)

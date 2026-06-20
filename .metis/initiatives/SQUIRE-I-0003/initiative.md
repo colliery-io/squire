@@ -4,14 +4,14 @@ level: initiative
 title: "Hosted multi-tenant cloud deployment (AWS free-tier)"
 short_code: "SQUIRE-I-0003"
 created_at: 2026-06-20T18:10:44.430485+00:00
-updated_at: 2026-06-20T18:10:44.430485+00:00
+updated_at: 2026-06-20T18:49:12.052393+00:00
 parent: SQUIRE-V-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/decompose"
 
 
 exit_criteria_met: false
@@ -129,14 +129,32 @@ All load-bearing decisions are locked → ready to **decompose into tasks** (Pha
 - **Backup/restore drills** — must be exercised, not assumed.
 - Cost creep past free-tier — billing alarms are mandatory, not optional.
 
-## Implementation Plan (phasing — NOT yet decomposed into tasks)
-1. **Cloud MVP**: 1 EC2 + Caddy + data + accounts + internet pairing → one real household live in cloud.
-2. **Hardening**: isolation tests, backups/restore drill, rate limiting, observability/alarms, deploy
-   automation, export/delete.
-3. **Multi-household onboarding + scale path** (RDS/PG, second box when needed).
+## Implementation Plan
+
+### Phase 1 — Cloud MVP (decomposed)
+| Task | What | Deps |
+|---|---|---|
+| [[SQUIRE-T-0100]] | Provision the box: EC2 + encrypted EBS, network (443/SSM), Route53, secrets, S3, **billing alarms**, deploy path | — |
+| [[SQUIRE-T-0101]] | Caddy auto-TLS reverse proxy (edge) | T-0100 |
+| [[SQUIRE-T-0024]] | Hosted multi-tenant concurrency: per-tenant shared store, single-writer-per-tenant (pulled from backlog) | — |
+| [[SQUIRE-T-0102]] | Cloud runtime mode: SSM/env config, mDNS off, per-tenant SQLite on EBS, loopback bind | — |
+| [[SQUIRE-T-0103]] | Accounts + provisioned onboarding: ProdIdentity verify/reset, token revocation, invite tenant | T-0102 |
+| [[SQUIRE-T-0104]] | Internet pairing + phone cloud config: cloud-endpoint QR (drop mDNS), code hardening | T-0103 |
+| [[SQUIRE-T-0105]] | **Tenant-isolation hardening + cross-tenant leakage tests** (security gate) | T-0024 |
+| [[SQUIRE-T-0106]] | Backups + restore drill: S3 per-tenant export + EBS snapshots, rehearsed restore | T-0100, T-0102 |
+
+**Critical path:** T-0100→T-0101 (infra/edge) ‖ T-0024→T-0102→T-0103→T-0104 (server/auth/pairing);
+T-0105 gates launch; T-0106 before any real data. The two infra/code tracks run in parallel.
+
+### Phase 2 — Hardening (not yet decomposed)
+Rate limiting, deeper observability/alarms, deploy automation, per-tenant export/**delete**.
+
+### Phase 3 — Scale path (not yet decomposed)
+RDS/Postgres migration (per [[SQUIRE-A-0014]] triggers), second box / multi-instance.
 
 ## Status
 
-**Discovery / design.** Plan captured. **Human-in-the-loop**: resolve the open decisions (data store
-first — it cascades) before decomposing into tasks. Pull `SQUIRE-T-0024` under this initiative when
-decomposing.
+**Decompose.** All decisions locked ([[SQUIRE-A-0014]], [[SQUIRE-A-0015]]); Phase 1 decomposed into
+T-0024 + T-0100..T-0106. Ready to start — recommended first moves: **T-0100** (stand up the box) and
+**T-0024** (the concurrency core) in parallel. **T-0105** is the highest-stakes item (security) — gate
+the MVP on it.
