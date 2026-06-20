@@ -60,7 +60,13 @@ Operator feedback after a day of real use. Grounded against the current code.
   #2 update-banner clarity ("Update now" → "Downloading… N%" → "tap Install in the system prompt");
   #5 "Do it!" → "Done"; #6 Forget into the ⋮ menu + "Download latest update" + a version marker;
   #7 one consistent **coins** currency (star-less minted coin + every "★" → "coins").
-- **Remaining (3/8):** #3 child can't see **available streaks/achievements to unlock** (needs the
-  StateView to carry the locked catalog + a "Goals to unlock" section); #4 quest-scoped achievements
-  in the phone authoring UI (domain supports `Scope::Quest`); #8 tap-to-open detail modals for
-  quests / rewards / streaks.
+- **ALL 8 DONE.** Remaining three completed:
+  - #8 tap-to-open detail dialogs for quests/rewards/streaks/badges (+ goals).
+  - #4 quest-scoped achievements/streaks in the phone authoring (Keep already had it → now at
+    parity; config is not phone-only).
+  - #3 "🎯 Goals to unlock" on the child home — new `GoalView` + `goals()` projection (active,
+    not-yet-earned, non-streak achievements with a kid-friendly description + bonus), regenerated
+    `openapi.json` + SDK, child section + detail dialog. Golden updated.
+- Rust tests green; Paparazzi goldens re-recorded and verified (the child-home golden shows coins,
+  the ⋮ menu, "Done", and the Goals section).
+- Next: build the signed APK + publish OTA so all 8 reach the phones.
