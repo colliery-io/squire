@@ -14,12 +14,13 @@ use axum::http::StatusCode;
 use axum::Json;
 
 use domain_core::contract::{
-    Achievement, Change, Command, Criterion, Date, DomainError, Event, Points, Quest, Snapshot,
+    Achievement, Change, Command, Criterion, Date, DomainError, Event, Points, Quest, Scope, Snapshot,
     Timestamp, UserId,
 };
 use domain_core::contract::{
-    ClaimState, ClaimStatus, QuestCard, RedemptionState, RedemptionStatus, RequestRedemptionReq,
-    RequestRedemptionResp, RewardCard, StateView, StreakView, SubmitClaimReq, SubmitClaimResp,
+    ClaimState, ClaimStatus, GoalView, QuestCard, RedemptionState, RedemptionStatus,
+    RequestRedemptionReq, RequestRedemptionResp, RewardCard, StateView, StreakView, SubmitClaimReq,
+    SubmitClaimResp,
 };
 use domain_core::contract::{Clock, Engine, Projections, Repository};
 use domain_core::{quest_status, reward_view, streak_view, Proj};
@@ -211,6 +212,7 @@ pub(crate) fn assemble_state(
     let balance = clamp_balance(Proj::balance(snap, squire));
     let streaks = streaks(snap, squire, today);
     let badges = badges(snap, squire);
+    let goals = goals(snap, squire);
     let rewards = rewards(snap, squire);
     let my_claims = my_claims(snap, squire);
     let my_requests = my_requests(snap, squire);
@@ -222,9 +224,60 @@ pub(crate) fn assemble_state(
         quests_today,
         streaks,
         badges,
+        goals,
         rewards,
         my_claims,
         my_requests,
+    }
+}
+
+/// Active achievements this Squire has **not yet earned** — "goals to unlock" on the child home
+/// (SQUIRE-T-0094 #3). Streak achievements are shown live in the Streaks section, so they're excluded
+/// here to avoid duplication; this surfaces the rest (TotalCompletions / PointsEarned) that would
+/// otherwise be invisible until earned.
+fn goals(snap: &Snapshot, squire: UserId) -> Vec<GoalView> {
+    let earned = |aid| {
+        snap.events.iter().any(|e| {
+            matches!(e, Event::AchievementUnlocked { squire: s, id, .. } if *s == squire && *id == aid)
+        })
+    };
+    snap.achievements
+        .iter()
+        .filter(|a| a.active)
+        .filter(|a| !matches!(a.criterion, Criterion::Streak { .. }))
+        .filter(|a| !earned(a.id))
+        .map(|a| GoalView {
+            id: a.id,
+            name: a.name.clone(),
+            description: goal_description(snap, &a.criterion),
+            bonus: a.bonus_points,
+        })
+        .collect()
+}
+
+/// Kid-friendly "how to earn it" for a non-streak [`Criterion`], with a scope suffix.
+fn goal_description(snap: &Snapshot, criterion: &Criterion) -> String {
+    fn scope_suffix(snap: &Snapshot, scope: &Scope) -> String {
+        match scope {
+            Scope::Any => String::new(),
+            Scope::Category(cat) => format!(" in {}", cat.0),
+            Scope::Quest(qid) => match snap.quests.iter().find(|q| q.id == *qid) {
+                Some(q) => format!(" on “{}”", q.title),
+                None => " on one quest".to_string(),
+            },
+        }
+    }
+    match criterion {
+        Criterion::TotalCompletions { scope, count } => format!(
+            "Complete {count} chore{}{}",
+            if *count == 1 { "" } else { "s" },
+            scope_suffix(snap, scope),
+        ),
+        Criterion::PointsEarned { total } => format!("Earn {total} coins"),
+        // Streaks are surfaced separately; describe defensively just in case.
+        Criterion::Streak { length, scope, .. } => {
+            format!("{length}-day streak{}", scope_suffix(snap, scope))
+        }
     }
 }
 

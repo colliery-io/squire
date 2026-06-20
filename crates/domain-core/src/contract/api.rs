@@ -18,6 +18,11 @@ pub struct StateView {
     /// from an older server without the field still deserializes.
     #[cfg_attr(feature = "serde", serde(default))]
     pub badges: Vec<BadgeView>,
+    /// Achievements not yet earned — "goals to unlock" on the child home (SQUIRE-T-0094 #3), so every
+    /// available achievement (not only the in-progress streaks) is visible to work toward.
+    /// `#[serde(default)]` so an older server's payload still deserializes.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub goals: Vec<GoalView>,
     pub rewards: Vec<RewardCard>,
     pub my_claims: Vec<ClaimStatus>,
     pub my_requests: Vec<RedemptionStatus>,
@@ -63,6 +68,20 @@ pub struct BadgeView {
     pub bonus: Points,
     /// When it was earned (newest first in the list).
     pub at: Timestamp,
+}
+
+/// An achievement the Squire has **not yet earned**, shown as a "goal to unlock" on the child home
+/// (SQUIRE-T-0094 #3) — so every available achievement, not only streaks, is visible to work toward.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct GoalView {
+    pub id: AchievementId,
+    pub name: String,
+    /// How to earn it, in kid-friendly words — e.g. "Complete 10 chores" or "Earn 100 coins".
+    pub description: String,
+    /// The bonus coins awarded when it unlocks.
+    pub bonus: Points,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
