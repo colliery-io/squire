@@ -42,6 +42,42 @@ rm -rf "$TMP"
 echo "Installed squire-serve $VER → $BIN_DIR/squire-serve"
 
 if [ "$OS" = "Darwin" ]; then
+  # ── Always-up background service (launchd LaunchAgent) ──────────────────────────────────────────
+  # Runs the home server on login, KEEPS IT ALIVE (auto-restart within ~10s if it ever exits), and
+  # survives reboots. Self-update + APK sync are ON (the gold release path) — the server pulls newer
+  # builds of itself and the phone APK from the dist repo. The released binary is ad-hoc/linker-signed
+  # (Apple Silicon), so it runs cleanly under launchd. SQUIRE_NO_SERVICE=1 skips this.
+  if [ "${SQUIRE_NO_SERVICE:-0}" != "1" ]; then
+    LA_DIR="${SQUIRE_LAUNCHAGENT_DIR:-$HOME/Library/LaunchAgents}"
+    PLIST="$LA_DIR/io.colliery.squire.plist"
+    mkdir -p "$LA_DIR" "$HOME/Library/Logs"
+    cat > "$PLIST" <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>io.colliery.squire</string>
+  <key>ProgramArguments</key><array><string>$BIN_DIR/squire-serve</string></array>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>$HOME/Library/Logs/squire-serve.log</string>
+  <key>StandardErrorPath</key><string>$HOME/Library/Logs/squire-serve.log</string>
+</dict>
+</plist>
+PL
+    GUI="gui/$(id -u)"
+    launchctl bootout "$GUI" "$PLIST" 2>/dev/null || true
+    if launchctl bootstrap "$GUI" "$PLIST" 2>/dev/null; then
+      echo "Background service installed (launchd io.colliery.squire) — starts on login, auto-restarts, survives reboot."
+    else
+      echo "(could not load the launchd service automatically — load it with: launchctl bootstrap $GUI \"$PLIST\")"
+    fi
+  fi
+
+  # A double-clickable Squire.app that just opens the Keep (the service keeps the server running).
   APP="$APP_DIR/Squire.app"
   rm -rf "$APP"
   mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -52,7 +88,7 @@ if [ "$OS" = "Darwin" ]; then
 <plist version="1.0"><dict>
   <key>CFBundleName</key><string>Squire</string>
   <key>CFBundleDisplayName</key><string>Squire</string>
-  <key>CFBundleIdentifier</key><string>io.colliery.squire</string>
+  <key>CFBundleIdentifier</key><string>io.colliery.squire.opener</string>
   <key>CFBundleExecutable</key><string>Squire</string>
   <key>CFBundleIconFile</key><string>squire</string>
   <key>CFBundlePackageType</key><string>APPL</string>
@@ -61,12 +97,12 @@ if [ "$OS" = "Darwin" ]; then
 PLIST
   cat > "$APP/Contents/MacOS/Squire" <<'LAUNCH'
 #!/bin/bash
-# Start the home server if it isn't already up, then open the Keep.
+# Open the Keep. The launchd service keeps the home server running; if it's somehow down, nudge it.
 BIN="$HOME/.local/bin/squire-serve"
 LOG="$HOME/Library/Logs/Squire.log"
 KEEP="http://127.0.0.1:4920"
 if ! curl -fsS "$KEEP/health" >/dev/null 2>&1; then
-  nohup "$BIN" >"$LOG" 2>&1 &
+  launchctl kickstart "gui/$(id -u)/io.colliery.squire" 2>/dev/null || nohup "$BIN" >"$LOG" 2>&1 &
   for _ in $(seq 1 40); do curl -fsS "$KEEP/health" >/dev/null 2>&1 && break; sleep 0.5; done
 fi
 open "$KEEP"
@@ -77,7 +113,13 @@ LAUNCH
 fi
 
 echo ""
-echo "Done. To start Squire:"
-[ "$OS" = "Darwin" ] && echo "  • Open “Squire” from $APP_DIR (double-click), or: open \"$APP_DIR/Squire.app\""
-echo "  • Or run: $BIN_DIR/squire-serve"
-echo "Then create your admin account in the Keep that opens, and pair phones with the QR it shows."
+echo "Done."
+if [ "$OS" = "Darwin" ] && [ "${SQUIRE_NO_SERVICE:-0}" != "1" ]; then
+  echo "The home server is now running in the background (and on every login)."
+  echo "  • Open “Squire” from $APP_DIR to administer it (it just opens the Keep)."
+  echo "  • Manage the service: launchctl kickstart -k gui/$(id -u)/io.colliery.squire (restart),"
+  echo "    launchctl bootout gui/$(id -u) \"$HOME/Library/LaunchAgents/io.colliery.squire.plist\" (stop)."
+else
+  echo "Run the home server: $BIN_DIR/squire-serve"
+fi
+echo "On first run, create your admin account in the Keep, and pair phones with the QR it shows."
