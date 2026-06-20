@@ -304,7 +304,7 @@ pub struct HouseholdReview {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct SquireSummary { pub squire: UserId, pub display_name: String, pub balance: Points }
+pub struct SquireSummary { pub squire: UserId, pub display_name: String, pub balance: Points, #[cfg_attr(feature = "serde", serde(default))] pub cash_balance: Points }
 /// A redeemable item the Knight can pick for a direct redeem (REQ-K5). Affordability/availability
 /// are re-checked by the Keep at commit, so this is just the catalog, not a per-Squire eligibility.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

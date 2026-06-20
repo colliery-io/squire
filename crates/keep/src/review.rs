@@ -190,6 +190,7 @@ fn squire_summaries(snap: &Snapshot) -> Vec<SquireSummary> {
             squire: u.id,
             display_name: u.display_name.clone(),
             balance: Proj::balance(snap, u.id).max(0) as domain_core::contract::Points,
+            cash_balance: Proj::balance_in(snap, u.id, domain_core::contract::Currency::Cash).max(0) as domain_core::contract::Points,
         })
         .collect()
 }
