@@ -58,5 +58,11 @@ browser — reusing the existing Keep web UI as-is.
 ## Status Updates
 
 - First cut done + verified: `cargo build -p squire-desktop` green; launched with throwaway
-  ports/data — process + embedded server up, `/health` 200, native window created. Bundling +
-  installer integration are the next step.
+  ports/data — process + embedded server up, `/health` 200, native window created. Bundled
+  `Squire.app`, published, and the installer installed it.
+- **BACKED OUT (operator decision).** Removed the `crates/squire-desktop` Tauri crate + its workspace
+  entry, reverted `install.sh` to the browser-based launcher, and deleted the `Squire.app.zip` asset
+  from the v0.7.3 release. The desktop UI is back to the browser-hosted Keep. **Kept** the
+  `run_home_server` refactor (a clean, Tauri-independent improvement to `squire-serve`). The Tauri
+  work is recoverable from git history (commits `2218867`/`75e09a8`) if revisited. Closely tied to the
+  background-server blocker in [[SQUIRE-T-0093]] (launchd needs code-signing).
