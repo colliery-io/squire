@@ -211,7 +211,7 @@ internal fun AchievementAdminScreen(
                             }
                         }
 
-                        OutlinedTextField(value = bonus, onValueChange = { bonus = it.filter(Char::isDigit) }, label = { Text("Bonus ★ (0 = unlock only)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = bonus, onValueChange = { bonus = it.filter(Char::isDigit) }, label = { Text("Bonus coins (0 = unlock only)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 
                         formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                         Button(
@@ -319,8 +319,8 @@ private fun libToReq(a: LibraryAch): CreateAchievementReq {
 private fun libSummary(a: LibraryAch): String {
     val scope = if (a.scope == "category") (a.category ?: "any") else "any"
     return when (a.criterion) {
-        "points" -> "${a.total} points · +${a.bonus} ★"
-        "total" -> "${a.count} completions · $scope · +${a.bonus} ★"
-        else -> "${a.length}-day streak · $scope · +${a.bonus} ★"
+        "points" -> "${a.total} points · +${a.bonus} coins"
+        "total" -> "${a.count} completions · $scope · +${a.bonus} coins"
+        else -> "${a.length}-day streak · $scope · +${a.bonus} coins"
     }
 }

@@ -247,7 +247,7 @@ private fun ReadyContent(
         PickDialog(
             title = "Redeem for ${target.displayName}",
             empty = "No items to redeem.",
-            options = review.items.map { it.itemId to "${it.name} · ${it.cost} ★" },
+            options = review.items.map { it.itemId to "${it.name} · ${it.cost} coins" },
             onPick = { itemId ->
                 onRedeem(target.squire, itemId)
                 redeemFor = null
@@ -373,7 +373,7 @@ private fun SquireRow(
             ) {
                 OutlinedButton(onClick = onMarkDone) { Text("Mark done") }
                 OutlinedButton(onClick = onRedeem) { Text("Redeem") }
-                OutlinedButton(onClick = onAddFunds) { Text("Add ★") }
+                OutlinedButton(onClick = onAddFunds) { Text("Add coins") }
             }
         }
     }
@@ -428,7 +428,7 @@ private fun PendingClaimRow(claim: PendingClaim, squireName: String, onApprove: 
 private fun PendingRequestRow(request: PendingRequest, squireName: String, onApprove: () -> Unit, onReject: () -> Unit) {
     ReviewCard(
         title = request.itemName,
-        subtitle = "$squireName · ${request.cost} ★",
+        subtitle = "$squireName · ${request.cost} coins",
         leading = { Medallion(null, request.itemName, reward = true) },
         trailing = { StatusChip("Reward", MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) },
         onApprove = onApprove,
@@ -489,13 +489,13 @@ private fun AddFundsDialog(squireName: String, onDismiss: () -> Unit, onConfirm:
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add ★ — $squireName") },
+        title = { Text("Add coins — $squireName") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it.filter(Char::isDigit) },
-                    label = { Text("Amount (★)") },
+                    label = { Text("Amount (coins)") },
                     singleLine = true,
                 )
                 OutlinedTextField(

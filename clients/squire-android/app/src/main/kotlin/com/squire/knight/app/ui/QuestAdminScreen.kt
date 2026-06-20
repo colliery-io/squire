@@ -195,7 +195,7 @@ internal fun QuestAdminScreen(
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            OutlinedTextField(value = reward, onValueChange = { reward = it.filter(Char::isDigit) }, label = { Text("Reward ★") }, singleLine = true, modifier = Modifier.weight(1f))
+                            OutlinedTextField(value = reward, onValueChange = { reward = it.filter(Char::isDigit) }, label = { Text("Reward coins") }, singleLine = true, modifier = Modifier.weight(1f))
                             OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category") }, singleLine = true, modifier = Modifier.weight(2f))
                         }
 
