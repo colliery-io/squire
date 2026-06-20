@@ -18,9 +18,9 @@ use domain_core::contract::{
     Timestamp, UserId,
 };
 use domain_core::contract::{
-    ClaimState, ClaimStatus, GoalView, QuestCard, RedemptionState, RedemptionStatus,
-    RequestRedemptionReq, RequestRedemptionResp, RewardCard, StateView, StreakView, SubmitClaimReq,
-    SubmitClaimResp,
+    AdjustmentView, ClaimState, ClaimStatus, GoalView, QuestCard, RedemptionState,
+    RedemptionStatus, RequestRedemptionReq, RequestRedemptionResp, RewardCard, StateView,
+    StreakView, SubmitClaimReq, SubmitClaimResp,
 };
 use domain_core::contract::{Clock, Engine, Projections, Repository};
 use domain_core::{quest_status, reward_view, streak_view, Proj};
@@ -216,6 +216,7 @@ pub(crate) fn assemble_state(
     let rewards = rewards(snap, squire);
     let my_claims = my_claims(snap, squire);
     let my_requests = my_requests(snap, squire);
+    let adjustments = adjustments(snap, squire);
 
     StateView {
         squire,
@@ -228,7 +229,25 @@ pub(crate) fn assemble_state(
         rewards,
         my_claims,
         my_requests,
+        adjustments,
     }
+}
+
+/// The Squire's recent point adjustments (newest first, capped) — grants and hazard penalties a
+/// Knight applied via `AdjustPoints`, surfaced so the child sees coins gained/lost and *why*
+/// (SQUIRE-T-0094 / SQUIRE-T-0096).
+fn adjustments(snap: &Snapshot, squire: UserId) -> Vec<AdjustmentView> {
+    snap.events
+        .iter()
+        .rev()
+        .filter_map(|e| match e {
+            Event::PointsAdjusted { squire: s, amount, reason, at, .. } if *s == squire => {
+                Some(AdjustmentView { amount: *amount, reason: reason.clone(), at: *at })
+            }
+            _ => None,
+        })
+        .take(20)
+        .collect()
 }
 
 /// Active achievements this Squire has **not yet earned** — "goals to unlock" on the child home
