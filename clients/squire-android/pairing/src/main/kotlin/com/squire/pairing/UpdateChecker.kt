@@ -143,6 +143,7 @@ object UpdateChecker {
 private sealed interface BannerState {
     data object Idle : BannerState
     data class Downloading(val percent: Int) : BannerState
+    data object Installing : BannerState
     data class Failed(val message: String) : BannerState
 }
 
@@ -171,7 +172,12 @@ fun UpdateBanner(info: UpdateInfo) {
                 )
                 when (val s = state) {
                     is BannerState.Downloading -> Text(
-                        if (s.percent >= 0) "Downloading… ${s.percent}%" else "Downloading…",
+                        if (s.percent >= 0) "Downloading update… ${s.percent}%" else "Downloading update…",
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    BannerState.Installing -> Text(
+                        "Downloaded — tap “Install” in the system prompt to finish.",
                         color = MaterialTheme.colorScheme.onTertiaryContainer,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -202,10 +208,10 @@ fun UpdateBanner(info: UpdateInfo) {
                             // build we now have so it doesn't re-advertise itself (SQUIRE-T-0085).
                             info.sha256?.let { UpdateChecker.markInstalled(context, info.appKey, it) }
                         }
-                        state = if (err == null) BannerState.Idle else BannerState.Failed(err)
+                        state = if (err == null) BannerState.Installing else BannerState.Failed(err)
                     }
                 }) {
-                    Text(if (state is BannerState.Failed) "Retry" else "Get update")
+                    Text(if (state is BannerState.Failed) "Retry" else "Update now")
                 }
             }
         }
