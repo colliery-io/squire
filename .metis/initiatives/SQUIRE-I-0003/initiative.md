@@ -112,7 +112,7 @@ tenants; per-tenant single-writer is `SQUIRE-T-0024`.
 
 | Decision | Option A | Option B | Lean |
 |---|---|---|---|
-| **Data store** | SQLite-on-EBS — free forever, code-supported, no managed backup/HA | RDS Postgres — managed backup/HA, **12-mo free cliff (~$15/mo after)** | SQLite-on-EBS for MVP; RDS as scale path → its own ADR |
+| **Data store** ✅ | SQLite-on-EBS — free forever, code-supported | RDS Postgres — managed, 12-mo free cliff | **DECIDED [[SQUIRE-A-0014]]: SQLite-per-tenant on EBS (MVP), Postgres scale path** |
 | **Onboarding** | Provisioned/invite (we create households for known families) | Open self-service signup | Provisioned (matches "known families", smaller surface) |
 | **Auth** | Extend `ProdIdentity` (Argon2id/HMAC, add verify/reset) | Managed (Cognito) | Extend ProdIdentity (no mass-scale need) |
 | **Compute** | EC2 t4g.micro free-tier | Lightsail (~$5/mo, simpler) | EC2 free-tier to start |
