@@ -74,6 +74,10 @@ the tunnel for Caddy with no domain/code changes — this is explicitly **not a 
 ### Positive
 - **$0 infra**; no AWS account/billing-alarm surface to manage for the MVP.
 - **No public attack surface** — outbound tunnel, no open ports/IP. Best security posture of the options.
+- **Tolerates a dynamic home IP and CGNAT** — the tunnel is outbound-only, so the public hostname is a
+  CNAME to the tunnel, NOT an A-record at our IP. An ISP IP change just triggers a `cloudflared`
+  reconnect (no DNS/DDNS, no propagation gap); works even behind carrier-grade NAT where inbound
+  port-forwarding is impossible. (This is a decisive advantage over a port-forward + DDNS setup.)
 - Reuses the home launchd service + self-update; only adds `cloudflared`.
 - Free managed TLS, DNS, and DDoS from Cloudflare.
 
