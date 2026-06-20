@@ -26,6 +26,22 @@ pub struct StateView {
     pub rewards: Vec<RewardCard>,
     pub my_claims: Vec<ClaimStatus>,
     pub my_requests: Vec<RedemptionStatus>,
+    /// Point adjustments the child should *see* in their activity feed — coins a grown-up granted
+    /// ("+", e.g. for being a gofur) or took away ("−", e.g. a hazard), each with the reason
+    /// (SQUIRE-T-0094 / SQUIRE-T-0096). `#[serde(default)]` for back-compat with older servers.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub adjustments: Vec<AdjustmentView>,
+}
+
+/// One point adjustment shown in the child's activity (SQUIRE-T-0096): a grant (`amount > 0`) or a
+/// hazard/penalty (`amount < 0`), with the grown-up's reason, newest first.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct AdjustmentView {
+    pub amount: i64,
+    pub reason: String,
+    pub at: Timestamp,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

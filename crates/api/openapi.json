@@ -1459,6 +1459,27 @@
           }
         }
       },
+      "AdjustmentView": {
+        "type": "object",
+        "description": "One point adjustment shown in the child's activity (SQUIRE-T-0096): a grant (`amount > 0`) or a\nhazard/penalty (`amount < 0`), with the grown-up's reason, newest first.",
+        "required": [
+          "amount",
+          "reason",
+          "at"
+        ],
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "AuthToken": {
         "type": "string",
         "description": "A tenant-scoped bearer token proving (household, user, role). Presented on every call."
@@ -2653,6 +2674,13 @@
           "my_requests"
         ],
         "properties": {
+          "adjustments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdjustmentView"
+            },
+            "description": "Point adjustments the child should *see* in their activity feed — coins a grown-up granted\n(\"+\", e.g. for being a gofur) or took away (\"−\", e.g. a hazard), each with the reason\n(SQUIRE-T-0094 / SQUIRE-T-0096). `#[serde(default)]` for back-compat with older servers."
+          },
           "badges": {
             "type": "array",
             "items": {

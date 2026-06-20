@@ -58,6 +58,7 @@ import com.squire.app.ui.theme.SquireGold
 import com.squire.app.ui.theme.SquireTheme
 import com.squire.core.PlayerUiState
 import com.squire.sdk.model.BadgeView
+import com.squire.sdk.model.AdjustmentView
 import com.squire.sdk.model.ClaimStateKind
 import com.squire.sdk.model.GoalView
 import com.squire.sdk.model.ClaimStatus
@@ -260,9 +261,12 @@ private fun ReadyContent(
 
         item { Spacer(Modifier.height(2.dp)) }
         item { SectionTitle("Recent activity") }
-        if (view.myClaims.isEmpty() && view.myRequests.isEmpty()) {
+        val adjustments = view.adjustments.orEmpty()
+        if (view.myClaims.isEmpty() && view.myRequests.isEmpty() && adjustments.isEmpty()) {
             item { EmptyHint("Nothing yet — go finish a quest! 💪") }
         } else {
+            // Coins a grown-up granted or took away (with the reason), newest first (SQUIRE-T-0096).
+            items(adjustments, key = { "adj${it.at}_${it.amount}" }) { AdjustmentRow(it) }
             items(view.myClaims, key = { "c" + it.claimId }) { ClaimRow(it) }
             items(view.myRequests, key = { "r" + it.requestId }) { RequestRow(it) }
         }
@@ -428,6 +432,20 @@ private fun ClaimRow(claim: ClaimStatus) {
             MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer,
         )
     }
+}
+
+/** A coin grant (+) or hazard penalty (−) a grown-up applied, with the reason (SQUIRE-T-0096). */
+@Composable
+private fun AdjustmentRow(adj: AdjustmentView) {
+    val positive = adj.amount >= 0
+    val magnitude = kotlin.math.abs(adj.amount)
+    RecentCard(
+        title = if (positive) "Coins from a grown-up 🪙" else "Coins taken away",
+        subtitle = adj.reason.ifBlank { null },
+        chipText = (if (positive) "+" else "−") + "$magnitude coins",
+        container = if (positive) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.errorContainer,
+        content = if (positive) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onErrorContainer,
+    )
 }
 
 @Composable
