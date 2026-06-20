@@ -188,6 +188,7 @@ fn replay(actions: &[Action]) -> InMemoryRepository {
                 command_id: CommandId(1000 + *cmd as u128), // disjoint id space
                 actor: UserId(KNIGHT),
                 squire: UserId(*squire),
+                currency: Currency::Coins,
                 amount: *amount,
                 reason: "fix".into(),
             }),
@@ -407,8 +408,8 @@ fn once_item_redeemable_exactly_once_householdwide() {
     // (c) The Once item (i2) can be redeemed exactly once across the household.
     let mut r = fixture();
     // Fund squires 1 and 3.
-    run(&mut r, Command::AdjustPoints { command_id: CommandId(900), actor: UserId(KNIGHT), squire: UserId(1), amount: 100, reason: "seed".into() }, 0).unwrap();
-    run(&mut r, Command::AdjustPoints { command_id: CommandId(901), actor: UserId(KNIGHT), squire: UserId(3), amount: 100, reason: "seed".into() }, 1).unwrap();
+    run(&mut r, Command::AdjustPoints { command_id: CommandId(900), actor: UserId(KNIGHT), squire: UserId(1), currency: Currency::Coins, amount: 100, reason: "seed".into() }, 0).unwrap();
+    run(&mut r, Command::AdjustPoints { command_id: CommandId(901), actor: UserId(KNIGHT), squire: UserId(3), currency: Currency::Coins, amount: 100, reason: "seed".into() }, 1).unwrap();
     run(&mut r, Command::RedeemItem { command_id: CommandId(1), actor: UserId(KNIGHT), squire: UserId(1), item_id: ItemId(ITEM_ONCE) }, 2).unwrap();
     // Second redeem (different squire, fresh command_id) → OutOfStock.
     assert!(matches!(
@@ -423,7 +424,7 @@ fn once_item_redeemable_exactly_once_householdwide() {
 fn replaying_identical_keys_is_a_no_op() {
     // (d) Replaying the same claim_id / request_id / command_id appends nothing.
     let mut r = fixture();
-    run(&mut r, Command::AdjustPoints { command_id: CommandId(900), actor: UserId(KNIGHT), squire: UserId(1), amount: 100, reason: "seed".into() }, 0).unwrap();
+    run(&mut r, Command::AdjustPoints { command_id: CommandId(900), actor: UserId(KNIGHT), squire: UserId(1), currency: Currency::Coins, amount: 100, reason: "seed".into() }, 0).unwrap();
     // Establish each fact once.
     run(&mut r, submit(1, 1, 1, 0), 1).unwrap();
     run(&mut r, Command::RequestRedemption { request_id: RequestId(7), squire: UserId(1), item_id: ItemId(1) }, 2).unwrap();
@@ -433,6 +434,6 @@ fn replaying_identical_keys_is_a_no_op() {
     assert!(run(&mut r, submit(1, 1, 1, 0), 4).unwrap().is_empty());
     assert!(run(&mut r, Command::RequestRedemption { request_id: RequestId(7), squire: UserId(1), item_id: ItemId(1) }, 5).unwrap().is_empty());
     assert!(run(&mut r, Command::RedeemItem { command_id: CommandId(5), actor: UserId(KNIGHT), squire: UserId(1), item_id: ItemId(1) }, 6).unwrap().is_empty());
-    assert!(run(&mut r, Command::AdjustPoints { command_id: CommandId(900), actor: UserId(KNIGHT), squire: UserId(1), amount: 100, reason: "seed".into() }, 7).unwrap().is_empty());
+    assert!(run(&mut r, Command::AdjustPoints { command_id: CommandId(900), actor: UserId(KNIGHT), squire: UserId(1), currency: Currency::Coins, amount: 100, reason: "seed".into() }, 7).unwrap().is_empty());
     assert_eq!(r.events.len(), before, "no new events appended on replay");
 }

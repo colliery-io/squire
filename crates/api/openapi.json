@@ -1554,6 +1554,10 @@
           "command_id": {
             "$ref": "#/components/schemas/CommandId"
           },
+          "currency": {
+            "$ref": "#/components/schemas/Currency",
+            "description": "Which currency to adjust (SQUIRE-A-0013). Omitted ⇒ Coins, so older clients keep working."
+          },
           "reason": {
             "type": "string"
           },
@@ -1982,6 +1986,41 @@
         "properties": {
           "id": {
             "$ref": "#/components/schemas/QuestId"
+          }
+        }
+      },
+      "Currency": {
+        "type": "string",
+        "description": "A household currency. `Coins` is the original in-app currency (folded in as the first member,\nSQUIRE-A-0013); `Cash` is real-world dollars. Adding a currency is a new member here + its\n[`CurrencyPolicy`] row + UI strings — no engine or projection changes. The serde tag is the\nstable wire/storage identity (also used as the `events.currency` column value), so member NAMES\nmust never change once shipped.",
+        "enum": [
+          "Coins",
+          "Cash"
+        ]
+      },
+      "CurrencyBalance": {
+        "type": "object",
+        "description": "One currency's balance for a Squire (SQUIRE-A-0013), with its display policy so the UI can render\nthe right name/symbol. `balance` is already floored per the currency's policy.",
+        "required": [
+          "currency",
+          "balance",
+          "name",
+          "symbol"
+        ],
+        "properties": {
+          "balance": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name (e.g. \"coins\", \"dollars\")."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Display symbol (e.g. \"🪙\", \"$\")."
           }
         }
       },
@@ -2814,7 +2853,15 @@
             "description": "Achievements the Squire has already earned (SQUIRE-T-0079). `#[serde(default)]` so a payload\nfrom an older server without the field still deserializes."
           },
           "balance": {
-            "$ref": "#/components/schemas/u32"
+            "$ref": "#/components/schemas/u32",
+            "description": "The Squire's **coin** balance (back-compat; equals the `Coins` entry of `balances`)."
+          },
+          "balances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurrencyBalance"
+            },
+            "description": "Every currency the household uses, with this Squire's floored balance (SQUIRE-A-0013). Lets the\nchild home show coins *and* dollars. `#[serde(default)]` for back-compat with older servers."
           },
           "generated_at": {
             "$ref": "#/components/schemas/Timestamp"

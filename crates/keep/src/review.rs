@@ -16,8 +16,8 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
-    ClaimId, Clock, Command, CommandId, Date, Decision, Event, HouseholdReview, ItemId, ItemOption,
-    PendingClaim, PendingRequest, Projections, QuestOption, RequestId, Role, Snapshot,
+    ClaimId, Clock, Command, CommandId, Currency, Date, Decision, Event, HouseholdReview, ItemId,
+    ItemOption, PendingClaim, PendingRequest, Projections, QuestOption, RequestId, Role, Snapshot,
     SquireSummary, Timestamp, UserId,
 };
 use domain_core::Proj;
@@ -70,8 +70,15 @@ pub struct RedeemReq {
 pub struct AdjustReq {
     pub command_id: CommandId,
     pub squire: UserId,
+    /// Currency to adjust (SQUIRE-A-0013); omitted ⇒ Coins (back-compat with older Keep callers).
+    #[serde(default = "default_coins")]
+    pub currency: Currency,
     pub amount: i64,
     pub reason: String,
+}
+
+fn default_coins() -> Currency {
+    Currency::Coins
 }
 
 /// The small JSON ack the actions return on success.
@@ -144,7 +151,7 @@ pub async fn adjust(
     if req.reason.trim().is_empty() {
         return Err(StatusCode::BAD_REQUEST);
     }
-    let cmd = Command::AdjustPoints { command_id: req.command_id, actor: op.user, squire: req.squire, amount: req.amount, reason: req.reason };
+    let cmd = Command::AdjustPoints { command_id: req.command_id, actor: op.user, squire: req.squire, currency: req.currency, amount: req.amount, reason: req.reason };
     state.commit(None, cmd).map_err(domain_status)?;
     Ok(ack())
 }

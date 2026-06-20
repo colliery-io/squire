@@ -82,6 +82,7 @@ fn child_surface_guard_rejects_admin_commands() {
         command_id: CommandId(1),
         actor: UserId(2),
         squire: UserId(1),
+        currency: Currency::Coins,
         amount: 5,
         reason: "x".into(),
     };
@@ -140,7 +141,7 @@ fn handle_dispatches_every_command_family_without_panicking() {
         Command::SubmitClaim { claim_id: ClaimId(1), squire: UserId(1), quest_id: QuestId(1), on: Date(0) },
         Command::ReviewClaim { actor: UserId(2), claim_id: ClaimId(1), decision: Decision::Approve },
         Command::RequestRedemption { request_id: RequestId(1), squire: UserId(1), item_id: ItemId(1) },
-        Command::AdjustPoints { command_id: CommandId(1), actor: UserId(2), squire: UserId(1), amount: 1, reason: "r".into() },
+        Command::AdjustPoints { command_id: CommandId(1), actor: UserId(2), squire: UserId(1), currency: Currency::Coins, amount: 1, reason: "r".into() },
     ];
     for cmd in cmds {
         // The point is dispatch reaches a handler for each family without panicking. The

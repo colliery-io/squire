@@ -4,14 +4,14 @@ level: task
 title: "Currency in api/SDK: per-currency balances, adjust-by-currency, quest rewards map"
 short_code: "SQUIRE-T-0098"
 created_at: 2026-06-20T03:26:26.411633+00:00
-updated_at: 2026-06-20T03:26:26.411633+00:00
+updated_at: 2026-06-20T13:03:31.877751+00:00
 parent: SQUIRE-I-0001
-blocked_by: ["SQUIRE-T-0097"]
+blocked_by: [SQUIRE-T-0097]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false

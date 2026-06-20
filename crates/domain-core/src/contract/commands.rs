@@ -17,7 +17,7 @@ pub enum Command {
     ReviewClaim { actor: UserId, claim_id: ClaimId, decision: Decision },          // actor = acting Knight; target Squire derived from the claim
     ReviewRedemption { actor: UserId, request_id: RequestId, decision: Decision }, // approve → ItemRedeemed; Squire from the request
     RedeemItem { command_id: CommandId, actor: UserId, squire: UserId, item_id: ItemId },          // Knight `actor` redeems for `squire`; command_id = idempotency key
-    AdjustPoints { command_id: CommandId, actor: UserId, squire: UserId, amount: i64, reason: String }, // Knight `actor` adjusts `squire`; "add funds" when amount > 0
+    AdjustPoints { command_id: CommandId, actor: UserId, squire: UserId, currency: Currency, amount: i64, reason: String }, // Knight `actor` adjusts `squire` in `currency` (SQUIRE-A-0013); grant > 0, correction/payout < 0
 
     // Squire — arrives via the API; `squire` is the authenticated user, filled by the API
     // from the caller's token (the wire request DTOs intentionally omit it):

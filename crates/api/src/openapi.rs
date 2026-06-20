@@ -94,6 +94,8 @@ impl Modify for SecurityAddon {
         domain_core::contract::StreakView,
         domain_core::contract::BadgeView,
         domain_core::contract::GoalView,
+        domain_core::contract::CurrencyBalance,
+        domain_core::contract::Currency,
         domain_core::contract::AdjustmentView,
         domain_core::contract::Hazard,
         domain_core::contract::RewardCard,
