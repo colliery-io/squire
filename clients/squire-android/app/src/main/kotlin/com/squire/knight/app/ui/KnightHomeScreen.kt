@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.squire.app.ui.components.CashPill
 import com.squire.app.ui.components.GoldPill
 import com.squire.app.ui.components.Medallion
 import com.squire.app.ui.components.SectionTitle
@@ -364,7 +365,12 @@ private fun SquireRow(
                         color = MaterialTheme.colorScheme.primary,
                     )
                     Spacer(Modifier.height(4.dp))
-                    GoldPill(amount = s.balance.toInt())
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        GoldPill(amount = s.balance.toInt())
+                        // Real money owed to this Squire (SQUIRE-T-0099) — settle via "Pay" on the Keep.
+                        val owed = s.cashBalance ?: 0
+                        if (owed > 0) CashPill(owed.toLong(), large = false)
+                    }
                 }
                 // Drop into this Squire's home and act on their behalf (SQUIRE-T-0055).
                 FilledTonalButton(onClick = onOpen) { Text("Open") }
