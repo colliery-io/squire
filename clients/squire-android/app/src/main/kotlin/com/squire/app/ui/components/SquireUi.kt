@@ -56,6 +56,26 @@ fun GoldPill(amount: Int, large: Boolean = false) {
     }
 }
 
+/** Real-money "$ owed" pill (SQUIRE-T-0099) — visually distinct from the gold coin (green, banknote
+ *  feel) so dollars never read as spendable coins. */
+@Composable
+fun CashPill(amount: Long, large: Boolean = true) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = Color(0xFFCDEFD6),
+        border = BorderStroke(1.dp, Color(0xFF2E7D4F).copy(alpha = .55f)),
+    ) {
+        Text(
+            "$$amount",
+            color = Color(0xFF1B5E33),
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Serif,
+            fontSize = if (large) 20.sp else 15.sp,
+            modifier = Modifier.padding(horizontal = if (large) 14.dp else 9.dp, vertical = if (large) 7.dp else 5.dp),
+        )
+    }
+}
+
 /** The minted gold coin used inside coin pills and medallions — a plain disc with an inner ring
  *  (no star), so the single in-app currency reads unambiguously as "coins" (SQUIRE-T-0094). */
 @Composable

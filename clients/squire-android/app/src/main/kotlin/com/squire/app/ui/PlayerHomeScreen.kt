@@ -49,6 +49,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.squire.app.BuildConfig
 import com.squire.app.ui.components.Banner
+import com.squire.app.ui.components.CashPill
 import com.squire.app.ui.components.GoldPill
 import com.squire.app.ui.components.Medallion
 import com.squire.app.ui.components.ProgressDots
@@ -91,6 +92,9 @@ fun PlayerHomeScreen(
     onBack: (() -> Unit)? = null,
 ) {
     val balance = (state as? PlayerUiState.Ready)?.view?.balance
+    // Real-money "$ owed" (SQUIRE-T-0099): shown next to coins when the Squire is owed any dollars.
+    val cashOwed = (state as? PlayerUiState.Ready)?.view?.balances.orEmpty()
+        .firstOrNull { it.currency == com.squire.sdk.model.Currency.Cash }?.balance ?: 0L
     val name = headerLabel ?: "Squire"
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -117,6 +121,10 @@ fun PlayerHomeScreen(
                             if (balance != null) {
                                 Spacer(Modifier.width(12.dp))
                                 GoldPill(balance, large = true)
+                            }
+                            if (cashOwed > 0) {
+                                Spacer(Modifier.width(8.dp))
+                                CashPill(cashOwed)
                             }
                         }
                     },
