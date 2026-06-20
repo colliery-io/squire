@@ -4,14 +4,14 @@ level: task
 title: "Real-money rewards on chores (dual currency: coins + actual money)"
 short_code: "SQUIRE-T-0095"
 created_at: 2026-06-20T02:05:00.755604+00:00
-updated_at: 2026-06-20T02:05:00.755604+00:00
+updated_at: 2026-06-20T03:09:10.124901+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -56,10 +56,29 @@ parent payout UI, child display. A real feature — warrants its own initiative 
 - **Per-chore cash** in addition to coins (a quest can carry an optional money amount).
 - A **"paid out" settle action** for the parent that draws down the owed balance (audited).
 - **Kept separate from coins** — money is its own ledger, NOT spendable in the in-app shop.
-- Store integer **cents**; never floats. Show "$ owed" with a clearly non-coin visual.
+- Store **whole dollars** (operator preference, 2026-06-19) — integer dollars, no cents, never floats.
+  Show "$ owed" with a clearly non-coin visual.
+
+## Build plan (operator: "EXACT same flow as coins — 'dollars'", auto-accrue on chores + manual grants)
+
+Mirror the coin system as a parallel **cash** currency (whole dollars, u32). Decisions locked:
+auto-accrue on chore approval (when a quest has cash set) **and** manual grants; payout = a negative
+cash adjust.
+
+- **Migration** (additive, safe): `quests.cash` + `events.cash` columns (default 0).
+- **Domain:** `Quest.cash`; `CompletionApproved` gains `cash` (snapshotted at approval like `points`);
+  new `CashAdjusted` event (reuses the generic `amount`/`reason` event columns — only `kind` differs)
+  + `AdjustCash` command (parent grant / payout); `Proj::cash_balance` = Σ approved `cash` + Σ cash
+  adjusts (floored at 0).
+- **Store:** `QuestRow.cash`; event row mapping for `CompletionApproved.cash` + `CashAdjusted`.
+- **API/SDK:** `StateView.cash_balance` + cash adjustments in activity; `CreateQuestReq.cash`;
+  `POST /admin/adjust-cash`; regenerate.
+- **Keep + phone:** quest authoring "$ (dollars)" field; cash balance display (banknote, not coin);
+  grant/payout cash; child sees "$ owed".
+
+Building deliberately layer-by-layer; the migration touches the LIVE prod DB (the kids' balances), so
+it ships only once the whole thing is solid + tested — not piecemeal.
 
 ## Status
 
-Direction approved. Next: a short written design (events/commands, projections, settle flow, UI on
-both surfaces) for review before building. Larger than [[SQUIRE-T-0096]]; likely sequence hazards
-first, then this.
+Active — building the domain + store foundation first.
