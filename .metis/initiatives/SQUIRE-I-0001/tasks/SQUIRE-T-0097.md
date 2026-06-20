@@ -4,14 +4,14 @@ level: task
 title: "Currency model foundation: generic Currency + policy, fold coins in, zero-balance migration"
 short_code: "SQUIRE-T-0097"
 created_at: 2026-06-20T03:26:20.263647+00:00
-updated_at: 2026-06-20T03:26:20.263647+00:00
+updated_at: 2026-06-20T12:26:33.267771+00:00
 parent: SQUIRE-I-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -48,3 +48,22 @@ working money code and migrates the kids' live balances. **Do this slow and veri
 
 The hardest seam is **policy-as-data** (no `if currency == Coins`). Get `Currency` + policy right
 here; everything above (api/UI) is mechanical. Blocks [[SQUIRE-T-0098]].
+
+## Findings (store layer → migration shape)
+
+Events live in ONE wide `events` table with generic nullable columns (`points`, `amount`, `reason`,
+…) keyed by a `kind` string (`EventRow::from_event`/`to_event` in `crates/store/src/rows.rs`). Money
+events map: `CompletionApproved`/`ItemRedeemed`/`AchievementUnlocked` → `points` col; `PointsAdjusted`
+→ `amount`+`reason`. **This makes the migration additive + safe:** add a `currency` column (default
+`'Coins'`) → every existing row is implicitly Coins → **no balance moves** by construction.
+
+## Progress
+
+- **Step 1 DONE (committed):** `Currency` enum (`Coins`, `Cash`) + `CurrencyPolicy` (policy-as-data:
+  spendable_in_shop / supports_payout / earns_achievement_bonus / floors_at_zero / name / symbol) in
+  `contract/primitives.rs`. Pure addition; `cargo build -p domain-core` green; nothing else touched.
+- **Design lock:** keep `Proj::balance(snap, squire)` returning today's value exactly, defined as
+  `balance_in(snap, squire, Coins)` — equivalence by construction, all existing tests/callers untouched.
+- **Next:** add `balance_in(snap, squire, currency)`; then a migration-equivalence test (replay log →
+  per-Squire balances golden) BEFORE generalizing `CompletionApproved` (awarded map) +
+  `PointsAdjusted`→`Adjusted{currency}`.
