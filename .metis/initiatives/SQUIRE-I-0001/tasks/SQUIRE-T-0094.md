@@ -56,3 +56,11 @@ Operator feedback after a day of real use. Grounded against the current code.
 ## Status Updates
 
 - Captured + grounded. Starting with the app-bar overflow menu + the "Done" label.
+- **Done (5/8), committed + goldens re-recorded:** #1 balance visible (app-bar actions → ⋮ menu);
+  #2 update-banner clarity ("Update now" → "Downloading… N%" → "tap Install in the system prompt");
+  #5 "Do it!" → "Done"; #6 Forget into the ⋮ menu + "Download latest update" + a version marker;
+  #7 one consistent **coins** currency (star-less minted coin + every "★" → "coins").
+- **Remaining (3/8):** #3 child can't see **available streaks/achievements to unlock** (needs the
+  StateView to carry the locked catalog + a "Goals to unlock" section); #4 quest-scoped achievements
+  in the phone authoring UI (domain supports `Scope::Quest`); #8 tap-to-open detail modals for
+  quests / rewards / streaks.
