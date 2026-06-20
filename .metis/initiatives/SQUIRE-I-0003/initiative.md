@@ -108,15 +108,17 @@ tenants; per-tenant single-writer is `SQUIRE-T-0024`.
    ([[SQUIRE-A-0012]]) or SSM run-command; `/health` already exists.
 9. **Keep account UI**: login/session/account-management (today it assumes one bootstrapped admin).
 
-## Alternatives Considered (the load-bearing decisions — OPEN)
+## Decisions (all RESOLVED)
 
-| Decision | Option A | Option B | Lean |
-|---|---|---|---|
-| **Data store** ✅ | SQLite-on-EBS — free forever, code-supported | RDS Postgres — managed, 12-mo free cliff | **DECIDED [[SQUIRE-A-0014]]: SQLite-per-tenant on EBS (MVP), Postgres scale path** |
-| **Onboarding** | Provisioned/invite (we create households for known families) | Open self-service signup | Provisioned (matches "known families", smaller surface) |
-| **Auth** | Extend `ProdIdentity` (Argon2id/HMAC, add verify/reset) | Managed (Cognito) | Extend ProdIdentity (no mass-scale need) |
-| **Compute** | EC2 t4g.micro free-tier | Lightsail (~$5/mo, simpler) | EC2 free-tier to start |
-| **Edge/TLS** | Caddy on the box (free LE) | ALB/CloudFront (cost/complexity) | Caddy |
+| Decision | Resolution | ADR |
+|---|---|---|
+| **Data store** ✅ | SQLite-per-tenant on EBS (MVP); Postgres/RDS = scale path | [[SQUIRE-A-0014]] |
+| **Compute** ✅ | EC2 t4g.micro (free-tier) + Caddy on the box | [[SQUIRE-A-0015]] |
+| **Edge / TLS** ✅ | Caddy auto-TLS (Let's Encrypt), reverse-proxy to loopback | [[SQUIRE-A-0015]] |
+| **Auth** ✅ | Extend `ProdIdentity` (add email verify + password reset) | [[SQUIRE-A-0015]] |
+| **Onboarding** ✅ | Provisioned / invite (not open signup) | [[SQUIRE-A-0015]] |
+
+All load-bearing decisions are locked → ready to **decompose into tasks** (Phase 1 MVP).
 
 ## Risks / gotchas
 - **Tenant-isolation correctness** is now a *security* boundary on shared infra — must be tested hard.
