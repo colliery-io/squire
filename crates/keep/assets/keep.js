@@ -65,6 +65,7 @@
     { tab: "review", panel: "review-panel" },
     { tab: "rewards", panel: "items-panel" },
     { tab: "achievements", panel: "achievements-panel" },
+    { tab: "hazards", panel: "hazards-panel" },
     { tab: "members", panel: "members-panel" },
     { tab: "pair", panel: "pair-panel" },
     { tab: "log", panel: "log-panel" },
@@ -75,6 +76,7 @@
     review: () => loadReview(),
     rewards: () => { loadCatalog("items", "item-list"); loadRewardsLibrary(); },
     achievements: () => { loadAchScopeQuests(); loadCatalog("achievements", "achievement-list"); loadAchLibrary(); },
+    hazards: () => loadHazards(),
     members: () => loadMembers(),
     pair: () => { loadPairMembers(); loadInstallQr(); },
     log: () => {},
@@ -1098,5 +1100,84 @@
         error.hidden = false;
       }
     });
+  }
+
+  // ── Hazards (SQUIRE-T-0096): the named-penalty catalog (shared config) + quick-apply ──────────
+  let hazards = [];
+  async function loadHazards() {
+    const res = await fetch("/api/hazards");
+    hazards = res.ok ? await res.json() : [];
+    if (Object.keys(squiresById).length === 0) await loadQuestSquires();
+    renderHazards();
+  }
+  async function saveHazards(next) {
+    const res = await fetch("/api/hazards", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(next),
+    });
+    if (res.ok) { hazards = await res.json(); renderHazards(); }
+  }
+  function renderHazards() {
+    const box = document.getElementById("hazard-list");
+    if (!box) return;
+    box.innerHTML = "";
+    if (hazards.length === 0) { box.appendChild(el("p", "sub", "No hazards yet.")); return; }
+    for (const h of hazards) {
+      const card = el("div", "list-row");
+      const title = el("div", "card-title");
+      title.appendChild(el("strong", null, h.name));
+      title.appendChild(el("span", "sub", `  ·  −${h.penalty} coins`));
+      card.appendChild(title);
+
+      const applyRow = el("div", "sub");
+      applyRow.appendChild(el("span", null, "Apply to: "));
+      const ids = Object.keys(squiresById);
+      if (ids.length === 0) {
+        applyRow.appendChild(el("span", null, "(no squires)"));
+      } else {
+        for (const id of ids) {
+          const b = el("button", null, squiresById[id]);
+          b.type = "button";
+          b.addEventListener("click", async () => {
+            await fetch("/api/adjust", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ command_id: Date.now(), squire: Number(id), amount: -Number(h.penalty), reason: h.name }),
+            });
+            b.textContent = "✓ " + squiresById[id];
+          });
+          applyRow.appendChild(b);
+          applyRow.appendChild(el("span", null, " "));
+        }
+      }
+      card.appendChild(applyRow);
+
+      const rm = el("button", null, "Remove");
+      rm.type = "button";
+      rm.addEventListener("click", () => saveHazards(hazards.filter((x) => x.name !== h.name)));
+      card.appendChild(rm);
+      box.appendChild(card);
+    }
+  }
+  {
+    const form = document.getElementById("hazard-form");
+    if (form) {
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(form);
+        const name = (fd.get("name") || "").toString().trim();
+        const penalty = Number(fd.get("penalty"));
+        const err = document.getElementById("hazard-error");
+        if (!name || !(penalty >= 1)) {
+          err.textContent = "Name and coins (at least 1) are required.";
+          err.hidden = false;
+          return;
+        }
+        err.hidden = true;
+        await saveHazards([...hazards, { name, penalty, icon: null }]);
+        form.reset();
+      });
+    }
   }
 })();

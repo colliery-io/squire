@@ -51,6 +51,7 @@
         <a class="tab" data-tab="review" href="#review"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 12l2.3 2.3L16 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Review</a>
         <a class="tab" data-tab="rewards" href="#rewards"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 9h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9Z" stroke="currentColor" stroke-width="1.6"/><path d="M3 6h18v3H3zM12 6v14" stroke="currentColor" stroke-width="1.6"/></svg>Rewards</a>
         <a class="tab" data-tab="achievements" href="#achievements"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3 L18 5.4 V11 C18 15 15.3 18 12 19.4 C8.7 18 6 15 6 11 V5.4 Z" stroke="currentColor" stroke-width="1.6"/></svg>Achievements</a>
+        <a class="tab" data-tab="hazards" href="#hazards"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3 L22 20 H2 Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 10v4M12 17h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Hazards</a>
         <a class="tab" data-tab="members" href="#members"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Members</a>
         <a class="tab" data-tab="pair" href="#pair"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.6"/><path d="M13 4h7v7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Pair</a>
         <a class="tab" data-tab="log" href="#log"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 4h14M5 9h14M5 14h10M5 19h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Log</a>
@@ -243,6 +244,18 @@
 
     <!-- Member administration (SQUIRE-T-0028). Add Knights/Squires; the minted token provisions a
          phone. De/reactivate is archive-not-delete. -->
+    <section id="hazards-panel" hidden>
+      <h2 id="hazards"><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 3 L22 20 H2 Z" stroke="#5A3D8E" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 10v4M12 17h.01" stroke="#5A3D8E" stroke-width="1.7" stroke-linecap="round"/></svg></span>Hazards</h2>
+      <p class="sub">Negative behaviors that cost coins. Applying one can't take a Squire below zero, and shows in their activity with the reason.</p>
+      <form id="hazard-form">
+        <label>Behavior <input name="name" required placeholder="e.g. Didn't brush teeth" /></label>
+        <label>Coins lost <input name="penalty" type="number" min="1" value="5" required /></label>
+        <button type="submit">Add hazard</button>
+      </form>
+      <p id="hazard-error" class="error" hidden></p>
+      <div id="hazard-list"></div>
+    </section>
+
     <section id="members-panel" hidden>
       <h2 id="members"><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="#5A3D8E" stroke-width="1.7"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="#5A3D8E" stroke-width="1.7" stroke-linecap="round"/></svg></span>Members</h2>
       <p class="sub">The Knights and Squires of your household.</p>
