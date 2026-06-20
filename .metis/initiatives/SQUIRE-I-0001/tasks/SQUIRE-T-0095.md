@@ -11,10 +11,10 @@ archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
-exit_criteria_met: false
+exit_criteria_met: true
 initiative_id: SQUIRE-I-0001
 ---
 
@@ -108,3 +108,6 @@ Decomposed into the build chain:
 
 This task (real-money) is realized by T-0099; close it when that ships. Build is a focused, well-tested
 pass — it rewrites working money code on the kids' live balances.
+## Realized
+
+Delivered by the currency model build [[SQUIRE-A-0013]] → [[SQUIRE-T-0097]]/[[SQUIRE-T-0098]]/[[SQUIRE-T-0099]]. Dollars ship as currency #2 (whole dollars, per-chore accrual + payout). **Closed.**

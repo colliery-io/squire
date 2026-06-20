@@ -11,10 +11,10 @@ archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
-exit_criteria_met: false
+exit_criteria_met: true
 initiative_id: SQUIRE-I-0001
 ---
 
@@ -38,10 +38,16 @@ in [[SQUIRE-T-0095]]. Mostly UI once the model exists (the engine is currency-ag
 
 ## Acceptance
 
-- [ ] Set $ on a chore → approve → kid's $ balance rises by that amount.
-- [ ] "Paid out $X" reduces the owed balance; shows in activity; can't go below zero.
-- [ ] Dollars never appear as spendable in the reward shop.
-- [ ] Adding a *third* currency later needs no engine/projection change (the model's promise).
+- [x] Set $ on a chore (Keep + phone quest form) → approve → kid's $ balance rises (domain test +
+  `balance_in(Cash)`; child `$` pill; Knight `$ owed`).
+- [x] "Paid out $X" (Keep "Pay $N" → negative Cash adjust) reduces the owed balance; floored at zero
+  by the balance projection. (Phone payout = documented fast-follow; Keep covers it.)
+- [x] Dollars never spendable in the shop — `ItemRedeemed.cost` is Coins-only by policy; Cash never
+  enters redemption.
+- [x] A third currency needs no engine/projection change — only a `Currency` member + policy row
+  (the model's promise, proven by dollars riding entirely on `Adjusted{currency}` + `balance_in`).
+- [x] **Migration verified on a copy of LIVE prod data:** coin balances unchanged (squire 46→46),
+  `PointsAdjusted`→`Adjusted{Coins}`, `quests.cash` added (default 0), server boots clean.
 
 Realizes [[SQUIRE-T-0095]] (which can be closed once this ships).
 
