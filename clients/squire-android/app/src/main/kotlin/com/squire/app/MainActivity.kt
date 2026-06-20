@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.squire.app.data.RoomOutbox
 import com.squire.app.data.RoomStateCache
+import com.squire.app.bg.CoinNotifyWorker
 import com.squire.app.bg.UpdateCheckWorker
 import com.squire.app.data.SquireApiAdapter
 import com.squire.app.data.db.SquireDb
@@ -74,8 +75,12 @@ class MainActivity : ComponentActivity() {
         val discovery = NsdDiscovery(this)
         val appCtx = applicationContext
 
-        // Background app-update checks (SQUIRE-T-0090): run while paired, even when backgrounded.
-        if (sessionStore.load() != null) UpdateCheckWorker.schedule(appCtx)
+        // Background app-update checks (SQUIRE-T-0090) + coin-balance notifications (SQUIRE-T-0094):
+        // run while paired, even when backgrounded.
+        if (sessionStore.load() != null) {
+            UpdateCheckWorker.schedule(appCtx)
+            CoinNotifyWorker.schedule(appCtx)
+        }
         maybeRequestNotificationPermission()
 
         setContent {
@@ -83,9 +88,9 @@ class MainActivity : ComponentActivity() {
                 var session by remember { mutableStateOf(sessionStore.load()) }
                 val current = session
                 val onSessionChanged: (Session) -> Unit =
-                    { s -> sessionStore.save(s); session = s; UpdateCheckWorker.schedule(appCtx) }
+                    { s -> sessionStore.save(s); session = s; UpdateCheckWorker.schedule(appCtx); CoinNotifyWorker.schedule(appCtx) }
                 val onForget: () -> Unit =
-                    { sessionStore.clear(); session = null; UpdateCheckWorker.cancel(appCtx) }
+                    { sessionStore.clear(); session = null; UpdateCheckWorker.cancel(appCtx); CoinNotifyWorker.cancel(appCtx) }
 
                 when {
                     current == null -> PairingScreen(
@@ -205,6 +210,14 @@ internal fun PlayerHomeHost(
     val updateContext = LocalContext.current
     LaunchedEffect(session, checkNonce) {
         update = UpdateChecker.check(updateContext, session.baseUrl, "squire", BuildConfig.VERSION_CODE)
+    }
+
+    // Keep the coin-notify baseline current: coins shown on screen are "seen", so the background
+    // watcher won't re-notify for them (SQUIRE-T-0094).
+    LaunchedEffect(state) {
+        (state as? PlayerUiState.Ready)?.view?.balance?.let {
+            CoinNotifyWorker.recordSeenBalance(updateContext, it)
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
