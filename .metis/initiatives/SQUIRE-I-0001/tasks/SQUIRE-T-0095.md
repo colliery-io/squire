@@ -100,6 +100,11 @@ real design pass (likely an **ADR**) before any code:
 
 ## Status
 
-Active — **design first.** Next artifact: an ADR for the Currency model + the live-balance migration
-strategy, then a focused, well-tested build (it rewrites working money code on real data). Not to be
-rushed at the tail of a long session.
+**ADR done + decided:** [[SQUIRE-A-0013]] (generalized multi-currency model, operator-approved).
+Decomposed into the build chain:
+- [[SQUIRE-T-0097]] — Currency model foundation (domain + store + zero-balance migration). ← start here
+- [[SQUIRE-T-0098]] — Currency in api/SDK.
+- [[SQUIRE-T-0099]] — Dollars end-to-end on the model (realizes this task).
+
+This task (real-money) is realized by T-0099; close it when that ships. Build is a focused, well-tested
+pass — it rewrites working money code on the kids' live balances.

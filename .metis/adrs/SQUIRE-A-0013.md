@@ -1,19 +1,19 @@
 ---
-id: 001-generalized-multi-currency-model
+id: 013-generalized-multi-currency-model
 level: adr
 title: "Generalized multi-currency model (coins, dollars, and beyond)"
 number: 13
 short_code: "SQUIRE-A-0013"
 created_at: 2026-06-20T03:20:14.491216+00:00
-updated_at: 2026-06-20T03:20:14.491216+00:00
-decision_date: 2026-06-19
+updated_at: 2026-06-20T03:26:02.617797+00:00
+decision_date: 
 decision_maker: Operator (Dylan)
 parent: 
 archived: false
 
 tags:
   - "#adr"
-  - "#phase/draft"
+  - "#phase/decided"
 
 
 exit_criteria_met: false
