@@ -22,8 +22,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -32,12 +35,17 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.squire.app.BuildConfig
 import com.squire.app.ui.components.Banner
 import com.squire.app.ui.components.GoldPill
 import com.squire.app.ui.components.Medallion
@@ -74,6 +82,7 @@ fun PlayerHomeScreen(
     onMarkDone: (questId: Long) -> Unit,
     onRedeem: (itemId: Long) -> Unit,
     onForget: () -> Unit = {},
+    onCheckUpdate: () -> Unit = {},
     headerLabel: String? = null,
     onBack: (() -> Unit)? = null,
 ) {
@@ -108,13 +117,46 @@ fun PlayerHomeScreen(
                         }
                     },
                     actions = {
-                        TextButton(onClick = onRefresh) {
-                            Text("Refresh", color = MaterialTheme.colorScheme.onPrimary)
+                        var menuOpen by remember { mutableStateOf(false) }
+                        IconButton(onClick = { menuOpen = true }) {
+                            Text(
+                                "⋮",
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                style = MaterialTheme.typography.titleLarge,
+                            )
                         }
-                        if (onBack != null) {
-                            TextButton(onClick = onBack) { Text("Back", color = MaterialTheme.colorScheme.onPrimary) }
-                        } else {
-                            TextButton(onClick = onForget) { Text("Forget", color = MaterialTheme.colorScheme.onPrimary) }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Refresh") },
+                                onClick = { menuOpen = false; onRefresh() },
+                            )
+                            if (onBack != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Back") },
+                                    onClick = { menuOpen = false; onBack() },
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Download latest update") },
+                                    onClick = { menuOpen = false; onCheckUpdate() },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Forget this device") },
+                                    onClick = { menuOpen = false; onForget() },
+                                )
+                            }
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "Squire v${BuildConfig.VERSION_NAME}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                onClick = {},
+                                enabled = false,
+                            )
                         }
                     },
                 )
@@ -236,7 +278,7 @@ private fun QuestCardRow(quest: QuestCard, onMarkDone: (Long) -> Unit) {
                         containerColor = MaterialTheme.colorScheme.tertiary,
                         contentColor = MaterialTheme.colorScheme.onTertiary,
                     ),
-                ) { Text("Do it!", fontWeight = FontWeight.Bold) }
+                ) { Text("Done", fontWeight = FontWeight.Bold) }
                 QuestStatus.Pending -> StatusChip(
                     "⏳ Pending",
                     MaterialTheme.colorScheme.secondaryContainer,
