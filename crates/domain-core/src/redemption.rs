@@ -25,8 +25,8 @@ pub(crate) fn handle(
         Command::RedeemItem { command_id, actor, squire, item_id } => {
             redeem_direct(snap, command_id, actor, squire, item_id, clock)
         }
-        Command::AdjustPoints { command_id, actor, squire, amount, reason } => {
-            adjust(snap, command_id, actor, squire, amount, reason, clock)
+        Command::AdjustPoints { command_id, actor, squire, currency, amount, reason } => {
+            adjust(snap, command_id, actor, squire, currency, amount, reason, clock)
         }
         _ => unreachable!("redemption::handle only receives redemption/ledger commands"),
     }
@@ -125,11 +125,13 @@ fn commit_redeem(
     })])
 }
 
+#[allow(clippy::too_many_arguments)]
 fn adjust(
     snap: &Snapshot,
     command_id: CommandId,
     actor: UserId,
     squire: UserId,
+    currency: Currency,
     amount: i64,
     reason: String,
     clock: &dyn Clock,
@@ -146,7 +148,7 @@ fn adjust(
         command_id,
         squire,
         actor: Some(actor),
-        currency: Currency::Coins, // adjust-by-currency arrives in SQUIRE-T-0098; today's path is Coins
+        currency,
         amount,
         reason,
         at: clock.now(),

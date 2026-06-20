@@ -25,8 +25,8 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
-    ClaimId, Clock, Command, CommandId, Date, Decision, Event, Hazard, HouseholdReview, ItemId,
-    ItemOption, PendingClaim, PendingRequest, Projections, QuestId, QuestOption, Repository,
+    ClaimId, Clock, Command, CommandId, Currency, Date, Decision, Event, Hazard, HouseholdReview,
+    ItemId, ItemOption, PendingClaim, PendingRequest, Projections, QuestId, QuestOption, Repository,
     RequestId, Role, Snapshot, SquireSummary, StateView, UserId,
 };
 use domain_core::Proj;
@@ -107,8 +107,15 @@ pub struct RedeemReq {
 pub struct AdjustReq {
     pub command_id: CommandId,
     pub squire: UserId,
+    /// Which currency to adjust (SQUIRE-A-0013). Omitted ⇒ Coins, so older clients keep working.
+    #[serde(default = "default_coins")]
+    pub currency: Currency,
     pub amount: i64,
     pub reason: String,
+}
+
+fn default_coins() -> Currency {
+    Currency::Coins
 }
 
 /// `POST /admin/mark-done` body — submit-then-approve a claim for `squire` in one shot. The
@@ -273,6 +280,7 @@ pub async fn adjust(
         command_id: req.command_id,
         actor: principal.user,
         squire: req.squire,
+        currency: req.currency,
         amount: req.amount,
         reason: req.reason,
     };

@@ -37,7 +37,7 @@ fn seed_points(repo: &mut InMemoryRepository, squire: u128, amount: i64, cmd: u1
     })]);
 }
 fn adjust(cmd: u128, squire: u128, amount: i64) -> Command {
-    Command::AdjustPoints { command_id: CommandId(cmd), actor: UserId(2), squire: UserId(squire), amount, reason: "fix".into() }
+    Command::AdjustPoints { command_id: CommandId(cmd), actor: UserId(2), squire: UserId(squire), currency: Currency::Coins, amount, reason: "fix".into() }
 }
 fn request(req: u128, squire: u128, it: u128) -> Command {
     Command::RequestRedemption { request_id: RequestId(req), squire: UserId(squire), item_id: ItemId(it) }
@@ -119,7 +119,7 @@ fn adjust_idempotent_and_requires_reason() {
     assert!(again.is_empty(), "replay of a command_id is a no-op");
     assert_eq!(bal(&r, 1), 25, "no double credit");
     assert!(matches!(
-        run(&mut r, Command::AdjustPoints { command_id: CommandId(6), actor: UserId(2), squire: UserId(1), amount: 5, reason: "  ".into() }),
+        run(&mut r, Command::AdjustPoints { command_id: CommandId(6), actor: UserId(2), squire: UserId(1), currency: Currency::Coins, amount: 5, reason: "  ".into() }),
         Err(DomainError::InvalidDefinition)
     ));
 }

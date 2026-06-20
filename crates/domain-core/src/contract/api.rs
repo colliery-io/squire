@@ -11,7 +11,12 @@ use super::*;
 pub struct StateView {
     pub squire: UserId,
     pub generated_at: Timestamp,
+    /// The Squire's **coin** balance (back-compat; equals the `Coins` entry of `balances`).
     pub balance: Points,
+    /// Every currency the household uses, with this Squire's floored balance (SQUIRE-A-0013). Lets the
+    /// child home show coins *and* dollars. `#[serde(default)]` for back-compat with older servers.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub balances: Vec<CurrencyBalance>,
     pub quests_today: Vec<QuestCard>,
     pub streaks: Vec<StreakView>,
     /// Achievements the Squire has already earned (SQUIRE-T-0079). `#[serde(default)]` so a payload
@@ -31,6 +36,20 @@ pub struct StateView {
     /// (SQUIRE-T-0094 / SQUIRE-T-0096). `#[serde(default)]` for back-compat with older servers.
     #[cfg_attr(feature = "serde", serde(default))]
     pub adjustments: Vec<AdjustmentView>,
+}
+
+/// One currency's balance for a Squire (SQUIRE-A-0013), with its display policy so the UI can render
+/// the right name/symbol. `balance` is already floored per the currency's policy.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct CurrencyBalance {
+    pub currency: Currency,
+    pub balance: i64,
+    /// Display name (e.g. "coins", "dollars").
+    pub name: String,
+    /// Display symbol (e.g. "🪙", "$").
+    pub symbol: String,
 }
 
 /// A named penalty in the household's **hazard catalog** (SQUIRE-T-0096) — a negative behavior a

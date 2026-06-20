@@ -22,7 +22,7 @@ use diesel::sqlite::SqliteConnection;
 
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, ClaimId, Command,
-    CommandId, Completion, Criterion, Date, Decision, Engine, Event, ItemId, Points, Projections,
+    CommandId, Completion, Criterion, Currency, Date, Decision, Engine, Event, ItemId, Points, Projections,
     Quest, QuestId, RedeemableItem, RequestId, Repository, Role, Schedule, Scope, Snapshot,
     StreakBasis, Timestamp, User, UserId,
 };
@@ -171,7 +171,7 @@ fn scenario() -> Vec<(Option<UserId>, Command)> {
         (a, Command::SubmitClaim { claim_id: ClaimId(101), squire: UserId(ALICE), quest_id: QuestId(QUEST_DAILY), on: Date(1) }),
         (k, Command::ReviewClaim { actor: UserId(KNIGHT), claim_id: ClaimId(101), decision: Decision::Approve }),
         // ── an AdjustPoints (Knight tops Alice up) ──
-        (k, Command::AdjustPoints { command_id: CommandId(300), actor: UserId(KNIGHT), squire: UserId(ALICE), amount: 5, reason: "bonus chores".into() }),
+        (k, Command::AdjustPoints { command_id: CommandId(300), actor: UserId(KNIGHT), squire: UserId(ALICE), currency: Currency::Coins, amount: 5, reason: "bonus chores".into() }),
         // ── redemption: request → approve (Alice redeems the now-unlocked gated item) ──
         (a, Command::RequestRedemption { request_id: RequestId(400), squire: UserId(ALICE), item_id: ItemId(ITEM_GATED) }),
         (k, Command::ReviewRedemption { actor: UserId(KNIGHT), request_id: RequestId(400), decision: Decision::Approve }),

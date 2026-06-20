@@ -210,6 +210,7 @@ pub(crate) fn assemble_state(
 ) -> StateView {
     let quests_today = quests_today(snap, squire, today);
     let balance = clamp_balance(Proj::balance(snap, squire));
+    let balances = currency_balances(snap, squire);
     let streaks = streaks(snap, squire, today);
     let badges = badges(snap, squire);
     let goals = goals(snap, squire);
@@ -222,6 +223,7 @@ pub(crate) fn assemble_state(
         squire,
         generated_at: now,
         balance,
+        balances,
         quests_today,
         streaks,
         badges,
@@ -330,6 +332,27 @@ fn badges(snap: &Snapshot, squire: UserId) -> Vec<domain_core::contract::BadgeVi
 /// balance clamps to `>= 0` and into [`Points`].
 fn clamp_balance(raw: i64) -> Points {
     raw.max(0) as Points
+}
+
+/// Every currency the household uses, with this Squire's balance (floored per the currency's policy)
+/// and its display strings (SQUIRE-A-0013). Coins is always present; a currency with a zero balance
+/// is still listed so the child can see "$ 0 owed" rather than the currency vanishing.
+fn currency_balances(snap: &Snapshot, squire: UserId) -> Vec<domain_core::contract::CurrencyBalance> {
+    use domain_core::contract::CurrencyBalance;
+    Currency::all()
+        .iter()
+        .map(|&currency| {
+            let policy = currency.policy();
+            let raw = Proj::balance_in(snap, squire, currency);
+            let balance = if policy.floors_at_zero { raw.max(0) } else { raw };
+            CurrencyBalance {
+                currency,
+                balance,
+                name: policy.name.to_string(),
+                symbol: policy.symbol.to_string(),
+            }
+        })
+        .collect()
 }
 
 /// The cards for every active quest the Squire is scheduled + assigned for "today" — including
