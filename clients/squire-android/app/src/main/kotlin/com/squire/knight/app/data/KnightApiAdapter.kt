@@ -123,6 +123,17 @@ class KnightApiAdapter(
         api.archiveItem(xHousehold = household, id = id)
     }
 
+    // ── Hazard catalog (SQUIRE-T-0096): shared config; applying one reuses the adjust above ───────
+    /** The household's hazard catalog (named penalties). */
+    suspend fun listHazards(): List<com.squire.sdk.model.Hazard> = withContext(Dispatchers.IO) {
+        api.listHazards(xHousehold = household)
+    }
+
+    /** Replace the household's hazard catalog. */
+    suspend fun setHazards(hazards: List<com.squire.sdk.model.Hazard>) = withContext(Dispatchers.IO) {
+        api.setHazards(xHousehold = household, hazard = hazards)
+    }
+
     // ── Member administration from the phone (SQUIRE-T-0075) ─────────────────────────────────────
     /** Every household member (Knights + Squires) with role + active flag. */
     suspend fun listMembers(): List<MemberSummaryDto> = withContext(Dispatchers.IO) {

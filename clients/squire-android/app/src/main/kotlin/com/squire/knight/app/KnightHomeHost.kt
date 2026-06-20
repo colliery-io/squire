@@ -126,6 +126,8 @@ internal fun KnightHomeHost(
     var managingRewards by remember(session) { mutableStateOf(false) }
     // Whether the native member-administration surface (SQUIRE-T-0075) is open.
     var managingMembers by remember(session) { mutableStateOf(false) }
+    // Whether the hazard catalog (SQUIRE-T-0096) is open.
+    var managingHazards by remember(session) { mutableStateOf(false) }
 
     val current = assumed
     if (current != null) {
@@ -183,6 +185,18 @@ internal fun KnightHomeHost(
         return
     }
 
+    if (managingHazards) {
+        val squires = (state as? KnightUiState.Ready)
+            ?.review?.squires?.map { it.squire to it.displayName } ?: emptyList()
+        com.squire.knight.app.ui.HazardAdminScreen(
+            adapter = adapter,
+            squires = squires,
+            onApply = { squire, amount, reason -> viewModel.adjust(squire, amount, reason) },
+            onBack = { managingHazards = false },
+        )
+        return
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         update?.let { info -> UpdateBanner(info) }
         Box(modifier = Modifier.weight(1f)) {
@@ -202,6 +216,7 @@ internal fun KnightHomeHost(
                 onManageAchievements = { managingAchievements = true },
                 onManageRewards = { managingRewards = true },
                 onManageMembers = { managingMembers = true },
+                onManageHazards = { managingHazards = true },
             )
         }
     }
