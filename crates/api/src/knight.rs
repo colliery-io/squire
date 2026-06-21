@@ -107,15 +107,14 @@ pub struct RedeemReq {
 pub struct AdjustReq {
     pub command_id: CommandId,
     pub squire: UserId,
-    /// Which currency to adjust (SQUIRE-A-0013). Omitted ⇒ Coins, so older clients keep working.
-    #[serde(default = "default_coins")]
-    pub currency: Currency,
+    /// Which currency to adjust (SQUIRE-A-0013). **`Option` is deliberate:** clients (the Kotlin SDK
+    /// with `encodeDefaults = true`) send an explicit `"currency": null` for the default — a plain
+    /// `#[serde(default)] Currency` rejects that null with a 400. `Option` accepts absent *and* null;
+    /// both mean Coins (resolved at the use site).
+    #[serde(default)]
+    pub currency: Option<Currency>,
     pub amount: i64,
     pub reason: String,
-}
-
-fn default_coins() -> Currency {
-    Currency::Coins
 }
 
 /// `POST /admin/mark-done` body — submit-then-approve a claim for `squire` in one shot. The
@@ -280,7 +279,7 @@ pub async fn adjust(
         command_id: req.command_id,
         actor: principal.user,
         squire: req.squire,
-        currency: req.currency,
+        currency: req.currency.unwrap_or(Currency::Coins),
         amount: req.amount,
         reason: req.reason,
     };
