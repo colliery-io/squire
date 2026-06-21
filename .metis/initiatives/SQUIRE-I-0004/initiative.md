@@ -82,6 +82,18 @@ and `/api/config`, but the LAN API does not expose them yet) → SDK regen → A
    (integration).
 5. Green `angreal test all`; then hand back for the bundled release (with [[SQUIRE-T-0108]]/[[SQUIRE-T-0109]]).
 
+## Progress log (resume here)
+- ✅ **2026-06-21** [[SQUIRE-T-0109]] null-currency adjust fix (committed `b94200a`).
+- ✅ **2026-06-21** [[SQUIRE-T-0113]] *backend* — `GET/PUT /admin/config` (timezone) added to the LAN
+  api, OpenAPI re-frozen, integration test green (committed `bc5f9b8`).
+- ▶ **NEXT:** [[SQUIRE-T-0112]] backend — history feed. Plan: add `Store::recent_events(limit)`
+  (mirror `raw_log_for_quest` pattern: `events::table.order(seq.desc).limit(n)`), then a Knight-gated
+  `GET /admin/history?limit=N` returning a **flat `HistoryEntryDto`** (`seq, at, kind, squire?, actor?,
+  quest_id?, item_id?, amount?, currency?, reason?`) mapped from `Event` variants — flat-for-codegen
+  per the repo convention; the Android resolves names from data it already holds (household-review).
+  Then **batch the SDK regen once** (config + history together), then Android UIs (T-0111/0112/0113),
+  then cucumber (T-0110/0114/0115/0116).
+
 ## Alternatives Considered
 - *GWT-structured tests in existing frameworks* (no Cucumber) — rejected by operator in favor of true
   Gherkin feature files.
