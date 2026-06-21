@@ -95,14 +95,19 @@ and `/api/config`, but the LAN API does not expose them yet) → SDK regen → A
 - ✅ **2026-06-21** [[SQUIRE-T-0111]] **DONE** — cash payout / "Pay" on the Android Knight app:
   `KnightStore.pay` (Cash adjust of −amount) + `PayDialog` + per-card "Pay $N" button; knight-core
   tests green, `:app` compiles, SDK regenerated, snapshot golden unchanged (`7ee2ae3`).
-- ▶ **NEXT — Phase 3 Android UI** (remaining 2 screens; SDK already carries the methods):
-  1. [[SQUIRE-T-0113]] **Settings/timezone** — `getConfig`/`updateConfig` via the adapter; a Settings
-     surface off the home dropdown (current zone + IANA picker → PUT).
-  2. [[SQUIRE-T-0112]] **History** — `history` SDK call; a read-only History screen (feed of recent
-     activity), reachable from the home dropdown.
-  Then **Phase 4** cucumber ([[SQUIRE-T-0110]]/[[SQUIRE-T-0114]]/[[SQUIRE-T-0115]]/[[SQUIRE-T-0116]]).
-  Note: these two need a `KnightApiAdapter` method + a read path (the current Knight adapter is
-  command/outbox-oriented; config/history are simple GET/PUT reads — wire them as direct adapter calls).
+- ✅ **2026-06-21** [[SQUIRE-T-0113]] **DONE** (Android) — timezone Settings screen + adapter
+  getConfig/updateConfig; `bd088f7`.
+- ✅ **2026-06-21** [[SQUIRE-T-0112]] **DONE** (Android) — History feed screen + adapter history();
+  `bd088f7`. **Phase 3 complete — all three parity gaps closed on Android.**
+- ▶ **NEXT — Phase 4 Gherkin/cucumber:**
+  1. [[SQUIRE-T-0110]] cucumber-rs foundation (domain-core + API; shared `.feature` vocabulary; wrap
+     existing covered behavior so it's green; **null-currency regression as a named scenario**;
+     `angreal test gherkin`). Build on the api `tests/integration.rs` oneshot `app()` fixture.
+  2. [[SQUIRE-T-0114]] Keep web Gherkin (Cucumber over Playwright; wrap the 21 specs).
+  3. [[SQUIRE-T-0115]] Android Gherkin (cucumber-jvm / instrumented; **covers the new Pay / Settings /
+     History screens** behaviorally).
+  4. [[SQUIRE-T-0116]] full-stack phone→API→store integration as Gherkin.
+  Then green `angreal test all` → hand back for the bundled release.
 
 ## Alternatives Considered
 - *GWT-structured tests in existing frameworks* (no Cucumber) — rejected by operator in favor of true
