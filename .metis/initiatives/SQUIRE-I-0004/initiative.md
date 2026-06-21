@@ -99,15 +99,19 @@ and `/api/config`, but the LAN API does not expose them yet) → SDK regen → A
   getConfig/updateConfig; `bd088f7`.
 - ✅ **2026-06-21** [[SQUIRE-T-0112]] **DONE** (Android) — History feed screen + adapter history();
   `bd088f7`. **Phase 3 complete — all three parity gaps closed on Android.**
-- ▶ **NEXT — Phase 4 Gherkin/cucumber:**
-  1. [[SQUIRE-T-0110]] cucumber-rs foundation (domain-core + API; shared `.feature` vocabulary; wrap
-     existing covered behavior so it's green; **null-currency regression as a named scenario**;
-     `angreal test gherkin`). Build on the api `tests/integration.rs` oneshot `app()` fixture.
-  2. [[SQUIRE-T-0114]] Keep web Gherkin (Cucumber over Playwright; wrap the 21 specs).
-  3. [[SQUIRE-T-0115]] Android Gherkin (cucumber-jvm / instrumented; **covers the new Pay / Settings /
+- ✅ **2026-06-21** [[SQUIRE-T-0110]] **DONE** — cucumber-rs Gherkin foundation for the api:
+  `harness=false` `cucumber` test target over the oneshot fixture; `ApiWorld` + shared step
+  vocabulary; 3 features / 8 scenarios / 38 steps green (adjust incl. the **null-currency T-0109
+  regression**, claims submit→approve→credit, auth role boundary); `angreal test gherkin` wired;
+  folded into `cargo test`/`test all` (`d86ad21`).
+- ▶ **NEXT — Phase 4 client Gherkin (3 suites left):**
+  1. [[SQUIRE-T-0114]] Keep web Gherkin (Cucumber over Playwright; wrap the 21 specs).
+  2. [[SQUIRE-T-0115]] Android Gherkin (cucumber-jvm / instrumented; **covers the new Pay / Settings /
      History screens** behaviorally).
-  4. [[SQUIRE-T-0116]] full-stack phone→API→store integration as Gherkin.
+  3. [[SQUIRE-T-0116]] full-stack phone→API→store integration as Gherkin.
   Then green `angreal test all` → hand back for the bundled release.
+  Note: reuse the **same scenario vocabulary** from the api `.feature` files across these to avoid
+  three Gherkin dialects.
 
 ## Alternatives Considered
 - *GWT-structured tests in existing frameworks* (no Cucumber) — rejected by operator in favor of true
