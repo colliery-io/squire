@@ -1,6 +1,7 @@
 package com.squire.knight.core
 
 import com.squire.sdk.model.AdjustReq
+import com.squire.sdk.model.Currency
 import com.squire.sdk.model.DecisionDto
 import com.squire.sdk.model.DecisionKind
 import com.squire.sdk.model.HouseholdReview
@@ -115,6 +116,21 @@ class KnightStore(
     suspend fun adjust(squire: Long, amount: Long, reason: String) {
         require(reason.isNotBlank()) { "AdjustPoints requires a reason" }
         submit(KnightCommand.Adjust(AdjustReq(amount = amount, commandId = ids(), reason = reason, squire = squire)))
+    }
+
+    /**
+     * Settle real-money cash owed to [squire] (SQUIRE-T-0111): a **Cash** adjustment of `−[amount]`
+     * that draws down the owed balance (floored at zero server-side). Parity with the Keep's "Pay".
+     * A positive [amount] and a non-empty [reason] are required (the UI blocks until both are set).
+     */
+    suspend fun pay(squire: Long, amount: Long, reason: String) {
+        require(reason.isNotBlank()) { "Pay requires a reason" }
+        require(amount > 0) { "Pay amount must be positive" }
+        submit(
+            KnightCommand.Adjust(
+                AdjustReq(amount = -amount, commandId = ids(), reason = reason, squire = squire, currency = Currency.Cash),
+            ),
+        )
     }
 
     /** Mark quest [questId] done for [squire] on day [on] (submit-then-approve); mints a `claim_id`. */
