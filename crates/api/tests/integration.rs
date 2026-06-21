@@ -606,3 +606,37 @@ async fn config_timezone_get_put_over_http() {
     let (st, _) = get(&state, "/admin/config", &squire, &handle).await;
     assert_eq!(st, StatusCode::FORBIDDEN);
 }
+
+/// SQUIRE-T-0112: the household history feed returns recent events newest-first, flattened, with
+/// `limit` honoured; Knight-gated (a Squire is 403). Exercised via two adjustments (which also
+/// confirms an absent `currency` defaults to Coins — the T-0109 path).
+#[tokio::test]
+async fn history_feed_is_knight_gated_newest_first_and_limited() {
+    let (state, _store, _dir, _today) = app();
+    let reg = register(&state, "The Round Table", "Arthur", "excalibur").await;
+    let handle = reg.household.0.clone();
+    let knight = reg.token.0.clone();
+    let (squire_id, squire) = add_squire_and_login(&state, &knight, &handle, "Lancelot", "lake").await;
+
+    // Two adjustments → two history entries, the later one newest.
+    fund(&state, &knight, &handle, squire_id, 5, 7001).await;
+    fund(&state, &knight, &handle, squire_id, 3, 7002).await;
+
+    let (st, hist) = get(&state, "/admin/history", &knight, &handle).await;
+    assert_eq!(st, StatusCode::OK);
+    let entries = hist.as_array().unwrap();
+    assert!(entries.len() >= 2, "the two adjustments are in the feed");
+    // Newest first: the second fund (amount 3) leads, flattened as an Adjusted/Coins entry.
+    assert_eq!(entries[0]["kind"], "Adjusted");
+    assert_eq!(entries[0]["squire"], squire_id as u64);
+    assert_eq!(entries[0]["amount"], 3);
+    assert_eq!(entries[0]["currency"], "Coins");
+
+    // `limit` is honoured.
+    let (_st, one) = get(&state, "/admin/history?limit=1", &knight, &handle).await;
+    assert_eq!(one.as_array().unwrap().len(), 1);
+
+    // A Squire token is 403.
+    let (st, _) = get(&state, "/admin/history", &squire, &handle).await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+}

@@ -88,6 +88,8 @@ impl Modify for SecurityAddon {
         // Household settings from the phone (SQUIRE-T-0113)
         crate::config::get_config,
         crate::config::update_config,
+        // Household activity history for the phone (SQUIRE-T-0112)
+        crate::history::history,
     ),
     components(schemas(
         // ── Squire state view + nested ──
@@ -178,6 +180,8 @@ impl Modify for SecurityAddon {
         // ── Household settings (SQUIRE-T-0113) ──
         crate::config::UpdateConfigReq,
         domain_core::contract::HouseholdConfig,
+        // ── Household history feed (SQUIRE-T-0112) ──
+        crate::history::HistoryEntryDto,
     )),
     modifiers(&SecurityAddon),
     tags(

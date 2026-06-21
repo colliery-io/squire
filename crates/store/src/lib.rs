@@ -246,6 +246,24 @@ impl<C: Clock> Store<C> {
             .expect("raw_log_for_quest: decode failed (corrupt store)")
     }
 
+    /// Recent **household-wide** event trail (SQUIRE-T-0112): the most recent `limit` events across
+    /// the whole household, **newest first**, decoded to domain [`Event`]s — the audit/history feed
+    /// for the Knight phone (parity with the Keep's per-entity inspector, but household-wide).
+    /// Ordered + limited at the database so a long log never materialises the whole snapshot.
+    pub fn recent_events(&self, limit: i64) -> Vec<Event> {
+        let mut conn = self.conn.borrow_mut();
+        let rows: Vec<EventRow> = events::table
+            .select(EventRow::as_select())
+            .order(events::seq.desc())
+            .limit(limit)
+            .load(&mut *conn)
+            .expect("recent_events: query failed (corrupt store)");
+        rows.iter()
+            .map(|r| r.to_event())
+            .collect::<Result<Vec<_>, _>>()
+            .expect("recent_events: decode failed (corrupt store)")
+    }
+
     /// Upsert a member's hashed secret into THIS tenant's `credentials` table (REQ-1.6).
     ///
     /// Credentials live inside the tenant schema, isolated exactly like the rest of the
