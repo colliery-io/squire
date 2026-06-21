@@ -84,15 +84,23 @@ and `/api/config`, but the LAN API does not expose them yet) → SDK regen → A
 
 ## Progress log (resume here)
 - ✅ **2026-06-21** [[SQUIRE-T-0109]] null-currency adjust fix (committed `b94200a`).
-- ✅ **2026-06-21** [[SQUIRE-T-0113]] *backend* — `GET/PUT /admin/config` (timezone) added to the LAN
-  api, OpenAPI re-frozen, integration test green (committed `bc5f9b8`).
-- ▶ **NEXT:** [[SQUIRE-T-0112]] backend — history feed. Plan: add `Store::recent_events(limit)`
-  (mirror `raw_log_for_quest` pattern: `events::table.order(seq.desc).limit(n)`), then a Knight-gated
-  `GET /admin/history?limit=N` returning a **flat `HistoryEntryDto`** (`seq, at, kind, squire?, actor?,
-  quest_id?, item_id?, amount?, currency?, reason?`) mapped from `Event` variants — flat-for-codegen
-  per the repo convention; the Android resolves names from data it already holds (household-review).
-  Then **batch the SDK regen once** (config + history together), then Android UIs (T-0111/0112/0113),
-  then cucumber (T-0110/0114/0115/0116).
+- ✅ **2026-06-21** [[SQUIRE-T-0113]] *backend* — `GET/PUT /admin/config` (timezone), OpenAPI
+  re-frozen, integration test green (`bc5f9b8`).
+- ✅ **2026-06-21** [[SQUIRE-T-0112]] *backend* — `Store::recent_events` + Knight-gated
+  `GET /admin/history` flat `HistoryEntryDto` feed, OpenAPI re-frozen, integration test green
+  (`4a5323f`). **Phase 2 backend complete.**
+- 📝 **SDK regen is automatic** — `clients/squire-android/sdk/build.gradle.kts` sets
+  `inputSpec = crates/api/openapi.json`, so the Kotlin SDK regenerates (getConfig/updateConfig/history
+  + models) on the next Android gradle build. No separate regen step.
+- ▶ **NEXT — Phase 3 Android UI** (each: ViewModel/command → `KnightApiAdapter` → SDK call → Compose
+  screen → Paparazzi snapshot):
+  1. [[SQUIRE-T-0111]] **Cash payout** — thread `currency = Cash` through the Knight adjust path; add a
+     "Pay" action on each squire card with `cashBalance > 0` (reuse the `AddFundsDialog` pattern,
+     negative amount, cap at owed). Smallest — no new SDK method (adjust exists).
+  2. [[SQUIRE-T-0113]] **Settings/timezone** — new `getConfig`/`updateConfig` SDK calls; a Settings
+     surface off the home dropdown.
+  3. [[SQUIRE-T-0112]] **History** — new `history` SDK call; a read-only History screen.
+  Then **Phase 4** cucumber ([[SQUIRE-T-0110]]/[[SQUIRE-T-0114]]/[[SQUIRE-T-0115]]/[[SQUIRE-T-0116]]).
 
 ## Alternatives Considered
 - *GWT-structured tests in existing frameworks* (no Cucumber) — rejected by operator in favor of true
