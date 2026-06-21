@@ -39,9 +39,9 @@ happened to re-pair within the last 24h (the earlier "offline" event), the son d
 ## Acceptance
 - [x] New tokens carry a ~100yr expiry; existing expiry tests (own short TTL) still pass; workspace green.
 - [x] Live on prod (service restarted on 0.7.9).
-- [ ] **Operator action: re-pair BOTH phones once** — the fix only applies to *newly issued* tokens;
+- [x] **Operator action: re-pair done** (operator confirmed working 2026-06-21); — the fix only applies to *newly issued* tokens;
   existing phones still hold the old 24h token until re-paired. After re-pairing, never again.
-- [ ] Publish v0.7.9 to dist so fresh installs + self-update get the fix.
+- [x] v0.7.9 published to dist (CI) → fresh installs + self-update get the fix.
 
 ## Follow-up
 The cloud work ([[SQUIRE-T-0103]]/[[SQUIRE-T-0104]]) should design real token rotation/refresh +
