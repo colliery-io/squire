@@ -19,6 +19,7 @@ pub mod authoring;
 pub mod auth;
 pub mod config;
 pub mod control;
+pub mod history;
 pub mod knight;
 pub mod openapi;
 pub mod squire;
@@ -80,6 +81,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         // Household settings from the phone (SQUIRE-T-0113): read + change the timezone, at parity
         // with the Keep's /api/config (hot-swaps the shared live cell).
         .route("/admin/config", get(config::get_config).put(config::update_config))
+        // Household activity history for the phone (SQUIRE-T-0112): recent events, newest first.
+        .route("/admin/history", get(history::history))
         // App-update distribution (SQUIRE-T-0051): version manifest + APK download, unauthenticated.
         .route("/app/manifest", get(app_dist::manifest))
         .route("/app/{file}", get(app_dist::download))

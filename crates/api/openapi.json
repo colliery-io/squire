@@ -409,6 +409,56 @@
         ]
       }
     },
+    "/admin/history": {
+      "get": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`GET /admin/history?limit=N` (Knight-only) — the most recent household events, newest first,\nflattened for the phone. Default 50, clamped to 1..=200.",
+        "operationId": "history",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Tenant household handle",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Max entries (default 50, capped 200)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent household activity, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEntryDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/admin/items": {
       "get": {
         "tags": [
@@ -2197,6 +2247,85 @@
           },
           "penalty": {
             "$ref": "#/components/schemas/u32"
+          }
+        }
+      },
+      "HistoryEntryDto": {
+        "type": "object",
+        "description": "One flattened activity entry for the Knight history feed. Every domain [`Event`] maps to exactly\none of these. Ids are int64 on the wire (the repo's fits-in-i64 invariant). `amount` carries the\nbalance delta where the event bears one (approve `+points`, redeem `−cost`, unlock `+bonus`,\nadjust `±amount`); `currency` is set only for an `Adjusted` entry (other events are always coins).",
+        "required": [
+          "at",
+          "kind",
+          "squire"
+        ],
+        "properties": {
+          "achievement_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "actor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The acting Knight, if any (`None` = auto-approve / system / squire-initiated)."
+          },
+          "amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Balance delta where the event bears one; `None` for claims/requests (no delta yet)."
+          },
+          "at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Event time, unix millis."
+          },
+          "currency": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Currency",
+                "description": "Currency for an `Adjusted` entry; `None` otherwise."
+              }
+            ]
+          },
+          "item_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Variant tag: `Claimed | Approved | Rejected | Redeemed | Requested | RedemptionRejected | Unlocked | Adjusted`."
+          },
+          "quest_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "squire": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The Squire the event is scoped to."
           }
         }
       },
