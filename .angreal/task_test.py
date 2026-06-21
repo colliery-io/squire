@@ -20,6 +20,12 @@ def _snapshots():
     return gradle(":app:verifyPaparazziDebug")
 
 
+def _gherkin():
+    # The Cucumber suite is a `harness = false` test target, so plain `cargo test` (in `_rust`)
+    # already runs it as part of the workspace; this is the convenience entry to run it alone.
+    return run(["cargo", "test", "-p", "api", "--test", "cucumber"])
+
+
 @test()
 @angreal.command(name="rust", about="Run the Rust workspace tests")
 def test_rust():
@@ -36,6 +42,12 @@ def test_e2e():
 @angreal.command(name="snapshots", about="Verify Android Paparazzi snapshots against the goldens")
 def test_snapshots():
     return _snapshots()
+
+
+@test()
+@angreal.command(name="gherkin", about="Run the Gherkin/Cucumber acceptance suite (api .feature files)")
+def test_gherkin():
+    return _gherkin()
 
 
 @test()

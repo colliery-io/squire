@@ -32,3 +32,12 @@ tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 # Isolated temp-dir SQLite tenant per test.
 tempfile = "3"
+# Gherkin/Cucumber acceptance suite (SQUIRE-I-0004 / SQUIRE-T-0110): true `.feature` files driven
+# against the axum Router over the oneshot fixture. The shared scenario vocabulary the client suites reuse.
+cucumber = "0.21"
+futures = "0.3"
+
+# The Cucumber harness runs as its own binary (no libtest), so it needs `harness = false`.
+[[test]]
+name = "cucumber"
+harness = false
