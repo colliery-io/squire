@@ -85,6 +85,8 @@ fun KnightHomeScreen(
     onManageRewards: () -> Unit = {},
     onManageMembers: () -> Unit = {},
     onManageHazards: () -> Unit = {},
+    onManageSettings: () -> Unit = {},
+    onViewHistory: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -116,6 +118,8 @@ fun KnightHomeScreen(
                         DropdownMenuItem(text = { Text("Manage rewards") }, onClick = { menuOpen = false; onManageRewards() })
                         DropdownMenuItem(text = { Text("Manage hazards") }, onClick = { menuOpen = false; onManageHazards() })
                         DropdownMenuItem(text = { Text("Manage members") }, onClick = { menuOpen = false; onManageMembers() })
+                        DropdownMenuItem(text = { Text("History") }, onClick = { menuOpen = false; onViewHistory() })
+                        DropdownMenuItem(text = { Text("Settings") }, onClick = { menuOpen = false; onManageSettings() })
                         DropdownMenuItem(text = { Text("Refresh") }, onClick = { menuOpen = false; onRefresh() })
                         DropdownMenuItem(text = { Text("Forget device") }, onClick = { menuOpen = false; onForget() })
                     }

@@ -134,6 +134,26 @@ class KnightApiAdapter(
         api.setHazards(xHousehold = household, hazard = hazards)
     }
 
+    // ── Household settings (SQUIRE-T-0113): read + change the timezone, parity with the Keep ───────
+    /** The current household config (timezone). */
+    suspend fun getConfig(): com.squire.sdk.model.HouseholdConfig = withContext(Dispatchers.IO) {
+        api.getConfig(xHousehold = household)
+    }
+
+    /** Change the household timezone (IANA name); returns the updated config (throws on a bad zone). */
+    suspend fun updateConfig(timezone: String): com.squire.sdk.model.HouseholdConfig = withContext(Dispatchers.IO) {
+        api.updateConfig(
+            xHousehold = household,
+            updateConfigReq = com.squire.sdk.model.UpdateConfigReq(timezone = timezone),
+        )
+    }
+
+    // ── Household history (SQUIRE-T-0112): recent activity feed for the Knight phone ───────────────
+    /** The most recent household events (newest first), flattened for display. */
+    suspend fun history(limit: Long = 50): List<com.squire.sdk.model.HistoryEntryDto> = withContext(Dispatchers.IO) {
+        api.history(xHousehold = household, limit = limit)
+    }
+
     // ── Member administration from the phone (SQUIRE-T-0075) ─────────────────────────────────────
     /** Every household member (Knights + Squires) with role + active flag. */
     suspend fun listMembers(): List<MemberSummaryDto> = withContext(Dispatchers.IO) {

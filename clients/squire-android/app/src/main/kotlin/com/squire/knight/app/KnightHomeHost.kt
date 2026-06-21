@@ -128,6 +128,10 @@ internal fun KnightHomeHost(
     var managingMembers by remember(session) { mutableStateOf(false) }
     // Whether the hazard catalog (SQUIRE-T-0096) is open.
     var managingHazards by remember(session) { mutableStateOf(false) }
+    // Whether the household settings (timezone, SQUIRE-T-0113) surface is open.
+    var managingSettings by remember(session) { mutableStateOf(false) }
+    // Whether the household activity history (SQUIRE-T-0112) surface is open.
+    var viewingHistory by remember(session) { mutableStateOf(false) }
 
     val current = assumed
     if (current != null) {
@@ -197,6 +201,25 @@ internal fun KnightHomeHost(
         return
     }
 
+    if (managingSettings) {
+        com.squire.knight.app.ui.SettingsScreen(
+            adapter = adapter,
+            onBack = { managingSettings = false },
+        )
+        return
+    }
+
+    if (viewingHistory) {
+        val names = (state as? KnightUiState.Ready)
+            ?.review?.squires?.associate { it.squire to it.displayName } ?: emptyMap()
+        com.squire.knight.app.ui.HistoryScreen(
+            adapter = adapter,
+            squireNames = names,
+            onBack = { viewingHistory = false },
+        )
+        return
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         update?.let { info -> UpdateBanner(info) }
         Box(modifier = Modifier.weight(1f)) {
@@ -218,6 +241,8 @@ internal fun KnightHomeHost(
                 onManageRewards = { managingRewards = true },
                 onManageMembers = { managingMembers = true },
                 onManageHazards = { managingHazards = true },
+                onManageSettings = { managingSettings = true },
+                onViewHistory = { viewingHistory = true },
             )
         }
     }
