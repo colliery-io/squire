@@ -85,6 +85,9 @@ impl Modify for SecurityAddon {
         // Knight member administration (SQUIRE-T-0075)
         crate::authoring::list_members,
         crate::authoring::set_member_active,
+        // Household settings from the phone (SQUIRE-T-0113)
+        crate::config::get_config,
+        crate::config::update_config,
     ),
     components(schemas(
         // ── Squire state view + nested ──
@@ -172,6 +175,9 @@ impl Modify for SecurityAddon {
         // ── Knight member-admin DTOs (SQUIRE-T-0075) ──
         crate::authoring::MemberSummaryDto,
         crate::authoring::SetActiveReq,
+        // ── Household settings (SQUIRE-T-0113) ──
+        crate::config::UpdateConfigReq,
+        domain_core::contract::HouseholdConfig,
     )),
     modifiers(&SecurityAddon),
     tags(

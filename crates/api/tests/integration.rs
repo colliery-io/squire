@@ -163,6 +163,21 @@ async fn get(state: &Arc<AppState>, path: &str, token: &str, handle: &str) -> (S
     status_and_json(resp).await
 }
 
+/// `PUT <path>` as `(token, handle)` with a JSON body → `(status, body)`.
+async fn put_json(
+    state: &Arc<AppState>,
+    path: &str,
+    token: &str,
+    handle: &str,
+    body: Value,
+) -> (StatusCode, Value) {
+    let resp = router(state.clone())
+        .oneshot(build("PUT", path, Some((token, handle)), Some(body.to_string())))
+        .await
+        .unwrap();
+    status_and_json(resp).await
+}
+
 // ─── over-the-wire register / login / add-member (how every token is obtained) ───────────────
 
 /// `POST /register` (unauthenticated) → the household handle + the first Knight's token.
@@ -556,4 +571,38 @@ async fn redemption_approval_fails_when_balance_drained_before_review() {
     let pending = review["pending_requests"].as_array().unwrap();
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0]["request_id"], request_id as u64);
+}
+
+/// SQUIRE-T-0113: the household timezone is readable + settable over the wire (Knight-gated), at
+/// parity with the Keep. Default UTC; a valid IANA zone is accepted, echoed, and reflected on a
+/// re-read; a garbage zone is 400; a Squire token is 403 on the whole surface.
+#[tokio::test]
+async fn config_timezone_get_put_over_http() {
+    let (state, _store, _dir, _today) = app();
+    let reg = register(&state, "The Round Table", "Arthur", "excalibur").await;
+    let handle = reg.household.0.clone();
+    let knight = reg.token.0.clone();
+
+    // GET default → UTC.
+    let (st, cfg) = get(&state, "/admin/config", &knight, &handle).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(cfg["timezone"], "UTC");
+
+    // PUT a valid IANA zone → 200, echoes the new value; a re-read reflects it.
+    let (st, cfg) =
+        put_json(&state, "/admin/config", &knight, &handle, json!({ "timezone": "America/Detroit" })).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(cfg["timezone"], "America/Detroit");
+    let (_st, cfg) = get(&state, "/admin/config", &knight, &handle).await;
+    assert_eq!(cfg["timezone"], "America/Detroit");
+
+    // A garbage zone → 400 (validated before any write).
+    let (st, _) =
+        put_json(&state, "/admin/config", &knight, &handle, json!({ "timezone": "Mars/Phobos" })).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+
+    // A Squire token is 403 on the Knight-gated config surface.
+    let (_id, squire) = add_squire_and_login(&state, &knight, &handle, "Lancelot", "lake").await;
+    let (st, _) = get(&state, "/admin/config", &squire, &handle).await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
 }
