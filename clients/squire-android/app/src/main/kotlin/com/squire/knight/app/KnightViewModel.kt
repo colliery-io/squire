@@ -31,6 +31,10 @@ class KnightViewModel(private val store: KnightStore) : ViewModel() {
     fun adjust(squire: Long, amount: Long, reason: String) =
         viewModelScope.launch { store.adjust(squire, amount, reason) }
 
+    /** Settle real-money cash owed to [squire] (SQUIRE-T-0111): a Cash payout of −[amount]. */
+    fun pay(squire: Long, amount: Long, reason: String) =
+        viewModelScope.launch { store.pay(squire, amount, reason) }
+
     fun markDone(squire: Long, questId: Long, on: Int) =
         viewModelScope.launch { store.markDone(squire, questId, on) }
 }

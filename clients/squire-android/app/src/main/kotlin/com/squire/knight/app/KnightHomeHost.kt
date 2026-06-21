@@ -208,6 +208,7 @@ internal fun KnightHomeHost(
                 onApproveRequest = { viewModel.approveRequest(it) },
                 onRejectRequest = { id, reason -> viewModel.rejectRequest(id, reason) },
                 onAddFunds = { squire, amount, reason -> viewModel.adjust(squire, amount, reason) },
+                onPay = { squire, amount, reason -> viewModel.pay(squire, amount, reason) },
                 onRedeem = { squire, itemId -> viewModel.redeem(squire, itemId) },
                 onMarkDone = { squire, questId, on -> viewModel.markDone(squire, questId, on) },
                 onForget = onForget,

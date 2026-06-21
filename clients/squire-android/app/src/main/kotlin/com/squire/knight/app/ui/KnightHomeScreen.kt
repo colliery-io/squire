@@ -75,6 +75,7 @@ fun KnightHomeScreen(
     onApproveRequest: (requestId: Long) -> Unit,
     onRejectRequest: (requestId: Long, reason: String?) -> Unit,
     onAddFunds: (squire: Long, amount: Long, reason: String) -> Unit,
+    onPay: (squire: Long, amount: Long, reason: String) -> Unit,
     onRedeem: (squire: Long, itemId: Long) -> Unit,
     onMarkDone: (squire: Long, questId: Long, on: Int) -> Unit,
     onForget: () -> Unit = {},
@@ -145,6 +146,7 @@ fun KnightHomeScreen(
                 onApproveRequest = onApproveRequest,
                 onRejectRequest = onRejectRequest,
                 onAddFunds = onAddFunds,
+                onPay = onPay,
                 onRedeem = onRedeem,
                 onMarkDone = onMarkDone,
                 onOpenSquire = onOpenSquire,
@@ -163,6 +165,7 @@ private fun ReadyContent(
     onApproveRequest: (Long) -> Unit,
     onRejectRequest: (Long, String?) -> Unit,
     onAddFunds: (Long, Long, String) -> Unit,
+    onPay: (Long, Long, String) -> Unit,
     onRedeem: (Long, Long) -> Unit,
     onMarkDone: (Long, Long, Int) -> Unit,
     onOpenSquire: (Long, String) -> Unit,
@@ -172,6 +175,7 @@ private fun ReadyContent(
     val names = review.squires.associate { it.squire to it.displayName }
 
     var fundsFor by remember { mutableStateOf<SquireSummary?>(null) }
+    var payFor by remember { mutableStateOf<SquireSummary?>(null) }
     var redeemFor by remember { mutableStateOf<SquireSummary?>(null) }
     var markDoneFor by remember { mutableStateOf<SquireSummary?>(null) }
     // Pending reject awaiting a reason (SQUIRE-T-0078): the claim / request the Knight tapped Reject on.
@@ -200,6 +204,7 @@ private fun ReadyContent(
                     s = s,
                     onOpen = { onOpenSquire(s.squire, s.displayName) },
                     onAddFunds = { fundsFor = s },
+                    onPay = { payFor = s },
                     onRedeem = { redeemFor = s },
                     onMarkDone = { markDoneFor = s },
                 )
@@ -242,6 +247,18 @@ private fun ReadyContent(
             onConfirm = { amount, reason ->
                 onAddFunds(target.squire, amount, reason)
                 fundsFor = null
+            },
+        )
+    }
+
+    payFor?.let { target ->
+        PayDialog(
+            squireName = target.displayName,
+            owed = target.cashBalance ?: 0,
+            onDismiss = { payFor = null },
+            onConfirm = { amount, reason ->
+                onPay(target.squire, amount, reason)
+                payFor = null
             },
         )
     }
@@ -344,6 +361,7 @@ private fun SquireRow(
     s: SquireSummary,
     onOpen: () -> Unit,
     onAddFunds: () -> Unit,
+    onPay: () -> Unit,
     onRedeem: () -> Unit,
     onMarkDone: () -> Unit,
 ) {
@@ -367,7 +385,7 @@ private fun SquireRow(
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         GoldPill(amount = s.balance.toInt())
-                        // Real money owed to this Squire (SQUIRE-T-0099) — settle via "Pay" on the Keep.
+                        // Real money owed to this Squire (SQUIRE-T-0099); settle with "Pay" (SQUIRE-T-0111).
                         val owed = s.cashBalance ?: 0
                         if (owed > 0) CashPill(owed.toLong(), large = false)
                     }
@@ -382,6 +400,10 @@ private fun SquireRow(
                 OutlinedButton(onClick = onMarkDone) { Text("Mark done") }
                 OutlinedButton(onClick = onRedeem) { Text("Redeem") }
                 OutlinedButton(onClick = onAddFunds) { Text("Add coins") }
+                // Settle real money owed (SQUIRE-T-0111) — only when there is a cash balance to pay.
+                if ((s.cashBalance ?: 0) > 0) {
+                    OutlinedButton(onClick = onPay) { Text("Pay $${s.cashBalance}") }
+                }
             }
         }
     }
@@ -523,6 +545,47 @@ private fun AddFundsDialog(squireName: String, onDismiss: () -> Unit, onConfirm:
     )
 }
 
+/**
+ * Settle real-money cash owed to a Squire (SQUIRE-T-0111), mirroring "Add coins". A positive amount
+ * (capped at [owed]) and a non-empty reason are required; the amount pre-fills to the full owed
+ * balance (the common case: pay it all off).
+ */
+@Composable
+private fun PayDialog(squireName: String, owed: Int, onDismiss: () -> Unit, onConfirm: (Long, String) -> Unit) {
+    var amount by remember { mutableStateOf(owed.toString()) }
+    var reason by remember { mutableStateOf("") }
+    val parsedAmount = amount.toLongOrNull()
+    val valid = parsedAmount != null && parsedAmount > 0 && parsedAmount <= owed.toLong() && reason.isNotBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Pay $squireName") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Owed: \$$owed", style = MaterialTheme.typography.bodyMedium)
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it.filter(Char::isDigit) },
+                    label = { Text("Amount ($, up to $owed)") },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    label = { Text("Reason (required)") },
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            Button(enabled = valid, onClick = { onConfirm(parsedAmount!!, reason.trim()) }) {
+                Text("Pay")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
 @Composable
 private fun OfflineBanner() {
     com.squire.app.ui.components.Banner(
@@ -568,6 +631,7 @@ private fun KnightHomePreview() {
             state = KnightUiState.Ready(sample, fromCache = false),
             onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
             onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
+            onPay = { _, _, _ -> },
             onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
         )
     }

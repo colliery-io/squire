@@ -1,5 +1,6 @@
 package com.squire.knight.core
 
+import com.squire.sdk.model.Currency
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.SquireSummary
 import kotlinx.coroutines.test.runTest
@@ -8,6 +9,7 @@ import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -115,5 +117,28 @@ class KnightStoreTest {
         assertTrue(threw)
         assertTrue(outbox.pending().isEmpty())
         assertTrue(submit.submitted.isEmpty())
+    }
+
+    @Test
+    fun `pay enqueues a Cash adjustment of the negated amount`() = runTest {
+        val submit = CountingSubmit()
+        val (s, outbox) = store(FakeFetcher(review(balance = 0)), submit)
+        s.pay(squire = 2, amount = 5, reason = "allowance")
+
+        assertEquals(1, submit.submitted.size)
+        val cmd = assertIs<KnightCommand.Adjust>(submit.submitted.single())
+        assertEquals(2L, cmd.req.squire)
+        assertEquals(-5L, cmd.req.amount) // a payout draws the owed cash balance down
+        assertEquals(Currency.Cash, cmd.req.currency)
+        assertEquals("allowance", cmd.req.reason)
+        assertTrue(outbox.pending().isEmpty()) // ack drained it
+    }
+
+    @Test
+    fun `pay rejects a blank reason and a non-positive amount`() = runTest {
+        val (s, outbox) = store(FakeFetcher(review(balance = 0)))
+        assertFailsWith<IllegalArgumentException> { s.pay(squire = 2, amount = 5, reason = "  ") }
+        assertFailsWith<IllegalArgumentException> { s.pay(squire = 2, amount = 0, reason = "ok") }
+        assertTrue(outbox.pending().isEmpty())
     }
 }
