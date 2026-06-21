@@ -82,6 +82,7 @@ class ScreenshotTests {
                     state = KnightUiState.Ready(review, fromCache = false),
                     onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
                     onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
+                    onPay = { _, _, _ -> },
                     onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
                 )
             }
