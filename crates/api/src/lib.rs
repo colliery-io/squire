@@ -17,6 +17,7 @@
 pub mod app_dist;
 pub mod authoring;
 pub mod auth;
+pub mod config;
 pub mod control;
 pub mod knight;
 pub mod openapi;
@@ -76,6 +77,9 @@ pub fn router(state: Arc<AppState>) -> Router {
         // mint-pair-code already live on the control-plane /members and /pair/codes, both Knight-gated.)
         .route("/admin/members", get(authoring::list_members))
         .route("/admin/members/{id}/active", post(authoring::set_member_active))
+        // Household settings from the phone (SQUIRE-T-0113): read + change the timezone, at parity
+        // with the Keep's /api/config (hot-swaps the shared live cell).
+        .route("/admin/config", get(config::get_config).put(config::update_config))
         // App-update distribution (SQUIRE-T-0051): version manifest + APK download, unauthenticated.
         .route("/app/manifest", get(app_dist::manifest))
         .route("/app/{file}", get(app_dist::download))

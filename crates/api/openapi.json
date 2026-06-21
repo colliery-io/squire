@@ -221,6 +221,91 @@
         ]
       }
     },
+    "/admin/config": {
+      "get": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`GET /admin/config` (Knight-only) — the current household settings (the typed view).",
+        "operationId": "get_config",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Tenant household handle",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current household config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdConfig"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`PUT /admin/config` (Knight-only) — change the household timezone. Validates the IANA zone (400\non an unknown one), persists it audit-stamped, hot-swaps the live cell so the day boundary\nchanges live (no restart), and echoes the new config.",
+        "operationId": "update_config",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Tenant household handle",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConfigReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated household config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown/invalid IANA timezone"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/admin/hazards": {
       "get": {
         "tags": [
@@ -2115,6 +2200,19 @@
           }
         }
       },
+      "HouseholdConfig": {
+        "type": "object",
+        "description": "The typed, in-memory view of a household's settings (assembled from the KV `config` rows).",
+        "required": [
+          "timezone"
+        ],
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone name (e.g. `\"America/Los_Angeles\"`). Sets the household's local-midnight day\nboundary for daily/weekly quests. Defaults to `\"UTC\"`."
+          }
+        }
+      },
       "HouseholdHandle": {
         "type": "string",
         "description": "Opaque handle a paired device presents to route to its household (and, hosted, to\nselect the schema — ADR SQUIRE-A-0002). Established at registration/pairing."
@@ -2996,6 +3094,19 @@
       "Timestamp": {
         "type": "integer",
         "format": "int64"
+      },
+      "UpdateConfigReq": {
+        "type": "object",
+        "description": "`PUT /admin/config` body — the settings a parent can change (just the timezone for now).",
+        "required": [
+          "timezone"
+        ],
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone name (e.g. `\"America/Detroit\"`)."
+          }
+        }
       },
       "UserId": {
         "type": "integer",
