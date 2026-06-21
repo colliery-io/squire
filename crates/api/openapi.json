@@ -1555,8 +1555,15 @@
             "$ref": "#/components/schemas/CommandId"
           },
           "currency": {
-            "$ref": "#/components/schemas/Currency",
-            "description": "Which currency to adjust (SQUIRE-A-0013). Omitted ⇒ Coins, so older clients keep working."
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Currency",
+                "description": "Which currency to adjust (SQUIRE-A-0013). **`Option` is deliberate:** clients (the Kotlin SDK\nwith `encodeDefaults = true`) send an explicit `\"currency\": null` for the default — a plain\n`#[serde(default)] Currency` rejects that null with a 400. `Option` accepts absent *and* null;\nboth mean Coins (resolved at the use site)."
+              }
+            ]
           },
           "reason": {
             "type": "string"

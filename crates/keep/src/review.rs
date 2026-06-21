@@ -70,15 +70,13 @@ pub struct RedeemReq {
 pub struct AdjustReq {
     pub command_id: CommandId,
     pub squire: UserId,
-    /// Currency to adjust (SQUIRE-A-0013); omitted ⇒ Coins (back-compat with older Keep callers).
-    #[serde(default = "default_coins")]
-    pub currency: Currency,
+    /// Currency to adjust (SQUIRE-A-0013). `Option` so an explicit `"currency": null` (sent by the
+    /// Kotlin SDK with `encodeDefaults = true`) is accepted as well as an absent field — both ⇒ Coins.
+    /// A plain `#[serde(default)] Currency` rejects an explicit null with a 400.
+    #[serde(default)]
+    pub currency: Option<Currency>,
     pub amount: i64,
     pub reason: String,
-}
-
-fn default_coins() -> Currency {
-    Currency::Coins
 }
 
 /// The small JSON ack the actions return on success.
@@ -151,7 +149,7 @@ pub async fn adjust(
     if req.reason.trim().is_empty() {
         return Err(StatusCode::BAD_REQUEST);
     }
-    let cmd = Command::AdjustPoints { command_id: req.command_id, actor: op.user, squire: req.squire, currency: req.currency, amount: req.amount, reason: req.reason };
+    let cmd = Command::AdjustPoints { command_id: req.command_id, actor: op.user, squire: req.squire, currency: req.currency.unwrap_or(Currency::Coins), amount: req.amount, reason: req.reason };
     state.commit(None, cmd).map_err(domain_status)?;
     Ok(ack())
 }
