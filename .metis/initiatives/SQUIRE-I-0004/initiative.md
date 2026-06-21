@@ -92,15 +92,17 @@ and `/api/config`, but the LAN API does not expose them yet) → SDK regen → A
 - 📝 **SDK regen is automatic** — `clients/squire-android/sdk/build.gradle.kts` sets
   `inputSpec = crates/api/openapi.json`, so the Kotlin SDK regenerates (getConfig/updateConfig/history
   + models) on the next Android gradle build. No separate regen step.
-- ▶ **NEXT — Phase 3 Android UI** (each: ViewModel/command → `KnightApiAdapter` → SDK call → Compose
-  screen → Paparazzi snapshot):
-  1. [[SQUIRE-T-0111]] **Cash payout** — thread `currency = Cash` through the Knight adjust path; add a
-     "Pay" action on each squire card with `cashBalance > 0` (reuse the `AddFundsDialog` pattern,
-     negative amount, cap at owed). Smallest — no new SDK method (adjust exists).
-  2. [[SQUIRE-T-0113]] **Settings/timezone** — new `getConfig`/`updateConfig` SDK calls; a Settings
-     surface off the home dropdown.
-  3. [[SQUIRE-T-0112]] **History** — new `history` SDK call; a read-only History screen.
+- ✅ **2026-06-21** [[SQUIRE-T-0111]] **DONE** — cash payout / "Pay" on the Android Knight app:
+  `KnightStore.pay` (Cash adjust of −amount) + `PayDialog` + per-card "Pay $N" button; knight-core
+  tests green, `:app` compiles, SDK regenerated, snapshot golden unchanged (`7ee2ae3`).
+- ▶ **NEXT — Phase 3 Android UI** (remaining 2 screens; SDK already carries the methods):
+  1. [[SQUIRE-T-0113]] **Settings/timezone** — `getConfig`/`updateConfig` via the adapter; a Settings
+     surface off the home dropdown (current zone + IANA picker → PUT).
+  2. [[SQUIRE-T-0112]] **History** — `history` SDK call; a read-only History screen (feed of recent
+     activity), reachable from the home dropdown.
   Then **Phase 4** cucumber ([[SQUIRE-T-0110]]/[[SQUIRE-T-0114]]/[[SQUIRE-T-0115]]/[[SQUIRE-T-0116]]).
+  Note: these two need a `KnightApiAdapter` method + a read path (the current Knight adapter is
+  command/outbox-oriented; config/history are simple GET/PUT reads — wire them as direct adapter calls).
 
 ## Alternatives Considered
 - *GWT-structured tests in existing frameworks* (no Cucumber) — rejected by operator in favor of true
