@@ -28,8 +28,20 @@ pub use apk_sync::spawn_apk_sync;
 mod updater;
 pub use updater::maybe_self_update;
 
-/// Standard token lifetime: 24h.
-pub const TOKEN_TTL_MS: i64 = 24 * 60 * 60 * 1000;
+/// Default token lifetime: effectively forever (~100 years). Paired devices have no token-refresh
+/// path and a Squire (kid) has no re-login, so a short TTL silently bricks the app daily (it just
+/// reads "offline"); device tokens are revocable via unpair/deactivate, so a very long life is the
+/// right model. Override with `SQUIRE_TOKEN_TTL_MS` (see `token_ttl_ms`).
+pub const TOKEN_TTL_MS: i64 = 100 * 365 * 24 * 60 * 60 * 1000;
+
+/// The effective token lifetime: `SQUIRE_TOKEN_TTL_MS` if set + valid, else [`TOKEN_TTL_MS`].
+pub fn token_ttl_ms() -> i64 {
+    std::env::var("SQUIRE_TOKEN_TTL_MS")
+        .ok()
+        .and_then(|v| v.trim().parse::<i64>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(TOKEN_TTL_MS)
+}
 
 type BoxErr = Box<dyn std::error::Error + Send + Sync>;
 
@@ -60,7 +72,7 @@ pub async fn run_home_server() -> Result<(), BoxErr> {
     let key = signing_key(&data_dir)?;
 
     // Provision-if-absent + open (NEVER wiped). Idempotent on an existing store.
-    let (store, identity) = open_household(&data_dir, &handle, &key, TOKEN_TTL_MS)?;
+    let (store, identity) = open_household(&data_dir, &handle, &key, token_ttl_ms())?;
 
     // Onboarding (ADR A-0011): ensure a household timezone is set.
     let timezone = ensure_timezone(&store);
