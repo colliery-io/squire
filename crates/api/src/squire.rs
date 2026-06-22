@@ -14,8 +14,8 @@ use axum::http::StatusCode;
 use axum::Json;
 
 use domain_core::contract::{
-    Achievement, Change, Command, Criterion, Currency, Date, DomainError, Event, Points, Quest, Scope,
-    Snapshot, Timestamp, UserId,
+    Achievement, Cadence, Change, Command, Criterion, Currency, Date, DomainError, Event, Points, Quest,
+    QuestStatus, Scope, Snapshot, Timestamp, UserId,
 };
 use domain_core::contract::{
     AdjustmentView, ClaimState, ClaimStatus, GoalView, QuestCard, RedemptionState,
@@ -23,7 +23,7 @@ use domain_core::contract::{
     StreakView, SubmitClaimReq, SubmitClaimResp,
 };
 use domain_core::contract::{Clock, Engine, Projections, Repository};
-use domain_core::{quest_status, reward_view, streak_view, Proj};
+use domain_core::{quest_status, reward_view, streak_view, total_completions, Proj};
 
 use crate::auth::RequireSquire;
 use crate::state::AppState;
@@ -250,9 +250,13 @@ fn adjustments(snap: &Snapshot, squire: UserId) -> Vec<AdjustmentView> {
             }
             _ => None,
         })
-        .take(20)
+        .take(RECENT_LIMIT)
         .collect()
 }
+
+/// How many entries each "recent activity" feed surfaces (usage feedback: the lists were growing
+/// unbounded — a repeatable quest/reward spammed dozens of rows). Newest-first, capped.
+const RECENT_LIMIT: usize = 10;
 
 /// Active achievements this Squire has **not yet earned** — "goals to unlock" on the child home
 /// (SQUIRE-T-0094 #3). Streak achievements are shown live in the Streaks section, so they're excluded
@@ -367,14 +371,23 @@ fn quests_today(snap: &Snapshot, squire: UserId, today: Date) -> Vec<QuestCard> 
     snap.quests
         .iter()
         .filter(|q| q.active && quest_relevant_today(snap, squire, q, today))
-        .map(|q| QuestCard {
-            quest_id: q.id,
-            title: q.title.clone(),
-            reward: q.reward,
-            category: q.category.clone(),
-            icon: q.icon.clone(),
-            on: today,
-            status: quest_status(snap, squire, q, today),
+        .filter_map(|q| {
+            let status = quest_status(snap, squire, q, today);
+            // Usage feedback: the active quest log shows only *actionable* quests. A quest that's
+            // been completed (approved) or taken by a sibling drops off here — it lives in the
+            // recent-activity feed instead — so the list shrinks as quests get done.
+            if matches!(status, QuestStatus::CompletedToday | QuestStatus::TakenByOther) {
+                return None;
+            }
+            Some(QuestCard {
+                quest_id: q.id,
+                title: q.title.clone(),
+                reward: q.reward,
+                category: q.category.clone(),
+                icon: q.icon.clone(),
+                on: today,
+                status,
+            })
         })
         .collect()
 }
@@ -385,6 +398,14 @@ fn quests_today(snap: &Snapshot, squire: UserId, today: Date) -> Vec<QuestCard> 
 /// still want to render).
 fn quest_relevant_today(snap: &Snapshot, squire: UserId, quest: &Quest, today: Date) -> bool {
     if !is_assignee(snap, squire, quest) {
+        return false;
+    }
+    // Usage feedback: a one-off quest is *spent* the moment the Squire completes it — it must never
+    // reappear on a later day (unlike a daily, which recurs). Once there's any approved completion
+    // for it, drop it from the Squire's list for good.
+    if matches!(quest.cadence, Cadence::OneOff { .. })
+        && total_completions(snap, squire, &Scope::Quest(quest.id), today) > 0
+    {
         return false;
     }
     let due = Proj::quests_due(snap, squire, today).contains(&quest.id);
@@ -497,6 +518,7 @@ fn rewards(snap: &Snapshot, squire: UserId) -> Vec<RewardCard> {
 fn my_claims(snap: &Snapshot, squire: UserId) -> Vec<ClaimStatus> {
     snap.events
         .iter()
+        .rev() // newest-first, so the recent ones survive the RECENT_LIMIT cap
         .filter_map(|e| match e {
             Event::CompletionClaimed { claim_id, squire: s, quest_id, on, .. } if *s == squire => {
                 let quest_title = snap
@@ -514,6 +536,7 @@ fn my_claims(snap: &Snapshot, squire: UserId) -> Vec<ClaimStatus> {
             }
             _ => None,
         })
+        .take(RECENT_LIMIT)
         .collect()
 }
 
@@ -538,6 +561,7 @@ fn claim_state(snap: &Snapshot, claim_id: domain_core::contract::ClaimId) -> Cla
 fn my_requests(snap: &Snapshot, squire: UserId) -> Vec<RedemptionStatus> {
     snap.events
         .iter()
+        .rev() // newest-first, so the recent ones survive the RECENT_LIMIT cap
         .filter_map(|e| match e {
             Event::RedemptionRequested { request_id, squire: s, item_id, .. } if *s == squire => {
                 let item = snap.items.iter().find(|i| i.id == *item_id);
@@ -550,6 +574,7 @@ fn my_requests(snap: &Snapshot, squire: UserId) -> Vec<RedemptionStatus> {
             }
             _ => None,
         })
+        .take(RECENT_LIMIT)
         .collect()
 }
 

@@ -17,3 +17,9 @@ Feature: Completion claims and Knight review (the credit flow)
     And the Knight approves the claim
     Then the request succeeds
     And Lancelot's coin balance is 5
+
+  Scenario: An approved quest drops off the active list (usage feedback)
+    When Lancelot submits a claim for "Tidy room"
+    Then Lancelot's active quests include "Tidy room"
+    When the Knight approves the claim
+    Then Lancelot's active quests do not include "Tidy room"

@@ -275,6 +275,21 @@ async fn the_server_restarts(world: &mut ApiWorld) {
     world.restart();
 }
 
+#[then(regex = r#"^(\w+)'s active quests (include|do not include) "([^"]+)"$"#)]
+async fn active_quests(world: &mut ApiWorld, name: String, verb: String, title: String) {
+    let (_, token) = world.squire(&name);
+    world.send("GET", "/state", Some(&token), None).await;
+    let present = world.last_body["quests_today"]
+        .as_array()
+        .map(|a| a.iter().any(|q| q["title"].as_str() == Some(title.as_str())))
+        .unwrap_or(false);
+    if verb == "include" {
+        assert!(present, "expected '{title}' in active quests; got {}", world.last_body["quests_today"]);
+    } else {
+        assert!(!present, "expected '{title}' NOT in active quests; got {}", world.last_body["quests_today"]);
+    }
+}
+
 #[tokio::main]
 async fn main() {
     ApiWorld::cucumber().run_and_exit("tests/features").await;
