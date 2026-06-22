@@ -432,18 +432,18 @@ impl Identity for ProdIdentity {
         // Take (lookup + delete = single-use) and confirm the member is still active, under one
         // lock. An unknown code, an inactive member, and (below) an expired code ALL surface as the
         // same `BadToken` so `/pair` is not an enumeration oracle.
-        let (user, role, expires_at) = self.with_tenant_store(household, |store| {
+        let (user, role, expires_at, display_name) = self.with_tenant_store(household, |store| {
             let taken = store.take_pairing_code(&code_hash).ok_or(AuthError::BadToken)?;
-            let (user, role, _exp) = taken;
-            let active = store
+            let (user, role, exp) = taken;
+            // Confirm the member is still active AND grab their display name for the greeting.
+            let name = store
                 .snapshot()
                 .users
                 .iter()
-                .any(|u| u.id == user && u.active && u.role == role);
-            if !active {
-                return Err(AuthError::BadToken);
-            }
-            Ok(taken)
+                .find(|u| u.id == user && u.active && u.role == role)
+                .map(|u| u.display_name.clone())
+                .ok_or(AuthError::BadToken)?;
+            Ok((user, role, exp, name))
         })?;
 
         // Expiry is checked after the take, so an expired code is still consumed (deleted) and can't
@@ -454,6 +454,6 @@ impl Identity for ProdIdentity {
 
         let principal = Principal { household: household.clone(), user, role };
         let token = self.signer.issue(&principal, now, self.token_ttl_ms);
-        Ok(PairResp { token, household: household.clone(), user, role })
+        Ok(PairResp { token, household: household.clone(), user, role, display_name })
     }
 }

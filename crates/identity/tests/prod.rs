@@ -110,6 +110,37 @@ fn add_member_then_login_and_audit() {
     assert_eq!(audit.updated_by, Some(caller.user), "updated_by == caller");
 }
 
+/// Pairing returns the member's display name, so the app can greet them by name ("Hi, <name>!").
+#[test]
+fn pairing_returns_the_members_display_name() {
+    let (id, handle, _inspector, _dir) = local_identity(60_000);
+    let admin = id
+        .register(RegisterHouseholdReq {
+            household_name: "House".into(),
+            admin_name: "Admin".into(),
+            admin_secret: "admin-secret".into(),
+        })
+        .expect("register");
+    let caller = id.verify(&admin.household, &admin.token).expect("admin principal");
+    let added = id
+        .add_member(
+            &caller,
+            AddMemberReq {
+                role: Role::Squire,
+                display_name: "Lancelot".into(),
+                initial_secret: "lake".into(),
+            },
+        )
+        .expect("add_member");
+
+    let minted = id.mint_pairing_code(&caller, added.user).expect("mint pairing code");
+    let paired = id.consume_pairing_code(&handle, &minted.code).expect("consume pairing code");
+
+    assert_eq!(paired.user, added.user);
+    assert_eq!(paired.role, Role::Squire);
+    assert_eq!(paired.display_name, "Lancelot", "PairResp carries the member's display name");
+}
+
 #[test]
 fn add_member_with_squire_caller_is_forbidden() {
     let (id, handle, _inspector, _dir) = local_identity(60_000);

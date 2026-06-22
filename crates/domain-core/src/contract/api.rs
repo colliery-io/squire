@@ -444,4 +444,13 @@ pub struct PairReq { pub household: HouseholdHandle, pub code: String }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct PairResp { pub token: AuthToken, pub household: HouseholdHandle, pub user: UserId, pub role: Role }
+pub struct PairResp {
+    pub token: AuthToken,
+    pub household: HouseholdHandle,
+    pub user: UserId,
+    pub role: Role,
+    /// The paired member's display name, so the app can greet them by name ("Hi, <name>!"). `serde(default)`
+    /// for back-compat with older servers that don't send it (the app falls back to a generic header).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub display_name: String,
+}

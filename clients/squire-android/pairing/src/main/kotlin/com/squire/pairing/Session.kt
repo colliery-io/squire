@@ -16,6 +16,9 @@ data class Session(
     val token: String,
     val user: Long,
     val role: String,
+    /** The member's display name, for the "Hi, <name>!" header. Default "" so older stored sessions
+     *  (saved before this field existed) still deserialize; the app falls back to a generic header. */
+    val displayName: String = "",
 ) {
     val baseUrl: String get() = "http://$host:$port"
 }
