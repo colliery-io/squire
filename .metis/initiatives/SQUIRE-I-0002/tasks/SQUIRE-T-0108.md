@@ -20,7 +20,24 @@ initiative_id: SQUIRE-I-0002
 
 # Stable code-signing for squire-serve (macOS Local Network permission)
 
-## Root cause (diagnosed 2026-06-21 — the "nothing submits" saga)
+## ⚠️ Causation UNCERTAIN — re-evaluated 2026-06-21 (operator skeptical)
+The "ad-hoc re-signing churns the grant" mechanism below is an **inference, not confirmed**. Counter-
+evidence: the binary was rebuilt/restarted several times during the saga but the operator was prompted
+**once**, and the grant **held across subsequent restarts** — consistent with a **one-time first grant
+macOS surfaced late**, not a per-update churn. Also, for a **bare CLI binary** (no bundle id) macOS may
+key the Local-Network grant by **path**, not cdhash → re-signing wouldn't re-prompt at all.
+
+**Empirical test in flight:** the **v0.7.10** release (cut via GitHub 2026-06-21) self-updates prod to a
+**CI-built binary with a different signature** than the running local one. If the kid's submit then
+works with **no new prompt** → no churn → **this task is unnecessary** (close as won't-fix). If it
+re-prompts → churn confirmed → proceed with a stable signing identity (operator chose **self-signed
+local cert**, $0).
+
+**Alternative that moots this entirely:** run squire-serve in a **container** (Docker Desktop now / the
+cloud box per [[SQUIRE-A-0016]] + [[SQUIRE-I-0003]]) — no TCC-gated native binary at all. Parked as a
+cloud-direction option, not an urgent fix, pending the v0.7.10 churn-test result.
+
+## Original root-cause hypothesis (diagnosed 2026-06-21 — the "nothing submits" saga)
 
 macOS Sequoia's **Local Network privacy** gates any app that uses the local network / Bonjour-mDNS.
 `squire-serve` advertises `_squire._tcp` via mDNS **and** serves the LAN, so it needs the **"Local
