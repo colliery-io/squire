@@ -105,6 +105,22 @@ impl HistoryEntryDto {
                 reason: reason.clone(),
                 ..base(at.0, "RedemptionRejected", squire.0)
             },
+            Event::CashOutRequested { squire, amount, at, .. } => HistoryEntryDto {
+                amount: Some(*amount),
+                currency: Some(Currency::Cash),
+                ..base(at.0, "CashOutRequested", squire.0)
+            },
+            Event::CashOutApproved { squire, actor, amount, at, .. } => HistoryEntryDto {
+                actor: actor.map(|u| u.0 as i64),
+                amount: Some(-*amount),
+                currency: Some(Currency::Cash),
+                ..base(at.0, "CashedOut", squire.0)
+            },
+            Event::CashOutRejected { squire, actor, reason, at, .. } => HistoryEntryDto {
+                actor: actor.map(|u| u.0 as i64),
+                reason: reason.clone(),
+                ..base(at.0, "CashOutRejected", squire.0)
+            },
         }
     }
 }

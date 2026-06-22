@@ -18,9 +18,9 @@ use domain_core::contract::{
     QuestStatus, Scope, Snapshot, Timestamp, UserId,
 };
 use domain_core::contract::{
-    AdjustmentView, ClaimState, ClaimStatus, GoalView, QuestCard, RedemptionState,
-    RedemptionStatus, RequestRedemptionReq, RequestRedemptionResp, RewardCard, StateView,
-    StreakView, SubmitClaimReq, SubmitClaimResp,
+    AdjustmentView, CashOutStatus, ClaimState, ClaimStatus, GoalView, QuestCard, RedemptionState,
+    RedemptionStatus, RequestCashOutReq, RequestCashOutResp, RequestRedemptionReq,
+    RequestRedemptionResp, RewardCard, StateView, StreakView, SubmitClaimReq, SubmitClaimResp,
 };
 use domain_core::contract::{Clock, Engine, Projections, Repository};
 use domain_core::{quest_status, reward_view, streak_view, total_completions, Proj};
@@ -142,6 +142,43 @@ pub async fn request_redemption(
     }))
 }
 
+/// POST /cash-out-requests — a Squire requests to "cash out" `amount` whole dollars of owed Cash
+/// (SQUIRE-T-0118). Idempotent on `request_id`; reviewed like a redemption (approval draws the Cash
+/// down). Affordability (owed ≥ amount) is checked now and re-checked at approval.
+#[utoipa::path(
+    post,
+    path = "/cash-out-requests",
+    tag = "squire",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    request_body = RequestCashOutReq,
+    responses(
+        (status = 200, description = "The cash-out request's state (always Pending)", body = RequestCashOutResp),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Squire"),
+        (status = 409, description = "Amount is not positive or exceeds the owed Cash"),
+    ),
+)]
+pub async fn request_cashout(
+    State(state): State<Arc<AppState>>,
+    RequireSquire(principal): RequireSquire,
+    Json(req): Json<RequestCashOutReq>,
+) -> Result<Json<RequestCashOutResp>, StatusCode> {
+    let squire = principal.user;
+    let cmd = Command::RequestCashOut {
+        request_id: req.request_id,
+        squire,
+        amount: req.amount,
+    };
+    handle_command(&state, None, cmd).map_err(domain_status)?;
+    Ok(Json(RequestCashOutResp {
+        request_id: req.request_id,
+        state: RedemptionState::pending(),
+    }))
+}
+
 // ─── command helper (reused by T-0016) ──────────────────────────────────────
 
 /// Lock the store, snapshot, run the command through the engine, and on success apply the
@@ -217,6 +254,7 @@ pub(crate) fn assemble_state(
     let rewards = rewards(snap, squire);
     let my_claims = my_claims(snap, squire);
     let my_requests = my_requests(snap, squire);
+    let my_cashouts = my_cashouts(snap, squire);
     let adjustments = adjustments(snap, squire);
 
     StateView {
@@ -231,6 +269,7 @@ pub(crate) fn assemble_state(
         rewards,
         my_claims,
         my_requests,
+        my_cashouts,
         adjustments,
     }
 }
@@ -587,6 +626,42 @@ fn redemption_state(snap: &Snapshot, request_id: domain_core::contract::RequestI
                 return RedemptionState::approved();
             }
             Event::RedemptionRejected { request_id: r, reason, .. } if *r == request_id => {
+                return RedemptionState::rejected(reason.clone());
+            }
+            _ => {}
+        }
+    }
+    RedemptionState::pending()
+}
+
+/// The Squire's own cash-out requests, each with amount + current state (SQUIRE-T-0118), newest-first.
+fn my_cashouts(snap: &Snapshot, squire: UserId) -> Vec<CashOutStatus> {
+    snap.events
+        .iter()
+        .rev()
+        .filter_map(|e| match e {
+            Event::CashOutRequested { request_id, squire: s, amount, .. } if *s == squire => {
+                Some(CashOutStatus {
+                    request_id: *request_id,
+                    amount: *amount,
+                    state: cashout_state(snap, *request_id),
+                })
+            }
+            _ => None,
+        })
+        .take(RECENT_LIMIT)
+        .collect()
+}
+
+/// The resolution of one cash-out request: `Approved` (a `CashOutApproved` carries the `request_id`),
+/// `Rejected { reason }`, or `Pending`. Reuses [`RedemptionState`] on the wire (SQUIRE-T-0118).
+fn cashout_state(snap: &Snapshot, request_id: domain_core::contract::RequestId) -> RedemptionState {
+    for e in &snap.events {
+        match e {
+            Event::CashOutApproved { request_id: r, .. } if *r == request_id => {
+                return RedemptionState::approved();
+            }
+            Event::CashOutRejected { request_id: r, reason, .. } if *r == request_id => {
                 return RedemptionState::rejected(reason.clone());
             }
             _ => {}

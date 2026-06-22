@@ -423,6 +423,7 @@ pub fn router(state: Arc<KeepState>) -> Router {
         .route("/api/review", get(review::get_review))
         .route("/api/review/claim", post(review::review_claim))
         .route("/api/review/redemption", post(review::review_redemption))
+        .route("/api/review/cashout", post(review::review_cashout))
         .route("/api/redeem", post(review::redeem))
         .route("/api/adjust", post(review::adjust))
         // ── Read-only event-log inspector (SQUIRE-T-0030) ──────────────────────

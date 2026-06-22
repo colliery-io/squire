@@ -986,6 +986,65 @@
         ]
       }
     },
+    "/admin/review-cashout": {
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/review-cashout` — approve (→ `CashOutApproved`, drawing down owed Cash) / reject a\nSquire's cash-out request (SQUIRE-T-0118). A second review is `AlreadyReviewed` → 409.",
+        "operationId": "review_cashout",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCashOutReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ack"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "Request not found"
+          },
+          "409": {
+            "description": "Request already reviewed, or owed Cash no longer covers it"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/admin/review-claim": {
       "post": {
         "tags": [
@@ -1151,6 +1210,62 @@
           },
           "404": {
             "description": "No such active Squire"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/cash-out-requests": {
+      "post": {
+        "tags": [
+          "squire"
+        ],
+        "summary": "POST /cash-out-requests — a Squire requests to \"cash out\" `amount` whole dollars of owed Cash\n(SQUIRE-T-0118). Idempotent on `request_id`; reviewed like a redemption (approval draws the Cash\ndown). Affordability (owed ≥ amount) is checked now and re-checked at approval.",
+        "operationId": "request_cashout",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCashOutReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The cash-out request's state (always Pending)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestCashOutResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Squire"
+          },
+          "409": {
+            "description": "Amount is not positive or exceeds the owed Cash"
           }
         },
         "security": [
@@ -1776,6 +1891,27 @@
           "OneOff"
         ]
       },
+      "CashOutStatus": {
+        "type": "object",
+        "description": "A Squire's cash-out request + its review state (SQUIRE-T-0118); `state` reuses [`RedemptionState`].",
+        "required": [
+          "request_id",
+          "amount",
+          "state"
+        ],
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/RequestId"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RedemptionState"
+          }
+        }
+      },
       "Category": {
         "type": "string",
         "description": "Free-form text labels — the parent types whatever grouping they like."
@@ -2369,6 +2505,13 @@
             },
             "description": "Active redeemable items the Knight can direct-redeem on a Squire's behalf (REQ-K5)."
           },
+          "pending_cashouts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingCashOut"
+            },
+            "description": "Pending cash-out requests across all Squires (SQUIRE-T-0118), each labeled with its Squire.\n`#[serde(default)]` for back-compat with older servers."
+          },
           "pending_claims": {
             "type": "array",
             "items": {
@@ -2626,6 +2769,27 @@
             "$ref": "#/components/schemas/AuthToken"
           },
           "user": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
+      "PendingCashOut": {
+        "type": "object",
+        "description": "A pending cash-out in the Knight's review queue (SQUIRE-T-0118), labeled with its Squire.",
+        "required": [
+          "request_id",
+          "squire",
+          "amount"
+        ],
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/RequestId"
+          },
+          "squire": {
             "$ref": "#/components/schemas/UserId"
           }
         }
@@ -2909,6 +3073,38 @@
           }
         }
       },
+      "RequestCashOutReq": {
+        "type": "object",
+        "description": "POST /cash-out-requests — idempotent on `request_id` (phone-minted). `amount` is whole dollars of\nowed Cash to draw down; re-checked at approval, mirroring a redemption (SQUIRE-T-0118).",
+        "required": [
+          "request_id",
+          "amount"
+        ],
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/RequestId"
+          }
+        }
+      },
+      "RequestCashOutResp": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "state"
+        ],
+        "properties": {
+          "request_id": {
+            "$ref": "#/components/schemas/RequestId"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RedemptionState"
+          }
+        }
+      },
       "RequestId": {
         "type": "integer",
         "format": "int64"
@@ -2941,6 +3137,22 @@
           },
           "state": {
             "$ref": "#/components/schemas/RedemptionState"
+          }
+        }
+      },
+      "ReviewCashOutReq": {
+        "type": "object",
+        "description": "`POST /admin/review-cashout` body (SQUIRE-T-0118).",
+        "required": [
+          "request_id",
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/DecisionDto"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/RequestId"
           }
         }
       },
@@ -3114,6 +3326,13 @@
               "$ref": "#/components/schemas/GoalView"
             },
             "description": "Achievements not yet earned — \"goals to unlock\" on the child home (SQUIRE-T-0094 #3), so every\navailable achievement (not only the in-progress streaks) is visible to work toward.\n`#[serde(default)]` so an older server's payload still deserializes."
+          },
+          "my_cashouts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashOutStatus"
+            },
+            "description": "Cash-out requests the Squire has made (SQUIRE-T-0118) — drawing down owed Cash, parent-approved.\n`#[serde(default)]` for back-compat with older servers."
           },
           "my_claims": {
             "type": "array",

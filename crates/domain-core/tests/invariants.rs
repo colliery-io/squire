@@ -236,6 +236,9 @@ fn snapshot_for_squire(repo: &InMemoryRepository, squire: UserId) -> Snapshot {
         Event::Adjusted { squire: s, .. } => *s == squire,
         Event::RedemptionRequested { squire: s, .. } => *s == squire,
         Event::RedemptionRejected { squire: s, .. } => *s == squire,
+        Event::CashOutRequested { squire: s, .. } => *s == squire,
+        Event::CashOutApproved { squire: s, .. } => *s == squire,
+        Event::CashOutRejected { squire: s, .. } => *s == squire,
     });
     snap
 }

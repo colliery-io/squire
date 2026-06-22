@@ -56,9 +56,11 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/state", get(squire::get_state))
         .route("/claims", post(squire::submit_claim))
         .route("/redemption-requests", post(squire::request_redemption))
+        .route("/cash-out-requests", post(squire::request_cashout))
         // ── Knight-role privileged endpoints (SQUIRE-T-0016) ───────────────────
         .route("/admin/review-claim", post(knight::review_claim))
         .route("/admin/review-redemption", post(knight::review_redemption))
+        .route("/admin/review-cashout", post(knight::review_cashout))
         .route("/admin/redeem", post(knight::redeem))
         .route("/admin/adjust", post(knight::adjust))
         .route("/admin/hazards", get(knight::list_hazards).put(knight::set_hazards))

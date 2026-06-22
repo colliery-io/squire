@@ -16,7 +16,9 @@ pub struct DomainEngine;
 pub fn child_originable(cmd: &Command) -> bool {
     matches!(
         cmd,
-        Command::SubmitClaim { .. } | Command::RequestRedemption { .. }
+        Command::SubmitClaim { .. }
+            | Command::RequestRedemption { .. }
+            | Command::RequestCashOut { .. }
     )
 }
 
@@ -64,7 +66,9 @@ impl Engine for DomainEngine {
             Command::RequestRedemption { .. }
             | Command::ReviewRedemption { .. }
             | Command::RedeemItem { .. }
-            | Command::AdjustPoints { .. } => crate::redemption::handle(snap, cmd, clock),
+            | Command::AdjustPoints { .. }
+            | Command::RequestCashOut { .. }
+            | Command::ReviewCashOut { .. } => crate::redemption::handle(snap, cmd, clock),
         }
     }
 }

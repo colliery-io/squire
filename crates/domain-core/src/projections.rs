@@ -30,6 +30,9 @@ impl Projections for Proj {
                 Event::ItemRedeemed { squire: s, cost, .. } if *s == squire && currency == Currency::Coins => -(*cost as i64),
                 Event::AchievementUnlocked { squire: s, bonus, .. } if *s == squire && currency == Currency::Coins => *bonus as i64,
                 Event::Adjusted { squire: s, currency: c, amount, .. } if *s == squire && *c == currency => *amount,
+                // An approved cash-out draws down owed Cash (SQUIRE-T-0118) — the Cash analogue of
+                // `ItemRedeemed` for coins.
+                Event::CashOutApproved { squire: s, amount, .. } if *s == squire && currency == Currency::Cash => -*amount,
                 _ => 0,
             })
             .sum()

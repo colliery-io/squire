@@ -11,7 +11,7 @@ archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -50,10 +50,24 @@ the **Cash** currency instead of spending coins.
 - **Cleanup:** remove the now-dead `onPay`/`PayDialog`/`KnightStore.pay` once this lands (or repurpose).
 
 ## Acceptance
-- [ ] A squire owed cash can request a cash-out; the parent approves it in the review queue; owed → 0
-  with an `Adjusted{Cash,−}` event; reject leaves it owed.
-- [ ] No per-squire Pay button anywhere; cards stay uniform.
-- [ ] Gherkin scenario green.
+- [x] A squire owed cash can request a cash-out; the parent approves it in the review queue; owed → 0
+  via a `CashOutApproved` event (counted as a Cash debit); reject leaves it owed. **(backend done)**
+- [x] No per-squire Pay button anywhere; cards stay uniform. **(done earlier in the redesign)**
+- [x] Gherkin scenario green — `crates/api/tests/features/cashout.feature` (4 scenarios). **(done)**
+- [ ] Android: child "Cash out $X" in Rewards; parent review-queue renders pending cash-outs.
+
+## Progress (2026-06-22)
+**Backend complete + green** (full Rust suite + 4 Gherkin scenarios). Model as built:
+- Events `CashOutRequested` / `CashOutApproved` (the Cash debit + resolution marker, counted in
+  `balance_in` for `Currency::Cash`) / `CashOutRejected`. Commands `RequestCashOut` (child-originable)
+  / `ReviewCashOut`. Engine handlers in `redemption.rs` (affordability re-checked at approve).
+- Store encode/decode reuse existing columns (no schema change). `StateView.my_cashouts`,
+  `HouseholdReview.pending_cashouts`. Routes `POST /cash-out-requests`, `POST /admin/review-cashout`
+  (+ Keep `/api/review/cashout`). openapi.json re-frozen.
+- Over-cash-out (amount > owed) → 409, like a blocked redeem.
+
+**Remaining: Android UI** — SDK regenerates from openapi.json on build; then wire the child Rewards
+"Cash out $X" action + the parent Review-tab pending-cashout rows.
 
 ## Note
 Deferred behind shipping the home redesign (tabs + first-name headers + uniform cards). Build as its

@@ -28,6 +28,12 @@ pub(crate) fn handle(
         Command::AdjustPoints { command_id, actor, squire, currency, amount, reason } => {
             adjust(snap, command_id, actor, squire, currency, amount, reason, clock)
         }
+        Command::RequestCashOut { request_id, squire, amount } => {
+            request_cashout(snap, request_id, squire, amount, clock)
+        }
+        Command::ReviewCashOut { actor, request_id, decision } => {
+            review_cashout(snap, actor, request_id, decision, clock)
+        }
         _ => unreachable!("redemption::handle only receives redemption/ledger commands"),
     }
 }
@@ -123,6 +129,75 @@ fn commit_redeem(
         cost: item.cost,
         at: clock.now(),
     })])
+}
+
+// ── Cash-out (T-0118): a Squire requests to draw down owed Cash; reviewed like a redemption ──
+
+/// A cash-out must be a positive whole-dollar amount no larger than the Squire's currently-owed
+/// Cash. Re-used at request and at commit (owed can change in between), mirroring `can_redeem`.
+fn check_cashout_affordable(snap: &Snapshot, squire: UserId, amount: i64) -> Result<(), DomainError> {
+    let owed = Proj::balance_in(snap, squire, Currency::Cash);
+    if amount <= 0 || owed < amount {
+        return Err(DomainError::Redeem(Blocked::InsufficientPoints {
+            needed: amount.max(0) as Points,
+            have: owed,
+        }));
+    }
+    Ok(())
+}
+
+fn request_cashout(
+    snap: &Snapshot,
+    request_id: RequestId,
+    squire: UserId,
+    amount: i64,
+    clock: &dyn Clock,
+) -> Result<Vec<Change>, DomainError> {
+    // Idempotent on the phone-minted request_id; reserves nothing (mirrors redemption FR-R5).
+    if cashout_meta(snap, request_id).is_some() {
+        return Ok(Vec::new());
+    }
+    require_active_squire(snap, squire)?;
+    check_cashout_affordable(snap, squire, amount)?;
+    Ok(vec![Change::Append(Event::CashOutRequested {
+        request_id,
+        squire,
+        amount,
+        at: clock.now(),
+    })])
+}
+
+fn review_cashout(
+    snap: &Snapshot,
+    actor: UserId,
+    request_id: RequestId,
+    decision: Decision,
+    clock: &dyn Clock,
+) -> Result<Vec<Change>, DomainError> {
+    let (squire, amount) = cashout_meta(snap, request_id).ok_or(DomainError::RequestNotFound)?;
+    if cashout_resolved(snap, request_id) {
+        return Err(DomainError::AlreadyReviewed);
+    }
+    match decision {
+        Decision::Approve => {
+            // Re-check at commit — the owed Cash may have changed since the request (FR-R4 analogue).
+            check_cashout_affordable(snap, squire, amount)?;
+            Ok(vec![Change::Append(Event::CashOutApproved {
+                request_id,
+                squire,
+                actor: Some(actor),
+                amount,
+                at: clock.now(),
+            })])
+        }
+        Decision::Reject { reason } => Ok(vec![Change::Append(Event::CashOutRejected {
+            request_id,
+            squire,
+            actor: Some(actor),
+            reason,
+            at: clock.now(),
+        })]),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

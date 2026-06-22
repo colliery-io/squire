@@ -788,6 +788,26 @@ impl EventRow {
                 r.reason = reason.clone();
                 r
             }
+            Event::CashOutRequested { request_id, squire, amount, at } => {
+                let mut r = empty_event_row(seq, "CashOutRequested", *squire, *at);
+                r.request_id = Some(id_to_text(request_id.0));
+                r.amount = Some(*amount);
+                r
+            }
+            Event::CashOutApproved { request_id, squire, actor, amount, at } => {
+                let mut r = empty_event_row(seq, "CashOutApproved", *squire, *at);
+                r.request_id = Some(id_to_text(request_id.0));
+                r.actor = opt_user_to_text(*actor);
+                r.amount = Some(*amount);
+                r
+            }
+            Event::CashOutRejected { request_id, squire, actor, reason, at } => {
+                let mut r = empty_event_row(seq, "CashOutRejected", *squire, *at);
+                r.request_id = Some(id_to_text(request_id.0));
+                r.actor = opt_user_to_text(*actor);
+                r.reason = reason.clone();
+                r
+            }
         }
     }
 
@@ -858,6 +878,26 @@ impl EventRow {
                 at,
             },
             "RedemptionRejected" => Event::RedemptionRejected {
+                request_id: RequestId(self.req_id("request_id", &self.request_id)?),
+                squire,
+                actor,
+                reason: self.reason.clone(),
+                at,
+            },
+            "CashOutRequested" => Event::CashOutRequested {
+                request_id: RequestId(self.req_id("request_id", &self.request_id)?),
+                squire,
+                amount: self.req_int("amount", self.amount)?,
+                at,
+            },
+            "CashOutApproved" => Event::CashOutApproved {
+                request_id: RequestId(self.req_id("request_id", &self.request_id)?),
+                squire,
+                actor,
+                amount: self.req_int("amount", self.amount)?,
+                at,
+            },
+            "CashOutRejected" => Event::CashOutRejected {
                 request_id: RequestId(self.req_id("request_id", &self.request_id)?),
                 squire,
                 actor,

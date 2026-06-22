@@ -17,8 +17,8 @@ use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
     ClaimId, Clock, Command, CommandId, Currency, Date, Decision, Event, HouseholdReview, ItemId,
-    ItemOption, PendingClaim, PendingRequest, Projections, QuestOption, RequestId, Role, Snapshot,
-    SquireSummary, Timestamp, UserId,
+    ItemOption, PendingCashOut, PendingClaim, PendingRequest, Projections, QuestOption, RequestId,
+    Role, Snapshot, SquireSummary, Timestamp, UserId,
 };
 use domain_core::Proj;
 
@@ -53,6 +53,13 @@ pub struct ReviewClaimReq {
 /// `POST /api/review/redemption` body.
 #[derive(Clone, Debug, Deserialize)]
 pub struct ReviewRedemptionReq {
+    pub request_id: RequestId,
+    pub decision: DecisionDto,
+}
+
+/// `POST /api/review/cashout` body (SQUIRE-T-0118).
+#[derive(Clone, Debug, Deserialize)]
+pub struct ReviewCashOutReq {
     pub request_id: RequestId,
     pub decision: DecisionDto,
 }
@@ -127,6 +134,18 @@ pub async fn review_redemption(
     Ok(ack())
 }
 
+/// `POST /api/review/cashout` — approve (→ `CashOutApproved`, drawing down owed Cash) / reject a
+/// cash-out request (SQUIRE-T-0118). Owed Cash no longer covering it at approval fails → 409.
+pub async fn review_cashout(
+    State(state): State<Arc<KeepState>>,
+    Operator(op): Operator,
+    Json(req): Json<ReviewCashOutReq>,
+) -> Result<Json<Ack>, StatusCode> {
+    let cmd = Command::ReviewCashOut { actor: op.user, request_id: req.request_id, decision: req.decision.into() };
+    state.commit(None, cmd).map_err(domain_status)?;
+    Ok(ack())
+}
+
 /// `POST /api/redeem` — a direct redeem for `squire` (no prior request). Idempotent on
 /// `command_id`: a replay yields an empty change set → still success.
 pub async fn redeem(
@@ -163,6 +182,7 @@ fn assemble_review(snap: &Snapshot, now: Timestamp, today: Date) -> HouseholdRev
         squires: squire_summaries(snap),
         pending_claims: pending_claims(snap),
         pending_requests: pending_requests(snap),
+        pending_cashouts: pending_cashouts(snap),
         items: snap
             .items
             .iter()
@@ -237,5 +257,24 @@ fn request_resolved(snap: &Snapshot, request_id: RequestId) -> bool {
     snap.events.iter().any(|e| {
         matches!(e,
             Event::ItemRedeemed { request_id: Some(r), .. } | Event::RedemptionRejected { request_id: r, .. } if *r == request_id)
+    })
+}
+
+fn pending_cashouts(snap: &Snapshot) -> Vec<PendingCashOut> {
+    snap.events
+        .iter()
+        .filter_map(|e| match e {
+            Event::CashOutRequested { request_id, squire, amount, .. } if !cashout_resolved(snap, *request_id) => {
+                Some(PendingCashOut { request_id: *request_id, squire: *squire, amount: *amount })
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn cashout_resolved(snap: &Snapshot, request_id: RequestId) -> bool {
+    snap.events.iter().any(|e| {
+        matches!(e,
+            Event::CashOutApproved { request_id: r, .. } | Event::CashOutRejected { request_id: r, .. } if *r == request_id)
     })
 }
