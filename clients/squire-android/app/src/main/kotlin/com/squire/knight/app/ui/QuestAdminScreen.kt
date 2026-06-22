@@ -109,6 +109,7 @@ internal fun QuestAdminScreen(
 
     // ── create-form state ──
     var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
     var reward by remember { mutableStateOf("5") }
     var cash by remember { mutableStateOf("0") } // real-money $ award (SQUIRE-T-0099)
     var category by remember { mutableStateOf("") }
@@ -125,7 +126,7 @@ internal fun QuestAdminScreen(
     var formError by remember { mutableStateOf<String?>(null) }
 
     fun resetForm() {
-        title = ""; reward = "5"; cash = "0"; category = ""; cadence = "Daily"
+        title = ""; description = ""; reward = "5"; cash = "0"; category = ""; cadence = "Daily"
         weekdays.clear(); completion = "EachAssignee"; assignAll = true
         chosenSquires.clear(); repeatDay = false; autoApprove = false
         due = null; dueLabel = null; formError = null
@@ -155,6 +156,7 @@ internal fun QuestAdminScreen(
                 reward = rewardN,
                 cash = cash.toLongOrNull() ?: 0,
                 title = title.trim(),
+                description = description.trim().ifBlank { null },
                 category = category.trim().ifBlank { null },
                 due = if (cadence == "OneOff") due else null,
                 id = null,
@@ -196,6 +198,7 @@ internal fun QuestAdminScreen(
                 ) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description (optional)") }, modifier = Modifier.fillMaxWidth())
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                             OutlinedTextField(value = reward, onValueChange = { reward = it.filter(Char::isDigit) }, label = { Text("Reward coins") }, singleLine = true, modifier = Modifier.weight(1f))
                             OutlinedTextField(value = cash, onValueChange = { cash = it.filter(Char::isDigit) }, label = { Text("Cash $") }, singleLine = true, modifier = Modifier.weight(1f))
