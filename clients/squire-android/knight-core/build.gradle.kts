@@ -12,10 +12,18 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)
+
+    // Gherkin/Cucumber acceptance suite (SQUIRE-T-0115): true `.feature` files driving the Knight
+    // offline store on the JVM (no emulator), same scenario vocabulary as the api/Keep suites.
+    testImplementation("io.cucumber:cucumber-java:7.18.1")
+    testImplementation("io.cucumber:cucumber-junit-platform-engine:7.18.1")
+    testImplementation("org.junit.platform:junit-platform-suite:1.10.2")
 }
 
 tasks.test {
     useJUnitPlatform()
+    // Cucumber's JUnit Platform engine discovers features via the suite runner below.
+    systemProperty("cucumber.junit-platform.naming-strategy", "long")
 }
 
 kotlin {
