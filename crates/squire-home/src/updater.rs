@@ -20,16 +20,28 @@ pub fn maybe_self_update() {
     let repo = std::env::var("SQUIRE_DIST_REPO").unwrap_or_else(|_| "colliery-io/squire".to_string());
     let (owner, name) = repo.split_once('/').unwrap_or(("colliery-io", "squire"));
 
-    let outcome = self_update::backends::github::Update::configure()
+    // Authenticate the GitHub API calls when a token is configured (SQUIRE-T-0117): unauthenticated
+    // is 60 req/hr/IP and 403s under repeated restarts; a token lifts it to 5000/hr. Optional —
+    // without one we keep working, just rate-limited (logged).
+    let mut builder = self_update::backends::github::Update::configure();
+    builder
         .repo_owner(owner)
         .repo_name(name)
         .bin_name("squire-serve")
         .current_version(env!("CARGO_PKG_VERSION"))
         .no_confirm(true)
         .show_download_progress(false)
-        .show_output(false)
-        .build()
-        .and_then(|u| u.update());
+        .show_output(false);
+    match update_token() {
+        Some(tok) => {
+            builder.auth_token(&tok);
+        }
+        None => eprintln!(
+            "self-update: no SQUIRE_UPDATE_TOKEN/GITHUB_TOKEN set — using the unauthenticated GitHub \
+             API (60 req/hr; updates may be rate-limited)"
+        ),
+    }
+    let outcome = builder.build().and_then(|u| u.update());
 
     match outcome {
         Ok(self_update::Status::Updated(v)) => {
@@ -39,6 +51,17 @@ pub fn maybe_self_update() {
         Ok(self_update::Status::UpToDate(_)) => {}
         Err(e) => eprintln!("self-update: {e} (continuing on the current build)"),
     }
+}
+
+/// A GitHub token for the update API calls — raises the 60→5000 req/hr rate limit (SQUIRE-T-0117).
+/// Reads `SQUIRE_UPDATE_TOKEN`, then `GITHUB_TOKEN`. For the **public** dist repo any valid token
+/// works (no scopes needed). `None` ⇒ unauthenticated (rate-limited but functional).
+pub(crate) fn update_token() -> Option<String> {
+    ["SQUIRE_UPDATE_TOKEN", "GITHUB_TOKEN"]
+        .iter()
+        .find_map(|k| std::env::var(k).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
 }
 
 /// True when the running exe lives under a `target/` dir — i.e. a `cargo build`/`cargo run` artifact.

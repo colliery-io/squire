@@ -56,9 +56,12 @@ async fn sync_once(
     dir: &Path,
 ) -> Result<Option<String>, String> {
     let url = format!("https://api.github.com/repos/{repo}/releases/latest");
-    let resp = client
-        .get(&url)
-        .header("Accept", "application/vnd.github+json")
+    // Authenticate when a token is set (SQUIRE-T-0117) to dodge the 60 req/hr unauthenticated 403s.
+    let mut req = client.get(&url).header("Accept", "application/vnd.github+json");
+    if let Some(tok) = crate::updater::update_token() {
+        req = req.header("Authorization", format!("Bearer {tok}"));
+    }
+    let resp = req
         .send()
         .await
         .map_err(|e| format!("fetch latest release: {e}"))?;
