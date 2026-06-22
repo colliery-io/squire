@@ -2180,6 +2180,13 @@
           "completion": {
             "$ref": "#/components/schemas/CompletionDto"
           },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional authored blurb shown in the Squire's quest detail (SQUIRE-T-0094 #8). `serde(default)`\nfor back-compat with older clients that omit it."
+          },
           "due": {
             "oneOf": [
               {
@@ -2956,6 +2963,13 @@
           },
           "completion": {
             "$ref": "#/components/schemas/CompletionDto"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The authored blurb (so the editor can pre-fill it on edit). `serde(default)` for back-compat."
           },
           "id": {
             "$ref": "#/components/schemas/QuestId"

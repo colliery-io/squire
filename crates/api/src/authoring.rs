@@ -90,6 +90,10 @@ pub struct CreateQuestReq {
     /// Existing quest id to edit (upsert), or null/absent to create a new one (the server assigns).
     pub id: Option<QuestId>,
     pub title: String,
+    /// Optional authored blurb shown in the Squire's quest detail (SQUIRE-T-0094 #8). `serde(default)`
+    /// for back-compat with older clients that omit it.
+    #[serde(default)]
+    pub description: Option<String>,
     pub reward: i64,
     /// Real-money award in whole dollars (SQUIRE-T-0099); omitted ⇒ 0 (no cash), back-compat.
     #[serde(default)]
@@ -124,6 +128,9 @@ pub struct CreatedQuest {
 pub struct QuestSummaryDto {
     pub id: QuestId,
     pub title: String,
+    /// The authored blurb (so the editor can pre-fill it on edit). `serde(default)` for back-compat.
+    #[serde(default)]
+    pub description: Option<String>,
     pub reward: i64,
     pub category: Option<String>,
     /// e.g. "Daily", "Mon/Wed/Fri", "One-time".
@@ -183,7 +190,7 @@ pub async fn create_quest(
     let quest = Quest {
         id,
         title: req.title,
-        description: None,
+        description: req.description.filter(|d| !d.trim().is_empty()),
         category: req.category.filter(|c| !c.is_empty()).map(domain_core::contract::Category),
         reward: req.reward.max(0) as u32,
         cash: req.cash.max(0) as u32,
@@ -224,6 +231,7 @@ pub async fn list_quests(
         .map(|q| QuestSummaryDto {
             id: q.id,
             title: q.title.clone(),
+            description: q.description.clone(),
             reward: q.reward as i64,
             category: q.category.as_ref().map(|c| c.0.clone()),
             cadence_label: cadence_label(&q.cadence),
