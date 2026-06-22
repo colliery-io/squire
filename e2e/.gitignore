@@ -3,3 +3,4 @@ test-results/
 playwright-report/
 playwright/.cache/
 screens/
+.features-gen/
