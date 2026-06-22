@@ -17,7 +17,11 @@ pub struct Quest {
     pub description: Option<String>,
     pub category: Option<Category>, // powers category-scoped streaks + UI grouping
     pub reward: Points,             // base coin award; snapshotted at approval time
-    pub cash: Points,               // real-money award in whole dollars (0 = none); accrues on approval (SQUIRE-T-0099)
+    // Real-money award in whole dollars (0 = none); accrues on approval (SQUIRE-T-0099). `serde(default)`
+    // so a client that omits `cash` (e.g. the Keep's library import) gets 0 rather than a deserialize
+    // error — the cash analog of the null-currency trap (SQUIRE-T-0109).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub cash: Points,
     pub cadence: Cadence,
     pub assignment: Assignment,     // which Squires this quest is for (always ≥ 1)
     pub completion: Completion,     // each assignee does their own, vs. first-to-win
