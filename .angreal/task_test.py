@@ -20,10 +20,20 @@ def _snapshots():
     return gradle(":app:verifyPaparazziDebug")
 
 
+def _android_unit():
+    # JVM unit + Gherkin (cucumber-jvm) tests for the shared Android modules — no emulator.
+    # Includes the Knight Gherkin suite (`:knight-core` RunCucumberTest, SQUIRE-T-0115).
+    return gradle(":core:test :knight-core:test")
+
+
 def _gherkin():
-    # The Cucumber suite is a `harness = false` test target, so plain `cargo test` (in `_rust`)
-    # already runs it as part of the workspace; this is the convenience entry to run it alone.
-    return run(["cargo", "test", "-p", "api", "--test", "cucumber"])
+    # Gherkin spans three stacks: cucumber-rs (api), cucumber-jvm (Android :knight-core), and
+    # playwright-bdd (Keep, run via `test e2e`). This runs the first two; `cargo test` already
+    # runs the api `harness = false` target as part of the workspace.
+    rc = run(["cargo", "test", "-p", "api", "--test", "cucumber"])
+    if rc != 0:
+        return rc
+    return gradle(':knight-core:test --tests "*RunCucumberTest"')
 
 
 @test()
@@ -57,9 +67,9 @@ def test_record():
 
 
 @test()
-@angreal.command(name="all", about="Run Rust + E2E + Paparazzi (stops at the first failure)")
+@angreal.command(name="all", about="Run Rust + E2E + Paparazzi + Android unit/Gherkin (stops at first failure)")
 def test_all():
-    for step in (_rust, _e2e, _snapshots):
+    for step in (_rust, _e2e, _snapshots, _android_unit):
         rc = step()
         if rc != 0:
             return rc
