@@ -167,6 +167,25 @@ class ScreenshotTests {
     }
 
     @Test
+    fun squireQuestDetailAuthored() {
+        // The description here is the exact blurb the integration test
+        // `authored_quest_description_reaches_the_card` drives through create_quest → /state → the card,
+        // so this render reflects a genuinely authored (not invented) description.
+        val quest = QuestCard(
+            on = 1, questId = 1L, reward = 5, status = QuestStatus.Available,
+            title = "Tidy your room", icon = "🧹", category = "Chores",
+            description = "Make your bed, put your clothes away, and clear the floor.",
+        )
+        paparazzi.snapshot {
+            SquireTheme {
+                Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(20.dp)) {
+                    DetailCard(questDetail(quest), Modifier.fillMaxWidth())
+                }
+            }
+        }
+    }
+
+    @Test
     fun squireDetailCards() {
         // The tap-to-expand detail views (SQUIRE-T-0094 #8), one per card type, rendered as cards
         // (Paparazzi can't capture the real AlertDialog popups).
