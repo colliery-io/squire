@@ -49,6 +49,8 @@ import com.squire.sdk.model.PendingCashOut
 import com.squire.sdk.model.Role
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.ItemOption
+import com.squire.sdk.model.LockReason
+import com.squire.sdk.model.LockReasonKind
 import com.squire.sdk.model.PendingClaim
 import com.squire.sdk.model.PendingRequest
 import com.squire.sdk.model.QuestCard
@@ -180,6 +182,29 @@ class ScreenshotTests {
             SquireTheme {
                 Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(20.dp)) {
                     DetailCard(questDetail(quest), Modifier.fillMaxWidth())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun squireRewardDetailVariants() {
+        // The reward detail renders differently by state (SQUIRE-T-0094 #8): affordable, still-saving,
+        // achievement-locked, and out-of-stock.
+        val affordable = RewardCard(affordable = true, cost = 3, itemId = 1L, name = "Ice cream", icon = "🍦", description = "A scoop of your favourite ice cream after dinner.")
+        val saving = RewardCard(affordable = false, cost = 15, itemId = 2L, name = "Movie night", icon = "🎬", description = "Pick a film and watch it together.")
+        val locked = RewardCard(affordable = false, cost = 10, itemId = 3L, name = "Toy car", icon = "🚗", description = "A shiny new race car.", lock = LockReason(kind = LockReasonKind.NeedsAchievement, name = "Chore Champion"))
+        val outOfStock = RewardCard(affordable = true, cost = 8, itemId = 4L, name = "Last cookie", icon = "🍪", description = "The very last cookie in the jar.", lock = LockReason(kind = LockReasonKind.OutOfStock))
+        paparazzi.snapshot {
+            SquireTheme {
+                Column(
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    DetailCard(rewardDetail(affordable), Modifier.fillMaxWidth())
+                    DetailCard(rewardDetail(saving), Modifier.fillMaxWidth())
+                    DetailCard(rewardDetail(locked), Modifier.fillMaxWidth())
+                    DetailCard(rewardDetail(outOfStock), Modifier.fillMaxWidth())
                 }
             }
         }
