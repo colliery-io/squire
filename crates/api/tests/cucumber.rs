@@ -27,8 +27,12 @@ use tower::ServiceExt;
 /// because `AppState`/`TempDir` aren't `Debug` and the cucumber `World` requires it.
 struct TestApp {
     state: Arc<AppState>,
-    _dir: tempfile::TempDir,
+    /// Kept alive so the tenant SQLite dir survives; reused on `restart` to reopen the same data.
+    dir: tempfile::TempDir,
     today: Date,
+    /// Reused across a `restart` so issued tokens stay valid (`DevIdentity` holds credentials in
+    /// memory). The durability being proven is the **store** — a fresh connection reading on-disk events.
+    identity: Arc<dyn identity::Identity>,
 }
 
 impl std::fmt::Debug for TestApp {
@@ -43,9 +47,9 @@ fn new_app() -> TestApp {
     let store = provisioner.open("seed", SystemClock).expect("open tenant store");
     let today = store.clock().today();
     let store = Arc::new(Mutex::new(store));
-    let identity = DevIdentity::new(store.clone());
-    let state = AppState::new(store.clone(), Arc::new(identity));
-    TestApp { state, _dir: dir, today }
+    let identity: Arc<dyn identity::Identity> = Arc::new(DevIdentity::new(store.clone()));
+    let state = AppState::new(store.clone(), identity.clone());
+    TestApp { state, dir, today, identity }
 }
 
 /// The Cucumber world: a live app plus the tokens/results threaded across steps.
@@ -139,6 +143,20 @@ impl ApiWorld {
             .apply(None, &[Change::PutQuest(quest)])
             .expect("seed quest");
         self.quests.insert(title.to_string(), id);
+    }
+
+    /// Reopen the app over the SAME on-disk SQLite tenant (a "server restart"): a **fresh store
+    /// connection** over the same file, reusing the identity (so issued tokens stay valid). A new
+    /// connection only sees balances that were actually written to disk — so a later `/state` read
+    /// returning the credited balance proves the event log is durable, not merely in memory.
+    fn restart(&mut self) {
+        let app = self.app.as_ref().expect("no app");
+        let dir_path = app.dir.path().to_path_buf();
+        let identity = app.identity.clone();
+        let provisioner = Provisioner::new(Backend::Sqlite { dir: dir_path });
+        let store = provisioner.open("seed", SystemClock).expect("reopen tenant store");
+        let store = Arc::new(Mutex::new(store));
+        self.app.as_mut().unwrap().state = AppState::new(store, identity);
     }
 }
 
@@ -248,6 +266,13 @@ async fn knight_approves(world: &mut ApiWorld) {
 async fn squire_requests_review(world: &mut ApiWorld, name: String) {
     let (_, token) = world.squire(&name);
     world.send("GET", "/household-review", Some(&token), None).await;
+}
+
+// ─── full-stack durability (phone → API → store, SQUIRE-T-0116) ──────────────────────────────────
+
+#[when("the server restarts")]
+async fn the_server_restarts(world: &mut ApiWorld) {
+    world.restart();
 }
 
 #[tokio::main]
