@@ -139,6 +139,7 @@ class MainActivity : ComponentActivity() {
             token = resp.token,
             user = 2L,
             role = resp.role.value,
+            displayName = "Gawain", // demo squire (login doesn't carry the name; pairing does)
         )
     }
 }
@@ -239,6 +240,7 @@ internal fun PlayerHomeHost(
                 onCashOut = viewModel::requestCashOut,
                 onForget = onForget,
                 onCheckUpdate = { checkNonce++ },
+                headerLabel = session.displayName.ifBlank { null }, // "Hi, <name>!" when paired with a name
             )
         }
     }

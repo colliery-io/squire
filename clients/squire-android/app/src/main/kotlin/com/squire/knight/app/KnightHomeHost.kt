@@ -230,6 +230,7 @@ internal fun KnightHomeHost(
         Box(modifier = Modifier.weight(1f)) {
             KnightHomeScreen(
                 state = state,
+                name = session.displayName, // "Hi, <name>!" header (blank -> "Your Family")
                 onRefresh = { viewModel.refresh() },
                 onApproveClaim = { viewModel.approveClaim(it) },
                 onRejectClaim = { id, reason -> viewModel.rejectClaim(id, reason) },

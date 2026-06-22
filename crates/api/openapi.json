@@ -2766,6 +2766,10 @@
           "role"
         ],
         "properties": {
+          "display_name": {
+            "type": "string",
+            "description": "The paired member's display name, so the app can greet them by name (\"Hi, <name>!\"). `serde(default)`\nfor back-compat with older servers that don't send it (the app falls back to a generic header)."
+          },
           "household": {
             "$ref": "#/components/schemas/HouseholdHandle"
           },

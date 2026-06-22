@@ -21,6 +21,7 @@ object PairingClient {
             token = resp.token,
             user = resp.user,
             role = resp.role.value,
+            displayName = resp.displayName.orEmpty(),
         )
     }
 }
