@@ -4,6 +4,7 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.android.resources.NightMode
 import com.squire.app.ui.PlayerHomeScreen
+import com.squire.app.ui.SquireTab
 import com.squire.app.ui.theme.SquireTheme
 import com.squire.core.PlayerUiState
 import com.squire.knight.app.data.KnightApiAdapter
@@ -24,6 +25,8 @@ import com.squire.sdk.model.ClaimState
 import com.squire.sdk.model.ClaimStateKind
 import com.squire.sdk.model.ClaimStatus
 import com.squire.sdk.model.CompletionDto
+import com.squire.sdk.model.Currency
+import com.squire.sdk.model.CurrencyBalance
 import com.squire.sdk.model.ItemSummaryDto
 import com.squire.sdk.model.MemberSummaryDto
 import com.squire.sdk.model.Role
@@ -63,7 +66,7 @@ class ScreenshotTests {
         val review = HouseholdReview(
             generatedAt = 0L,
             squires = listOf(
-                SquireSummary(balance = 25, displayName = "Gawain", squire = 2),
+                SquireSummary(balance = 25, displayName = "Gawain", squire = 2, cashBalance = 5),
                 SquireSummary(balance = 40, displayName = "Percival", squire = 3),
             ),
             pendingClaims = listOf(
@@ -80,6 +83,28 @@ class ScreenshotTests {
             SquireTheme {
                 KnightHomeScreen(
                     state = KnightUiState.Ready(review, fromCache = false),
+                    name = "David Storey",
+                    onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
+                    onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
+                    onPay = { _, _, _ -> },
+                    onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
+                )
+            }
+        }
+    }
+
+    @Test
+    fun knightManage() {
+        val review = HouseholdReview(
+            generatedAt = 0L, squires = emptyList(), pendingClaims = emptyList(),
+            pendingRequests = emptyList(), items = emptyList(), quests = emptyList(), today = 20624,
+        )
+        paparazzi.snapshot {
+            SquireTheme {
+                KnightHomeScreen(
+                    state = KnightUiState.Ready(review, fromCache = false),
+                    name = "David Storey",
+                    initialTab = com.squire.knight.app.ui.KnightTab.Manage,
                     onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
                     onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
                     onPay = { _, _, _ -> },
@@ -93,6 +118,8 @@ class ScreenshotTests {
     fun squirePlayerHome() {
         val view = StateView(
             balance = 12,
+            // Dual-currency header: coins (⭐, from `balance`) + real-money dollars owed ($, SQUIRE-T-0099).
+            balances = listOf(CurrencyBalance(balance = 5, currency = Currency.Cash, name = "Dollars", symbol = "$")),
             generatedAt = 0L,
             squire = 1L,
             questsToday = listOf(
@@ -117,6 +144,60 @@ class ScreenshotTests {
                 PlayerHomeScreen(
                     state = PlayerUiState.Ready(view, fromCache = false),
                     onRefresh = {}, onMarkDone = {}, onRedeem = {},
+                    headerLabel = "Matrim Oakenfury", // realistic long name — stresses the header layout
+                )
+            }
+        }
+    }
+
+    @Test
+    fun squirePlayerRewards() {
+        val view = StateView(
+            balance = 12, generatedAt = 0L, squire = 1L,
+            questsToday = emptyList(),
+            rewards = listOf(
+                RewardCard(affordable = true, cost = 3, itemId = 1L, name = "Ice cream", icon = "🍦"),
+                RewardCard(affordable = true, cost = 8, itemId = 3L, name = "Extra screen time", icon = "📺"),
+                RewardCard(affordable = false, cost = 15, itemId = 2L, name = "Movie night", icon = "🎬"),
+            ),
+            myClaims = emptyList(), myRequests = emptyList(),
+            streaks = emptyList(), badges = emptyList(), goals = emptyList(),
+        )
+        paparazzi.snapshot {
+            SquireTheme {
+                PlayerHomeScreen(
+                    state = PlayerUiState.Ready(view, fromCache = false),
+                    onRefresh = {}, onMarkDone = {}, onRedeem = {},
+                    initialTab = SquireTab.Rewards,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun squirePlayerMe() {
+        val view = StateView(
+            balance = 12, generatedAt = 0L, squire = 1L,
+            questsToday = emptyList(), rewards = emptyList(),
+            myClaims = emptyList(), myRequests = emptyList(),
+            badges = listOf(
+                BadgeView(at = 0L, bonus = 25, id = 1L, name = "Century Club"),
+                BadgeView(at = 0L, bonus = 50, id = 2L, name = "Chore Champion"),
+            ),
+            streaks = listOf(
+                StreakView(name = "Room Master", current = 3, best = 5, alive = true, nextMilestone = 7),
+                StreakView(name = "Early Bird", current = 1, best = 4, alive = true, nextMilestone = 3),
+            ),
+            goals = listOf(
+                GoalView(id = 7L, name = "Best Friends", description = "Complete 10 chores together", bonus = 25),
+            ),
+        )
+        paparazzi.snapshot {
+            SquireTheme {
+                PlayerHomeScreen(
+                    state = PlayerUiState.Ready(view, fromCache = false),
+                    onRefresh = {}, onMarkDone = {}, onRedeem = {},
+                    initialTab = SquireTab.Me,
                 )
             }
         }
@@ -255,6 +336,7 @@ class ScreenshotTests {
                 PlayerHomeScreen(
                     state = PlayerUiState.Ready(view, fromCache = false),
                     onRefresh = {}, onMarkDone = {}, onRedeem = {},
+                    initialTab = SquireTab.Activity, // the compact recent-activity page
                 )
             }
         }

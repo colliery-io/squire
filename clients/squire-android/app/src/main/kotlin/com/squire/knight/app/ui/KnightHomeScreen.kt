@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -25,6 +27,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -65,10 +70,19 @@ import com.squire.sdk.model.SquireSummary
  * in `:knight-core`'s `KnightStore`. Styled to the "playful quest" theme (SQUIRE-T-0057): parchment
  * cards, royal serif headers, gold balance pills — kept scannable for a parent triaging the queue.
  */
+/** The Knight (parent) home's bottom-nav pages — mirrors the Squire's tabbed layout for consistency. */
+enum class KnightTab(val label: String, val icon: String) {
+    Review("Review", "📋"),
+    Manage("Manage", "🛠"),
+    History("History", "📜"),
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KnightHomeScreen(
     state: KnightUiState,
+    name: String = "",
+    initialTab: KnightTab = KnightTab.Review,
     onRefresh: () -> Unit,
     onApproveClaim: (claimId: Long) -> Unit,
     onRejectClaim: (claimId: Long, reason: String?) -> Unit,
@@ -88,6 +102,8 @@ fun KnightHomeScreen(
     onManageSettings: () -> Unit = {},
     onViewHistory: () -> Unit = {},
 ) {
+    val firstName = name.substringBefore(' ')
+    var tab by remember { mutableStateOf(initialTab) }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -99,7 +115,13 @@ fun KnightHomeScreen(
                             Text("🛡", modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
                         }
                         Spacer(Modifier.width(10.dp))
-                        Text("The Round Table", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text(
+                            if (firstName.isBlank()) "Your Family" else "Hi, $firstName!",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -112,13 +134,8 @@ fun KnightHomeScreen(
                     IconButton(onClick = { menuOpen = true }) {
                         Text("⋮", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.titleLarge)
                     }
+                    // Manage surfaces + History moved to the bottom-nav tabs; the menu keeps the rest.
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(text = { Text("Manage quests") }, onClick = { menuOpen = false; onManageQuests() })
-                        DropdownMenuItem(text = { Text("Manage achievements") }, onClick = { menuOpen = false; onManageAchievements() })
-                        DropdownMenuItem(text = { Text("Manage rewards") }, onClick = { menuOpen = false; onManageRewards() })
-                        DropdownMenuItem(text = { Text("Manage hazards") }, onClick = { menuOpen = false; onManageHazards() })
-                        DropdownMenuItem(text = { Text("Manage members") }, onClick = { menuOpen = false; onManageMembers() })
-                        DropdownMenuItem(text = { Text("History") }, onClick = { menuOpen = false; onViewHistory() })
                         DropdownMenuItem(text = { Text("Settings") }, onClick = { menuOpen = false; onManageSettings() })
                         DropdownMenuItem(text = { Text("Refresh") }, onClick = { menuOpen = false; onRefresh() })
                         DropdownMenuItem(text = { Text("Forget device") }, onClick = { menuOpen = false; onForget() })
@@ -127,6 +144,27 @@ fun KnightHomeScreen(
             )
             HorizontalDivider(thickness = 3.dp, color = SquireGold)
           }
+        },
+        bottomBar = {
+            if (state is KnightUiState.Ready) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.primary) {
+                    KnightTab.entries.forEach { t ->
+                        NavigationBarItem(
+                            selected = tab == t,
+                            onClick = { tab = t },
+                            icon = { Text(t.icon, style = MaterialTheme.typography.titleLarge) },
+                            label = { Text(t.label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedTextColor = MaterialTheme.colorScheme.onPrimary,
+                                unselectedIconColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
+                                unselectedTextColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
+                                indicatorColor = MaterialTheme.colorScheme.secondary,
+                            ),
+                        )
+                    }
+                }
+            }
         },
     ) { padding ->
         when (state) {
@@ -142,21 +180,93 @@ fun KnightHomeScreen(
                 Button(onClick = onRefresh) { Text("Retry") }
             }
 
-            is KnightUiState.Ready -> ReadyContent(
-                review = state.review,
-                fromCache = state.fromCache,
-                onApproveClaim = onApproveClaim,
-                onRejectClaim = onRejectClaim,
-                onApproveRequest = onApproveRequest,
-                onRejectRequest = onRejectRequest,
-                onAddFunds = onAddFunds,
-                onPay = onPay,
-                onRedeem = onRedeem,
-                onMarkDone = onMarkDone,
-                onOpenSquire = onOpenSquire,
-                modifier = Modifier.fillMaxSize().padding(padding),
-            )
+            is KnightUiState.Ready -> when (tab) {
+                KnightTab.Review -> ReadyContent(
+                    review = state.review,
+                    fromCache = state.fromCache,
+                    onApproveClaim = onApproveClaim,
+                    onRejectClaim = onRejectClaim,
+                    onApproveRequest = onApproveRequest,
+                    onRejectRequest = onRejectRequest,
+                    onAddFunds = onAddFunds,
+                    onPay = onPay,
+                    onRedeem = onRedeem,
+                    onMarkDone = onMarkDone,
+                    onOpenSquire = onOpenSquire,
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                )
+                KnightTab.Manage -> ManageHub(
+                    onManageQuests = onManageQuests,
+                    onManageRewards = onManageRewards,
+                    onManageAchievements = onManageAchievements,
+                    onManageHazards = onManageHazards,
+                    onManageMembers = onManageMembers,
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                )
+                KnightTab.History -> HistoryTabPage(onViewHistory, Modifier.fillMaxSize().padding(padding))
+            }
         }
+    }
+}
+
+/** The "Manage" tab: a hub of the parent's authoring/admin surfaces (each opens its full screen). */
+@Composable
+private fun ManageHub(
+    onManageQuests: () -> Unit,
+    onManageRewards: () -> Unit,
+    onManageAchievements: () -> Unit,
+    onManageHazards: () -> Unit,
+    onManageMembers: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item { SectionTitle("Manage") }
+        item { ManageRow("⚔", "Quests", "Create, edit, schedule chores", onManageQuests) }
+        item { ManageRow("🎁", "Rewards", "The shop your Squires spend coins in", onManageRewards) }
+        item { ManageRow("🏅", "Achievements", "Badges, streaks and goals to unlock", onManageAchievements) }
+        item { ManageRow("⚠", "Hazards", "Named penalties to apply", onManageHazards) }
+        item { ManageRow("👪", "Members & devices", "Add people, pair phones", onManageMembers) }
+    }
+}
+
+@Composable
+private fun ManageRow(icon: String, title: String, subtitle: String, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(icon, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.width(40.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** The "History" tab: opens the full activity history (kept as its own screen via [onViewHistory]). */
+@Composable
+private fun HistoryTabPage(onViewHistory: () -> Unit, modifier: Modifier = Modifier) {
+    Centered(modifier) {
+        Text("📜", style = MaterialTheme.typography.displaySmall)
+        Spacer(Modifier.height(8.dp))
+        Text("Activity history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Every approval, reward and adjustment across the household.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = onViewHistory) { Text("Open history") }
     }
 }
 
@@ -360,6 +470,7 @@ internal fun RejectReasonDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SquireRow(
     s: SquireSummary,
@@ -374,40 +485,41 @@ private fun SquireRow(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // Row 1: name + Open (the name flexes/ellipsizes so it never pushes Open off).
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "⚔ ${s.displayName}",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        GoldPill(amount = s.balance.toInt())
-                        // Real money owed to this Squire (SQUIRE-T-0099); settle with "Pay" (SQUIRE-T-0111).
-                        val owed = s.cashBalance ?: 0
-                        if (owed > 0) CashPill(owed.toLong(), large = false)
-                    }
-                }
+                Text(
+                    "⚔ ${s.displayName}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
                 // Drop into this Squire's home and act on their behalf (SQUIRE-T-0055).
                 FilledTonalButton(onClick = onOpen) { Text("Open") }
             }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(top = 12.dp),
-            ) {
+            // Row 2: currency (coins + any real-money owed).
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GoldPill(amount = s.balance.toInt())
+                val owed = s.cashBalance ?: 0
+                if (owed > 0) CashPill(owed.toLong(), large = false)
+            }
+            // Row 3: the same actions for every squire (uniform cards). Cash payout is NOT here —
+            // "cashing out" is modelled as a redemption (drawing down the owed-cash balance, parent-
+            // approved), handled through the rewards/redemption flow, so the card never grows a
+            // variable extra button.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onMarkDone) { Text("Mark done") }
                 OutlinedButton(onClick = onRedeem) { Text("Redeem") }
                 OutlinedButton(onClick = onAddFunds) { Text("Add coins") }
-                // Settle real money owed (SQUIRE-T-0111) — only when there is a cash balance to pay.
-                if ((s.cashBalance ?: 0) > 0) {
-                    OutlinedButton(onClick = onPay) { Text("Pay $${s.cashBalance}") }
-                }
             }
         }
     }
