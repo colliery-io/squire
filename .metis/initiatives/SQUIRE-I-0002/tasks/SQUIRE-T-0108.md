@@ -11,10 +11,10 @@ archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
-exit_criteria_met: false
+exit_criteria_met: true
 initiative_id: SQUIRE-I-0002
 ---
 
@@ -76,3 +76,10 @@ updates and macOS keeps the Local Network grant (no re-prompt on self-update / r
 - **The cloud direction sidesteps this entirely:** [[SQUIRE-I-0003]] (home server via Cloudflare Tunnel)
   drops LAN/mDNS, so there's no Local Network permission to manage — another point for it.
 - Related to the self-update mechanism ([[SQUIRE-A-0012]]) and the launchd service work.
+
+## RESOLVED 2026-06-21 — won't-fix (churn disproven)
+The v0.7.10 release self-updated prod to a CI-built binary and a **phone write landed with NO macOS
+prompt** (operator confirmed: no prompt; coin grant saved, event seq 68). So re-signing/updating does
+**not** churn the Local Network grant — the earlier prompt was a one-time first grant macOS surfaced late.
+Stable signing is **not needed** for the home appliance. The container/cloud path ([[SQUIRE-A-0016]] /
+[[SQUIRE-I-0003]]) remains a roadmap option for other reasons, not as a fix for this.
