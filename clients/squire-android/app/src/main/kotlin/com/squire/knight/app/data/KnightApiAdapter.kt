@@ -180,6 +180,7 @@ class KnightApiAdapter(
             when (command) {
                 is KnightCommand.ReviewClaim -> api.reviewClaim(household, command.req)
                 is KnightCommand.ReviewRedemption -> api.reviewRedemption(household, command.req)
+                is KnightCommand.ReviewCashOut -> api.reviewCashout(household, command.req)
                 is KnightCommand.Redeem -> api.redeem(household, command.req)
                 is KnightCommand.Adjust -> api.adjust(household, command.req)
                 is KnightCommand.MarkDone -> api.markDone(household, command.req)

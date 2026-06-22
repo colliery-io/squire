@@ -5,6 +5,7 @@ import com.squire.app.data.db.OutboxEntity
 import com.squire.core.Outbox
 import com.squire.core.OutboxItem
 import com.squire.core.SubmissionKind
+import com.squire.sdk.model.RequestCashOutReq
 import com.squire.sdk.model.RequestRedemptionReq
 import com.squire.sdk.model.SubmitClaimReq
 import kotlinx.serialization.json.Json
@@ -25,6 +26,8 @@ class RoomOutbox(
                 json.encodeToString(SubmitClaimReq.serializer(), item.req)
             is OutboxItem.Redemption ->
                 json.encodeToString(RequestRedemptionReq.serializer(), item.req)
+            is OutboxItem.CashOut ->
+                json.encodeToString(RequestCashOutReq.serializer(), item.req)
         }
         dao.insert(OutboxEntity(id = item.id, kind = item.kind.name, payloadJson = payloadJson))
     }
@@ -36,6 +39,8 @@ class RoomOutbox(
                     OutboxItem.Claim(json.decodeFromString(SubmitClaimReq.serializer(), e.payloadJson))
                 SubmissionKind.REDEMPTION ->
                     OutboxItem.Redemption(json.decodeFromString(RequestRedemptionReq.serializer(), e.payloadJson))
+                SubmissionKind.CASHOUT ->
+                    OutboxItem.CashOut(json.decodeFromString(RequestCashOutReq.serializer(), e.payloadJson))
             }
         }
 

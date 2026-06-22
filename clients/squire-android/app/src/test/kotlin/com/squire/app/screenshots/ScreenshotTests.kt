@@ -29,6 +29,7 @@ import com.squire.sdk.model.Currency
 import com.squire.sdk.model.CurrencyBalance
 import com.squire.sdk.model.ItemSummaryDto
 import com.squire.sdk.model.MemberSummaryDto
+import com.squire.sdk.model.PendingCashOut
 import com.squire.sdk.model.Role
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.ItemOption
@@ -74,6 +75,9 @@ class ScreenshotTests {
             ),
             pendingRequests = listOf(
                 PendingRequest(cost = 15, itemName = "Movie night", requestId = 5L, squire = 2),
+            ),
+            pendingCashouts = listOf(
+                PendingCashOut(amount = 5, requestId = 7L, squire = 2),
             ),
             items = listOf(ItemOption(itemId = 200, name = "Ice cream", cost = 3)),
             quests = listOf(QuestOption(questId = 100, title = "Make your bed")),
@@ -154,6 +158,8 @@ class ScreenshotTests {
     fun squirePlayerRewards() {
         val view = StateView(
             balance = 12, generatedAt = 0L, squire = 1L,
+            // Owed $5 → the "Cash out" affordance shows above the coin shop (SQUIRE-T-0118).
+            balances = listOf(CurrencyBalance(balance = 5, currency = Currency.Cash, name = "Dollars", symbol = "$")),
             questsToday = emptyList(),
             rewards = listOf(
                 RewardCard(affordable = true, cost = 3, itemId = 1L, name = "Ice cream", icon = "🍦"),

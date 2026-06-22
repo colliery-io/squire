@@ -29,6 +29,11 @@ private class RecordingApi(private val failWith: Throwable? = null) : Submission
         failWith?.let { throw it }
         requestIds += req.requestId
     }
+
+    override suspend fun requestCashOut(req: com.squire.sdk.model.RequestCashOutReq) {
+        failWith?.let { throw it }
+        requestIds += req.requestId
+    }
 }
 
 private class FakeStatePort(private val resolved: ResolvedIds) : StatePort {
@@ -52,7 +57,7 @@ class SyncEngineTest {
         outbox.enqueue(claim(1))
         outbox.enqueue(redemption(2))
         val api = RecordingApi()
-        val statePort = FakeStatePort(ResolvedIds(claims = setOf(1L), requests = setOf(2L)))
+        val statePort = FakeStatePort(ResolvedIds(claims = setOf(1L), requests = setOf(2L), cashouts = emptySet()))
         val engine = SyncEngine(outbox, api, statePort)
 
         val outcome = engine.sync()
@@ -71,7 +76,7 @@ class SyncEngineTest {
         outbox.enqueue(claim(1))
         outbox.enqueue(claim(2))
         val api = RecordingApi(failWith = IOException("computer unreachable"))
-        val statePort = FakeStatePort(ResolvedIds(emptySet(), emptySet()))
+        val statePort = FakeStatePort(ResolvedIds(emptySet(), emptySet(), emptySet()))
         val engine = SyncEngine(outbox, api, statePort)
 
         val outcome = engine.sync()
@@ -86,7 +91,7 @@ class SyncEngineTest {
         outbox.enqueue(claim(1))
         outbox.enqueue(claim(2))
         val api = RecordingApi()
-        val statePort = FakeStatePort(ResolvedIds(claims = setOf(1L), requests = emptySet()))
+        val statePort = FakeStatePort(ResolvedIds(claims = setOf(1L), requests = emptySet(), cashouts = emptySet()))
         val engine = SyncEngine(outbox, api, statePort)
 
         val outcome = engine.sync()

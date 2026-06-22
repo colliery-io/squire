@@ -236,6 +236,7 @@ internal fun PlayerHomeHost(
                     viewModel.submitClaim(questId = questId, on = on)
                 },
                 onRedeem = viewModel::requestRedemption,
+                onCashOut = viewModel::requestCashOut,
                 onForget = onForget,
                 onCheckUpdate = { checkNonce++ },
             )

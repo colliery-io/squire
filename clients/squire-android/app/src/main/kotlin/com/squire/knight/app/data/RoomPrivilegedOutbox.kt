@@ -8,6 +8,7 @@ import com.squire.knight.core.PrivilegedOutbox
 import com.squire.sdk.model.AdjustReq
 import com.squire.sdk.model.MarkDoneReq
 import com.squire.sdk.model.RedeemReq
+import com.squire.sdk.model.ReviewCashOutReq
 import com.squire.sdk.model.ReviewClaimReq
 import com.squire.sdk.model.ReviewRedemptionReq
 import kotlinx.serialization.json.Json
@@ -28,6 +29,8 @@ class RoomPrivilegedOutbox(
                 json.encodeToString(ReviewClaimReq.serializer(), command.req)
             is KnightCommand.ReviewRedemption ->
                 json.encodeToString(ReviewRedemptionReq.serializer(), command.req)
+            is KnightCommand.ReviewCashOut ->
+                json.encodeToString(ReviewCashOutReq.serializer(), command.req)
             is KnightCommand.Redeem ->
                 json.encodeToString(RedeemReq.serializer(), command.req)
             is KnightCommand.Adjust ->
@@ -47,6 +50,8 @@ class RoomPrivilegedOutbox(
                     KnightCommand.ReviewClaim(json.decodeFromString(ReviewClaimReq.serializer(), e.payloadJson))
                 CommandKind.REVIEW_REDEMPTION ->
                     KnightCommand.ReviewRedemption(json.decodeFromString(ReviewRedemptionReq.serializer(), e.payloadJson))
+                CommandKind.REVIEW_CASHOUT ->
+                    KnightCommand.ReviewCashOut(json.decodeFromString(ReviewCashOutReq.serializer(), e.payloadJson))
                 CommandKind.REDEEM ->
                     KnightCommand.Redeem(json.decodeFromString(RedeemReq.serializer(), e.payloadJson))
                 CommandKind.ADJUST ->

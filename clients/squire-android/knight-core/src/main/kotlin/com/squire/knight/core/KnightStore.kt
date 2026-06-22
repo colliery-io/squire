@@ -8,6 +8,7 @@ import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.MarkDoneReq
 import com.squire.sdk.model.RedeemReq
 import com.squire.sdk.model.ReviewClaimReq
+import com.squire.sdk.model.ReviewCashOutReq
 import com.squire.sdk.model.ReviewRedemptionReq
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -104,6 +105,14 @@ class KnightStore(
     /** Reject a pending redemption request, with an optional reason. */
     suspend fun rejectRequest(requestId: Long, reason: String? = null) =
         submit(KnightCommand.ReviewRedemption(ReviewRedemptionReq(decision = DecisionDto(DecisionKind.reject, reason), requestId = requestId)))
+
+    /** Approve a pending cash-out request (→ CashOutApproved, drawing down owed Cash; SQUIRE-T-0118). */
+    suspend fun approveCashOut(requestId: Long) =
+        submit(KnightCommand.ReviewCashOut(ReviewCashOutReq(decision = DecisionDto(DecisionKind.approve), requestId = requestId)))
+
+    /** Reject a pending cash-out request, with an optional reason. */
+    suspend fun rejectCashOut(requestId: Long, reason: String? = null) =
+        submit(KnightCommand.ReviewCashOut(ReviewCashOutReq(decision = DecisionDto(DecisionKind.reject, reason), requestId = requestId)))
 
     /** Direct redeem of [itemId] on [squire]'s behalf; mints a `command_id`. */
     suspend fun redeem(squire: Long, itemId: Long) =

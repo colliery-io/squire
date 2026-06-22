@@ -1,5 +1,6 @@
 package com.squire.core
 
+import com.squire.sdk.model.RequestCashOutReq
 import com.squire.sdk.model.RequestRedemptionReq
 import com.squire.sdk.model.StateView
 import com.squire.sdk.model.SubmitClaimReq
@@ -111,6 +112,14 @@ class PlayerStore(
         outbox.enqueue(
             OutboxItem.Redemption(RequestRedemptionReq(itemId = itemId, requestId = id)),
         )
+        sync.sync()
+        refresh()
+    }
+
+    /** Request to "cash out" [amount] whole dollars of owed Cash (SQUIRE-T-0118) — parent-approved. */
+    suspend fun requestCashOut(amount: Long) {
+        val id = ids()
+        outbox.enqueue(OutboxItem.CashOut(RequestCashOutReq(amount = amount, requestId = id)))
         sync.sync()
         refresh()
     }

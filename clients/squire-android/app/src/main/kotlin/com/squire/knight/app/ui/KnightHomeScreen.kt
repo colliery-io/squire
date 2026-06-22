@@ -60,6 +60,7 @@ import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.ItemOption
 import com.squire.sdk.model.PendingClaim
+import com.squire.sdk.model.PendingCashOut
 import com.squire.sdk.model.PendingRequest
 import com.squire.sdk.model.QuestOption
 import com.squire.sdk.model.SquireSummary
@@ -88,6 +89,8 @@ fun KnightHomeScreen(
     onRejectClaim: (claimId: Long, reason: String?) -> Unit,
     onApproveRequest: (requestId: Long) -> Unit,
     onRejectRequest: (requestId: Long, reason: String?) -> Unit,
+    onApproveCashOut: (requestId: Long) -> Unit = {},
+    onRejectCashOut: (requestId: Long, reason: String?) -> Unit = { _, _ -> },
     onAddFunds: (squire: Long, amount: Long, reason: String) -> Unit,
     onPay: (squire: Long, amount: Long, reason: String) -> Unit,
     onRedeem: (squire: Long, itemId: Long) -> Unit,
@@ -188,6 +191,8 @@ fun KnightHomeScreen(
                     onRejectClaim = onRejectClaim,
                     onApproveRequest = onApproveRequest,
                     onRejectRequest = onRejectRequest,
+                    onApproveCashOut = onApproveCashOut,
+                    onRejectCashOut = onRejectCashOut,
                     onAddFunds = onAddFunds,
                     onPay = onPay,
                     onRedeem = onRedeem,
@@ -278,6 +283,8 @@ private fun ReadyContent(
     onRejectClaim: (Long, String?) -> Unit,
     onApproveRequest: (Long) -> Unit,
     onRejectRequest: (Long, String?) -> Unit,
+    onApproveCashOut: (Long) -> Unit,
+    onRejectCashOut: (Long, String?) -> Unit,
     onAddFunds: (Long, Long, String) -> Unit,
     onPay: (Long, Long, String) -> Unit,
     onRedeem: (Long, Long) -> Unit,
@@ -295,8 +302,10 @@ private fun ReadyContent(
     // Pending reject awaiting a reason (SQUIRE-T-0078): the claim / request the Knight tapped Reject on.
     var rejectClaimFor by remember { mutableStateOf<PendingClaim?>(null) }
     var rejectRequestFor by remember { mutableStateOf<PendingRequest?>(null) }
+    var rejectCashOutFor by remember { mutableStateOf<PendingCashOut?>(null) }
 
-    val pendingCount = review.pendingClaims.size + review.pendingRequests.size
+    val cashouts = review.pendingCashouts.orEmpty()
+    val pendingCount = review.pendingClaims.size + review.pendingRequests.size + cashouts.size
 
     LazyColumn(
         modifier = modifier,
@@ -349,6 +358,20 @@ private fun ReadyContent(
                     squireName = names[req.squire] ?: "Squire ${req.squire}",
                     onApprove = { onApproveRequest(req.requestId) },
                     onReject = { rejectRequestFor = req },
+                )
+            }
+        }
+
+        item { SectionTitle("Cash-outs to pay") }
+        if (cashouts.isEmpty()) {
+            item { EmptyNote("No cash-outs waiting.") }
+        } else {
+            items(cashouts, key = { "co" + it.requestId }) { co ->
+                PendingCashOutRow(
+                    cashout = co,
+                    squireName = names[co.squire] ?: "Squire ${co.squire}",
+                    onApprove = { onApproveCashOut(co.requestId) },
+                    onReject = { rejectCashOutFor = co },
                 )
             }
         }
@@ -423,6 +446,18 @@ private fun ReadyContent(
             onConfirm = { reason ->
                 onRejectRequest(req.requestId, reason)
                 rejectRequestFor = null
+            },
+        )
+    }
+
+    rejectCashOutFor?.let { co ->
+        RejectReasonDialog(
+            title = "Reject cash-out",
+            subject = "\$${co.amount} · ${names[co.squire] ?: "Squire ${co.squire}"}",
+            onDismiss = { rejectCashOutFor = null },
+            onConfirm = { reason ->
+                onRejectCashOut(co.requestId, reason)
+                rejectCashOutFor = null
             },
         )
     }
@@ -577,6 +612,19 @@ private fun PendingRequestRow(request: PendingRequest, squireName: String, onApp
         subtitle = "$squireName · ${request.cost} coins",
         leading = { Medallion(null, request.itemName, reward = true) },
         trailing = { StatusChip("Reward", MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) },
+        onApprove = onApprove,
+        onReject = onReject,
+    )
+}
+
+/** A pending cash-out (SQUIRE-T-0118): approve pays out the owed dollars; reject leaves them owed. */
+@Composable
+private fun PendingCashOutRow(cashout: PendingCashOut, squireName: String, onApprove: () -> Unit, onReject: () -> Unit) {
+    ReviewCard(
+        title = "Cash out \$${cashout.amount}",
+        subtitle = "$squireName · real money owed",
+        leading = { Text("💵", style = MaterialTheme.typography.headlineMedium) },
+        trailing = { StatusChip("Cash", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer) },
         onApprove = onApprove,
         onReject = onReject,
     )

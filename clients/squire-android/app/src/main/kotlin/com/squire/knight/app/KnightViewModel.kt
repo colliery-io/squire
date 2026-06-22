@@ -27,6 +27,10 @@ class KnightViewModel(private val store: KnightStore) : ViewModel() {
     fun rejectRequest(requestId: Long, reason: String?) =
         viewModelScope.launch { store.rejectRequest(requestId, reason) }
 
+    fun approveCashOut(requestId: Long) = viewModelScope.launch { store.approveCashOut(requestId) }
+    fun rejectCashOut(requestId: Long, reason: String?) =
+        viewModelScope.launch { store.rejectCashOut(requestId, reason) }
+
     fun redeem(squire: Long, itemId: Long) = viewModelScope.launch { store.redeem(squire, itemId) }
     fun adjust(squire: Long, amount: Long, reason: String) =
         viewModelScope.launch { store.adjust(squire, amount, reason) }

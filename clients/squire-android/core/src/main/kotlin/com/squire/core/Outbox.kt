@@ -1,10 +1,11 @@
 package com.squire.core
 
+import com.squire.sdk.model.RequestCashOutReq
 import com.squire.sdk.model.RequestRedemptionReq
 import com.squire.sdk.model.SubmitClaimReq
 
 /** The kind of submission an outbox item represents. */
-enum class SubmissionKind { CLAIM, REDEMPTION }
+enum class SubmissionKind { CLAIM, REDEMPTION, CASHOUT }
 
 /**
  * A single pending offline submission.
@@ -24,6 +25,11 @@ sealed interface OutboxItem {
     data class Redemption(val req: RequestRedemptionReq) : OutboxItem {
         override val id: Long get() = req.requestId
         override val kind: SubmissionKind get() = SubmissionKind.REDEMPTION
+    }
+
+    data class CashOut(val req: RequestCashOutReq) : OutboxItem {
+        override val id: Long get() = req.requestId
+        override val kind: SubmissionKind get() = SubmissionKind.CASHOUT
     }
 }
 

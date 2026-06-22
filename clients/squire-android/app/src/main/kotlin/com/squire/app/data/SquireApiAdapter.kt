@@ -5,6 +5,7 @@ import com.squire.core.StateFetcher
 import com.squire.core.StatePort
 import com.squire.core.SubmissionApi
 import com.squire.sdk.api.SquireApi
+import com.squire.sdk.model.RequestCashOutReq
 import com.squire.sdk.model.RequestRedemptionReq
 import com.squire.sdk.model.StateView
 import com.squire.sdk.model.SubmitClaimReq
@@ -61,11 +62,18 @@ class SquireApiAdapter(
         }
     }
 
+    override suspend fun requestCashOut(req: RequestCashOutReq) {
+        withContext(Dispatchers.IO) {
+            api.requestCashout(xHousehold = household, requestCashOutReq = req)
+        }
+    }
+
     override suspend fun resolvedIds(): ResolvedIds = withContext(Dispatchers.IO) {
         val state = api.getState(xHousehold = household)
         ResolvedIds(
             claims = state.myClaims.map { it.claimId }.toSet(),
             requests = state.myRequests.map { it.requestId }.toSet(),
+            cashouts = state.myCashouts.orEmpty().map { it.requestId }.toSet(),
         )
     }
 }

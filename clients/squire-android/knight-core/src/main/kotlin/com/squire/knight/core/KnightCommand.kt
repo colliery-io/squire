@@ -3,11 +3,12 @@ package com.squire.knight.core
 import com.squire.sdk.model.AdjustReq
 import com.squire.sdk.model.MarkDoneReq
 import com.squire.sdk.model.RedeemReq
+import com.squire.sdk.model.ReviewCashOutReq
 import com.squire.sdk.model.ReviewClaimReq
 import com.squire.sdk.model.ReviewRedemptionReq
 
 /** The kind of privileged quick-action an outbox entry represents (SQUIRE-S-0006). */
-enum class CommandKind { REVIEW_CLAIM, REVIEW_REDEMPTION, REDEEM, ADJUST, MARK_DONE }
+enum class CommandKind { REVIEW_CLAIM, REVIEW_REDEMPTION, REVIEW_CASHOUT, REDEEM, ADJUST, MARK_DONE }
 
 /**
  * A single privileged command the parent issued, wrapping the generated `:sdk` request DTO so the
@@ -36,6 +37,12 @@ sealed interface KnightCommand {
     data class ReviewRedemption(val req: ReviewRedemptionReq) : KnightCommand {
         override val id: Long get() = req.requestId
         override val kind: CommandKind get() = CommandKind.REVIEW_REDEMPTION
+    }
+
+    /** Approve/reject a pending cash-out request; the Squire is derived from the request (SQUIRE-T-0118). */
+    data class ReviewCashOut(val req: ReviewCashOutReq) : KnightCommand {
+        override val id: Long get() = req.requestId
+        override val kind: CommandKind get() = CommandKind.REVIEW_CASHOUT
     }
 
     /** Direct redeem on a target Squire's behalf; deduped on the minted `command_id` (REQ-K5). */

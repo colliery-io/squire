@@ -106,6 +106,7 @@ fun PlayerHomeScreen(
     onRefresh: () -> Unit,
     onMarkDone: (questId: Long) -> Unit,
     onRedeem: (itemId: Long) -> Unit,
+    onCashOut: (amount: Long) -> Unit = {},
     onForget: () -> Unit = {},
     onCheckUpdate: () -> Unit = {},
     headerLabel: String? = null,
@@ -261,6 +262,7 @@ fun PlayerHomeScreen(
                 tab = tab,
                 onMarkDone = { qid -> cheer("Sent! ⏳ A grown-up will check it"); onMarkDone(qid) },
                 onRedeem = { iid -> cheer("Sent! 🎁 Asked a grown-up"); onRedeem(iid) },
+                onCashOut = { amt -> cheer("Sent! 💵 Asked a grown-up to pay you"); onCashOut(amt) },
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
         }
@@ -274,8 +276,14 @@ private fun ReadyContent(
     tab: SquireTab,
     onMarkDone: (questId: Long) -> Unit,
     onRedeem: (itemId: Long) -> Unit,
+    onCashOut: (amount: Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Owed real money + whether a cash-out is already awaiting a grown-up (SQUIRE-T-0118).
+    val cashOwed = view.balances.orEmpty()
+        .firstOrNull { it.currency == com.squire.sdk.model.Currency.Cash }?.balance ?: 0L
+    val cashoutPending = view.myCashouts.orEmpty()
+        .any { it.state.state == com.squire.sdk.model.RedemptionStateKind.Pending }
     // Tap any quest / reward / streak / badge card to see its full details (SQUIRE-T-0094 #8).
     var detail by remember { mutableStateOf<DetailContent?>(null) }
     Box(modifier) {
@@ -306,6 +314,11 @@ private fun ReadyContent(
                     }
                 }
                 SquireTab.Rewards -> {
+                    // "Cash out" the owed real money (SQUIRE-T-0118) — a redemption of the $ balance,
+                    // shown above the coin shop whenever a grown-up owes the Squire dollars.
+                    if (cashOwed > 0) {
+                        item { CashOutRow(cashOwed, pending = cashoutPending, onCashOut = { onCashOut(cashOwed) }) }
+                    }
                     item { SectionTitle("Rewards") }
                     if (view.rewards.isEmpty()) {
                         item { EmptyHint("No rewards in the shop yet — ask a grown-up! 🛒") }
@@ -427,6 +440,35 @@ private fun RewardCardRow(reward: RewardCard, balance: Int, onRedeem: (Long) -> 
                     MaterialTheme.colorScheme.surfaceVariant,
                     MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+/** The "Cash out" affordance on the Rewards page (SQUIRE-T-0118): redeem owed real money, parent-approved. */
+@Composable
+private fun CashOutRow(owed: Long, pending: Boolean, onCashOut: () -> Unit) {
+    QuestCard(accent = MaterialTheme.colorScheme.primary) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("💵", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.width(48.dp))
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Cash out", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "A grown-up owes you \$$owed",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (pending) {
+                StatusChip(
+                    "⏳ asked",
+                    MaterialTheme.colorScheme.surfaceVariant,
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Button(onClick = onCashOut) { Text("Cash out \$$owed") }
             }
         }
     }
