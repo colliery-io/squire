@@ -31,6 +31,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,7 +43,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -96,8 +101,20 @@ fun PlayerHomeScreen(
     val cashOwed = (state as? PlayerUiState.Ready)?.view?.balances.orEmpty()
         .firstOrNull { it.currency == com.squire.sdk.model.Currency.Cash }?.balance ?: 0L
     val name = headerLabel ?: "Squire"
+    // Immediate "it registered!" feedback on every turn-in (usage feedback #5): a repeatable quest /
+    // reward stays Available after a tap, so without this the child sees nothing happen and re-taps
+    // (spams). The snackbar fires on tap regardless of the card's state.
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    fun cheer(msg: String) {
+        scope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss() // replace, don't queue, on rapid taps
+            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
+        }
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
@@ -192,8 +209,8 @@ fun PlayerHomeScreen(
             is PlayerUiState.Ready -> ReadyContent(
                 view = state.view,
                 fromCache = state.fromCache,
-                onMarkDone = onMarkDone,
-                onRedeem = onRedeem,
+                onMarkDone = { qid -> cheer("Sent! ⏳ A grown-up will check it"); onMarkDone(qid) },
+                onRedeem = { iid -> cheer("Sent! 🎁 Asked a grown-up"); onRedeem(iid) },
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
         }
