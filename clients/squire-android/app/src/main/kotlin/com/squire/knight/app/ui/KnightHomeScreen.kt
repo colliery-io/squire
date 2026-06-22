@@ -25,6 +25,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -58,6 +59,7 @@ import com.squire.app.ui.components.StatusChip
 import com.squire.app.ui.theme.SquireGold
 import com.squire.app.ui.theme.SquireTheme
 import com.squire.knight.core.KnightUiState
+import com.squire.sdk.model.Currency
 import com.squire.sdk.model.HistoryEntryDto
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.ItemOption
@@ -93,7 +95,7 @@ fun KnightHomeScreen(
     onRejectRequest: (requestId: Long, reason: String?) -> Unit,
     onApproveCashOut: (requestId: Long) -> Unit = {},
     onRejectCashOut: (requestId: Long, reason: String?) -> Unit = { _, _ -> },
-    onAddFunds: (squire: Long, amount: Long, reason: String) -> Unit,
+    onAddFunds: (squire: Long, amount: Long, reason: String, currency: Currency) -> Unit,
     onPay: (squire: Long, amount: Long, reason: String) -> Unit,
     onRedeem: (squire: Long, itemId: Long) -> Unit,
     onMarkDone: (squire: Long, questId: Long, on: Int) -> Unit,
@@ -310,7 +312,7 @@ private fun ReadyContent(
     onRejectRequest: (Long, String?) -> Unit,
     onApproveCashOut: (Long) -> Unit,
     onRejectCashOut: (Long, String?) -> Unit,
-    onAddFunds: (Long, Long, String) -> Unit,
+    onAddFunds: (Long, Long, String, Currency) -> Unit,
     onPay: (Long, Long, String) -> Unit,
     onRedeem: (Long, Long) -> Unit,
     onMarkDone: (Long, Long, Int) -> Unit,
@@ -406,8 +408,8 @@ private fun ReadyContent(
         AddFundsDialog(
             squireName = target.displayName,
             onDismiss = { fundsFor = null },
-            onConfirm = { amount, reason ->
-                onAddFunds(target.squire, amount, reason)
+            onConfirm = { amount, reason, currency ->
+                onAddFunds(target.squire, amount, reason, currency)
                 fundsFor = null
             },
         )
@@ -579,7 +581,7 @@ private fun SquireRow(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onMarkDone) { Text("Mark done") }
                 OutlinedButton(onClick = onRedeem) { Text("Redeem") }
-                OutlinedButton(onClick = onAddFunds) { Text("Add coins") }
+                OutlinedButton(onClick = onAddFunds) { Text("Add funds") }
             }
         }
     }
@@ -699,39 +701,68 @@ private fun ReviewCard(
 }
 
 @Composable
-private fun AddFundsDialog(squireName: String, onDismiss: () -> Unit, onConfirm: (Long, String) -> Unit) {
+private fun AddFundsDialog(squireName: String, onDismiss: () -> Unit, onConfirm: (Long, String, Currency) -> Unit) {
     var amount by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
+    // Coins (in-app) or Dollars (real money owed) — both go through the same Adjust command (T-0099).
+    var currency by remember { mutableStateOf(Currency.Coins) }
+    val isCash = currency == Currency.Cash
     val parsedAmount = amount.toLongOrNull()
     // REQ-K6: a positive amount AND a non-empty reason are required before the action is allowed.
     val valid = parsedAmount != null && parsedAmount > 0 && reason.isNotBlank()
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add coins — $squireName") },
+        title = { Text("Add to $squireName") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = amount,
-                    onValueChange = { amount = it.filter(Char::isDigit) },
-                    label = { Text("Amount (coins)") },
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = reason,
-                    onValueChange = { reason = it },
-                    label = { Text("Reason (required)") },
-                    singleLine = true,
-                )
-            }
+            AddFundsFields(
+                amount = amount,
+                onAmount = { amount = it.filter(Char::isDigit) },
+                reason = reason,
+                onReason = { reason = it },
+                currency = currency,
+                onCurrency = { currency = it },
+            )
         },
         confirmButton = {
-            Button(enabled = valid, onClick = { onConfirm(parsedAmount!!, reason.trim()) }) {
+            Button(enabled = valid, onClick = { onConfirm(parsedAmount!!, reason.trim(), currency) }) {
                 Text("Add")
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+/** The body of [AddFundsDialog]: the ⭐ Coins / $ Dollars toggle + amount + reason. Stateless so it
+ *  can be previewed/snapshotted (Paparazzi can't capture the AlertDialog popup). */
+@Composable
+internal fun AddFundsFields(
+    amount: String,
+    onAmount: (String) -> Unit,
+    reason: String,
+    onReason: (String) -> Unit,
+    currency: Currency,
+    onCurrency: (Currency) -> Unit,
+) {
+    val isCash = currency == Currency.Cash
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = !isCash, onClick = { onCurrency(Currency.Coins) }, label = { Text("⭐ Coins") })
+            FilterChip(selected = isCash, onClick = { onCurrency(Currency.Cash) }, label = { Text("\$ Dollars") })
+        }
+        OutlinedTextField(
+            value = amount,
+            onValueChange = onAmount,
+            label = { Text(if (isCash) "Amount (dollars)" else "Amount (coins)") },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = reason,
+            onValueChange = onReason,
+            label = { Text("Reason (required)") },
+            singleLine = true,
+        )
+    }
 }
 
 /**
@@ -819,7 +850,7 @@ private fun KnightHomePreview() {
         KnightHomeScreen(
             state = KnightUiState.Ready(sample, fromCache = false),
             onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
-            onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
+            onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _, _ -> },
             onPay = { _, _, _ -> },
             onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
         )

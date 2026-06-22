@@ -200,7 +200,7 @@ internal fun KnightHomeHost(
         com.squire.knight.app.ui.HazardAdminScreen(
             adapter = adapter,
             squires = squires,
-            onApply = { squire, amount, reason -> viewModel.adjust(squire, amount, reason) },
+            onApply = { squire, amount, reason -> viewModel.adjust(squire, amount, reason, com.squire.sdk.model.Currency.Coins) },
             onBack = { managingHazards = false },
         )
         return
@@ -244,7 +244,7 @@ internal fun KnightHomeHost(
                         runCatching { adapter.history(limit = 100) }.onSuccess { history = it }
                     }
                 },
-                onAddFunds = { squire, amount, reason -> viewModel.adjust(squire, amount, reason) },
+                onAddFunds = { squire, amount, reason, currency -> viewModel.adjust(squire, amount, reason, currency) },
                 onPay = { squire, amount, reason -> viewModel.pay(squire, amount, reason) },
                 onRedeem = { squire, itemId -> viewModel.redeem(squire, itemId) },
                 onMarkDone = { squire, questId, on -> viewModel.markDone(squire, questId, on) },
