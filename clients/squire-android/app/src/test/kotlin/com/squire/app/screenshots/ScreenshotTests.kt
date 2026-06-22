@@ -20,6 +20,7 @@ import com.squire.knight.app.ui.RewardAdminScreen
 import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.AchievementSummaryDto
 import com.squire.sdk.model.BadgeView
+import com.squire.sdk.model.HistoryEntryDto
 import com.squire.sdk.model.GoalView
 import com.squire.sdk.model.ClaimState
 import com.squire.sdk.model.ClaimStateKind
@@ -109,6 +110,38 @@ class ScreenshotTests {
                     state = KnightUiState.Ready(review, fromCache = false),
                     name = "David Storey",
                     initialTab = com.squire.knight.app.ui.KnightTab.Manage,
+                    onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
+                    onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
+                    onPay = { _, _, _ -> },
+                    onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
+                )
+            }
+        }
+    }
+
+    @Test
+    fun knightHistory() {
+        val review = HouseholdReview(
+            generatedAt = 0L,
+            squires = listOf(SquireSummary(balance = 25, displayName = "Gawain", squire = 2)),
+            pendingClaims = emptyList(),
+            pendingRequests = emptyList(), items = emptyList(), quests = emptyList(), today = 20624,
+        )
+        val at = 1_700_000_000_000L
+        val history = listOf(
+            HistoryEntryDto(at = at, kind = "CashedOut", squire = 2, amount = 5, currency = Currency.Cash),
+            HistoryEntryDto(at = at - 60_000, kind = "CashOutRequested", squire = 2, amount = 5, currency = Currency.Cash),
+            HistoryEntryDto(at = at - 120_000, kind = "Approved", squire = 2, amount = 5),
+            HistoryEntryDto(at = at - 180_000, kind = "Redeemed", squire = 2, amount = 3, itemId = 1),
+            HistoryEntryDto(at = at - 240_000, kind = "Adjusted", squire = 2, amount = 10, currency = Currency.Coins, reason = "gophering"),
+        )
+        paparazzi.snapshot {
+            SquireTheme {
+                KnightHomeScreen(
+                    state = KnightUiState.Ready(review, fromCache = false),
+                    name = "David Storey",
+                    initialTab = com.squire.knight.app.ui.KnightTab.History,
+                    history = history,
                     onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
                     onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
                     onPay = { _, _, _ -> },

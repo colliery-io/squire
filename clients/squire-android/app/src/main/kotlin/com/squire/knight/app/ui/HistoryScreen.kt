@@ -90,8 +90,9 @@ internal fun HistoryScreen(
     }
 }
 
+/** One activity-feed row; reused by the Knight Review's History tab (SQUIRE-T-0118 polish). */
 @Composable
-private fun HistoryRow(e: HistoryEntryDto, squireName: String) {
+internal fun HistoryRow(e: HistoryEntryDto, squireName: String) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -129,6 +130,9 @@ private fun describe(e: HistoryEntryDto, name: String): String {
         "Redeemed" -> "$name redeemed a reward (${amt ?: 0} coins)"
         "Requested" -> "$name requested a reward"
         "RedemptionRejected" -> "$name's reward request was rejected"
+        "CashOutRequested" -> "$name asked to cash out $${amt ?: 0}"
+        "CashedOut" -> "$name cashed out $${kotlin.math.abs(amt ?: 0)}"
+        "CashOutRejected" -> "$name's cash-out was declined"
         "Unlocked" -> "$name unlocked an achievement (+${amt ?: 0})"
         "Adjusted" -> {
             val unit = if (e.currency == Currency.Cash) "$" else "coins"

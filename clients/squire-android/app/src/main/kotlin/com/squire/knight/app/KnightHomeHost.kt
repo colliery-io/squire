@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +33,7 @@ import com.squire.pairing.UpdateBanner
 import com.squire.pairing.UpdateChecker
 import com.squire.pairing.UpdateInfo
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicLong
 
@@ -82,6 +84,9 @@ internal fun KnightHomeHost(
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    // Activity feed for the History tab, fetched lazily when that tab is opened (SQUIRE-T-0118 polish).
+    val scope = rememberCoroutineScope()
+    var history by remember(session) { mutableStateOf<List<com.squire.sdk.model.HistoryEntryDto>>(emptyList()) }
 
     LaunchedEffect(session) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -232,6 +237,12 @@ internal fun KnightHomeHost(
                 onRejectRequest = { id, reason -> viewModel.rejectRequest(id, reason) },
                 onApproveCashOut = { viewModel.approveCashOut(it) },
                 onRejectCashOut = { id, reason -> viewModel.rejectCashOut(id, reason) },
+                history = history,
+                onHistoryShown = {
+                    scope.launch {
+                        runCatching { adapter.history(limit = 100) }.onSuccess { history = it }
+                    }
+                },
                 onAddFunds = { squire, amount, reason -> viewModel.adjust(squire, amount, reason) },
                 onPay = { squire, amount, reason -> viewModel.pay(squire, amount, reason) },
                 onRedeem = { squire, itemId -> viewModel.redeem(squire, itemId) },
