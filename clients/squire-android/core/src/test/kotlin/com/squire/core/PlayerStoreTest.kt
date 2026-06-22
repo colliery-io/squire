@@ -91,9 +91,13 @@ private class RecordingSubmissionApi : SubmissionApi {
     override suspend fun requestRedemption(req: RequestRedemptionReq) {
         requestIds += req.requestId
     }
+
+    override suspend fun requestCashOut(req: com.squire.sdk.model.RequestCashOutReq) {
+        requestIds += req.requestId
+    }
 }
 
-private class FakeResolvedStatePort(var resolved: ResolvedIds = ResolvedIds(emptySet(), emptySet())) :
+private class FakeResolvedStatePort(var resolved: ResolvedIds = ResolvedIds(emptySet(), emptySet(), emptySet())) :
     StatePort {
     override suspend fun resolvedIds(): ResolvedIds = resolved
 }
@@ -162,7 +166,7 @@ class PlayerStoreTest {
         val outbox = InMemoryOutbox()
         val api = RecordingSubmissionApi()
         // The refreshed state reports the minted claim id 42 as resolved.
-        val statePort = FakeResolvedStatePort(ResolvedIds(claims = setOf(42L), requests = emptySet()))
+        val statePort = FakeResolvedStatePort(ResolvedIds(claims = setOf(42L), requests = emptySet(), cashouts = emptySet()))
         val s = store(
             FakeFetcher(view = sampleState()),
             outbox = outbox,
@@ -184,7 +188,7 @@ class PlayerStoreTest {
         val outbox = InMemoryOutbox()
         val api = RecordingSubmissionApi()
         // Server has not yet acknowledged the request id, so it stays pending.
-        val statePort = FakeResolvedStatePort(ResolvedIds(claims = emptySet(), requests = emptySet()))
+        val statePort = FakeResolvedStatePort(ResolvedIds(claims = emptySet(), requests = emptySet(), cashouts = emptySet()))
         val s = store(
             FakeFetcher(view = sampleState()),
             outbox = outbox,

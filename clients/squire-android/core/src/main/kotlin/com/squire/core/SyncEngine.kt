@@ -33,6 +33,7 @@ class SyncEngine(
                 when (item) {
                     is OutboxItem.Claim -> api.submitClaim(item.req)
                     is OutboxItem.Redemption -> api.requestRedemption(item.req)
+                    is OutboxItem.CashOut -> api.requestCashOut(item.req)
                 }
             }
 
@@ -43,6 +44,7 @@ class SyncEngine(
                     when (item.kind) {
                         SubmissionKind.CLAIM -> item.id in resolved.claims
                         SubmissionKind.REDEMPTION -> item.id in resolved.requests
+                        SubmissionKind.CASHOUT -> item.id in resolved.cashouts
                     }
                 }
                 .map { it.id }

@@ -54,7 +54,11 @@ the **Cash** currency instead of spending coins.
   via a `CashOutApproved` event (counted as a Cash debit); reject leaves it owed. **(backend done)**
 - [x] No per-squire Pay button anywhere; cards stay uniform. **(done earlier in the redesign)**
 - [x] Gherkin scenario green — `crates/api/tests/features/cashout.feature` (4 scenarios). **(done)**
-- [ ] Android: child "Cash out $X" in Rewards; parent review-queue renders pending cash-outs.
+- [x] Android: child "Cash out $X" in Rewards; parent review-queue "Cash-outs to pay" section.
+  Full offline path wired (outbox/sync/Room on both sides); core + knight-core unit tests + Paparazzi
+  snapshots green. **(done)**
+
+**Implemented end to end + green; ships with the next release (UI-polish hold — not yet released).**
 
 ## Progress (2026-06-22)
 **Backend complete + green** (full Rust suite + 4 Gherkin scenarios). Model as built:

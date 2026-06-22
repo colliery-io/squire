@@ -30,4 +30,8 @@ class SquireViewModel(private val store: PlayerStore) : ViewModel() {
     fun requestRedemption(itemId: Long) {
         viewModelScope.launch { store.requestRedemption(itemId = itemId) }
     }
+
+    fun requestCashOut(amount: Long) {
+        viewModelScope.launch { store.requestCashOut(amount = amount) }
+    }
 }
