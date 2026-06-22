@@ -26,6 +26,7 @@ mod claims;
 pub(crate) mod common;
 mod redemption;
 
+pub use common::total_completions;
 pub use contract::*;
 pub use engine::{child_originable, DomainEngine};
 pub use projections::{quest_status, reward_view, streak_view, Proj};
