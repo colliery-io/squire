@@ -1,17 +1,23 @@
 package com.squire.app.screenshots
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
@@ -27,6 +33,7 @@ import com.squire.app.ui.streakDetail
 import com.squire.app.ui.theme.SquireTheme
 import com.squire.core.PlayerUiState
 import com.squire.knight.app.data.KnightApiAdapter
+import com.squire.knight.app.ui.AddFundsFields
 import com.squire.knight.app.ui.AchievementAdminScreen
 import com.squire.knight.app.ui.KnightHomeScreen
 import com.squire.knight.app.ui.LibraryAch
@@ -111,7 +118,7 @@ class ScreenshotTests {
                     state = KnightUiState.Ready(review, fromCache = false),
                     name = "David Storey",
                     onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
-                    onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
+                    onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _, _ -> },
                     onPay = { _, _, _ -> },
                     onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
                 )
@@ -132,7 +139,7 @@ class ScreenshotTests {
                     name = "David Storey",
                     initialTab = com.squire.knight.app.ui.KnightTab.Manage,
                     onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
-                    onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
+                    onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _, _ -> },
                     onPay = { _, _, _ -> },
                     onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
                 )
@@ -164,10 +171,35 @@ class ScreenshotTests {
                     initialTab = com.squire.knight.app.ui.KnightTab.History,
                     history = history,
                     onRefresh = {}, onApproveClaim = {}, onRejectClaim = { _, _ -> },
-                    onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _ -> },
+                    onApproveRequest = {}, onRejectRequest = { _, _ -> }, onAddFunds = { _, _, _, _ -> },
                     onPay = { _, _, _ -> },
                     onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
                 )
+            }
+        }
+    }
+
+    @Test
+    fun knightAddFunds() {
+        // The "Add funds" dialog body — a grown-up can now grant Dollars, not just Coins (the currency
+        // toggle). Rendered as a card (Paparazzi can't capture the AlertDialog popup).
+        paparazzi.snapshot {
+            SquireTheme {
+                Surface(
+                    modifier = Modifier.padding(24.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 4.dp,
+                ) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text("Add to Gawain", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        AddFundsFields(amount = "5", onAmount = {}, reason = "Birthday money", onReason = {}, currency = Currency.Cash, onCurrency = {})
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {}) { Text("Cancel") }
+                            Button(onClick = {}) { Text("Add") }
+                        }
+                    }
+                }
             }
         }
     }

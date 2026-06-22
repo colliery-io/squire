@@ -32,8 +32,8 @@ class KnightViewModel(private val store: KnightStore) : ViewModel() {
         viewModelScope.launch { store.rejectCashOut(requestId, reason) }
 
     fun redeem(squire: Long, itemId: Long) = viewModelScope.launch { store.redeem(squire, itemId) }
-    fun adjust(squire: Long, amount: Long, reason: String) =
-        viewModelScope.launch { store.adjust(squire, amount, reason) }
+    fun adjust(squire: Long, amount: Long, reason: String, currency: com.squire.sdk.model.Currency) =
+        viewModelScope.launch { store.adjust(squire, amount, reason, currency) }
 
     /** Settle real-money cash owed to [squire] (SQUIRE-T-0111): a Cash payout of −[amount]. */
     fun pay(squire: Long, amount: Long, reason: String) =

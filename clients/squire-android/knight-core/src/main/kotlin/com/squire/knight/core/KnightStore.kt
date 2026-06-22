@@ -122,9 +122,9 @@ class KnightStore(
      * Add funds: a positive [amount] with a **required** [reason] (REQ-K6). The caller (UI) blocks
      * the action until a non-empty reason is supplied; this also guards defensively.
      */
-    suspend fun adjust(squire: Long, amount: Long, reason: String) {
+    suspend fun adjust(squire: Long, amount: Long, reason: String, currency: Currency = Currency.Coins) {
         require(reason.isNotBlank()) { "AdjustPoints requires a reason" }
-        submit(KnightCommand.Adjust(AdjustReq(amount = amount, commandId = ids(), reason = reason, squire = squire)))
+        submit(KnightCommand.Adjust(AdjustReq(amount = amount, commandId = ids(), reason = reason, squire = squire, currency = currency)))
     }
 
     /**
