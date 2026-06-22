@@ -1,12 +1,16 @@
 package com.squire.app.screenshots
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
@@ -182,6 +186,38 @@ class ScreenshotTests {
             SquireTheme {
                 Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(20.dp)) {
                     DetailCard(questDetail(quest), Modifier.fillMaxWidth())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun squireSubmitFeedback() {
+        // Usage feedback #5: a repeatable quest stays "Available" after a tap, so without a cue the
+        // child sees nothing happen and re-taps (spams). Tapping "Done" pops this "Sent!" snackbar.
+        val view = StateView(
+            balance = 12, generatedAt = 0L, squire = 1L,
+            questsToday = listOf(
+                QuestCard(on = 1, questId = 1L, reward = 5, status = QuestStatus.Available, title = "Practice piano", icon = "🎹"),
+                QuestCard(on = 1, questId = 2L, reward = 3, status = QuestStatus.Available, title = "Feed the dog", icon = "🐶"),
+            ),
+            rewards = emptyList(), myClaims = emptyList(), myRequests = emptyList(),
+            streaks = emptyList(), badges = emptyList(), goals = emptyList(),
+        )
+        paparazzi.snapshot {
+            SquireTheme {
+                Box(Modifier.fillMaxSize()) {
+                    PlayerHomeScreen(
+                        state = PlayerUiState.Ready(view, fromCache = false),
+                        onRefresh = {}, onMarkDone = {}, onRedeem = {},
+                        headerLabel = "Matrim",
+                    )
+                    // The exact snackbar cheer() shows on a turn-in, placed where the host renders it
+                    // (above the bottom nav). Composed explicitly because Paparazzi can't run the
+                    // suspending showSnackbar().
+                    Snackbar(modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 96.dp)) {
+                        Text("Sent! ⏳ A grown-up will check it")
+                    }
                 }
             }
         }
