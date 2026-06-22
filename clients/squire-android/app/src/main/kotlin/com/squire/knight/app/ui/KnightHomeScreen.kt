@@ -40,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,7 @@ import com.squire.app.ui.components.StatusChip
 import com.squire.app.ui.theme.SquireGold
 import com.squire.app.ui.theme.SquireTheme
 import com.squire.knight.core.KnightUiState
+import com.squire.sdk.model.HistoryEntryDto
 import com.squire.sdk.model.HouseholdReview
 import com.squire.sdk.model.ItemOption
 import com.squire.sdk.model.PendingClaim
@@ -104,9 +106,13 @@ fun KnightHomeScreen(
     onManageHazards: () -> Unit = {},
     onManageSettings: () -> Unit = {},
     onViewHistory: () -> Unit = {},
+    history: List<HistoryEntryDto> = emptyList(),
+    onHistoryShown: () -> Unit = {},
 ) {
     val firstName = name.substringBefore(' ')
     var tab by remember { mutableStateOf(initialTab) }
+    // Lazily load the activity feed the first time the History tab is opened (SQUIRE-T-0118 polish).
+    LaunchedEffect(tab) { if (tab == KnightTab.History) onHistoryShown() }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -208,7 +214,11 @@ fun KnightHomeScreen(
                     onManageMembers = onManageMembers,
                     modifier = Modifier.fillMaxSize().padding(padding),
                 )
-                KnightTab.History -> HistoryTabPage(onViewHistory, Modifier.fillMaxSize().padding(padding))
+                KnightTab.History -> HistoryTabPage(
+                    history = history,
+                    squireNames = state.review.squires.associate { it.squire to it.displayName },
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                )
             }
         }
     }
@@ -257,21 +267,36 @@ private fun ManageRow(icon: String, title: String, subtitle: String, onClick: ()
     }
 }
 
-/** The "History" tab: opens the full activity history (kept as its own screen via [onViewHistory]). */
+/** The "History" tab: the household activity feed inline (SQUIRE-T-0118 polish) — approvals, rewards,
+ *  cash-outs, adjustments and unlocks across all Squires, newest first. */
 @Composable
-private fun HistoryTabPage(onViewHistory: () -> Unit, modifier: Modifier = Modifier) {
-    Centered(modifier) {
-        Text("📜", style = MaterialTheme.typography.displaySmall)
-        Spacer(Modifier.height(8.dp))
-        Text("Activity history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Every approval, reward and adjustment across the household.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(12.dp))
-        Button(onClick = onViewHistory) { Text("Open history") }
+private fun HistoryTabPage(
+    history: List<HistoryEntryDto>,
+    squireNames: Map<Long, String>,
+    modifier: Modifier = Modifier,
+) {
+    if (history.isEmpty()) {
+        Centered(modifier) {
+            Text("📜", style = MaterialTheme.typography.displaySmall)
+            Spacer(Modifier.height(8.dp))
+            Text("No activity yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Approvals, rewards and adjustments will show up here.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(history) { e ->
+            HistoryRow(e, squireNames[e.squire] ?: "Squire ${e.squire}")
+        }
     }
 }
 
