@@ -110,14 +110,17 @@ and `/api/config`, but the LAN API does not expose them yet) → SDK regen → A
   (approve/reject/adjust). **Bonus:** caught + fixed a real pre-existing bug — `Quest.cash` had no
   serde default, so the Keep's library import (omits cash) 400'd (the **cash analog of T-0109**);
   `#[serde(default)]` added. Full e2e green: **23 passed** (`60b8dfc`, `f25a57a`).
-- ▶ **NEXT — Phase 4 (2 suites left):**
-  1. [[SQUIRE-T-0115]] Android Gherkin (cucumber-jvm / instrumented; **covers the new Pay / Settings /
-     History screens** behaviorally).
-  2. [[SQUIRE-T-0116]] full-stack phone→API→store integration as Gherkin.
-  Then green `angreal test all` → hand back for the bundled release.
-  Pattern proven twice (cucumber-rs + playwright-bdd): reuse the **same scenario vocabulary**.
-  Remaining Keep specs (keep-admin/achievements/rewards/quests) can convert to `.feature` the same
-  way as a follow-up — not blocking.
+- ✅ **2026-06-21** [[SQUIRE-T-0115]] **DONE** — Android Knight Gherkin via **cucumber-jvm** (JUnit
+  Platform suite in `:knight-core`, JVM/no-emulator). `knight_actions.feature` covers the new cash
+  payout (pay → Cash adjust of −amount) + coin grant + guards; 3 scenarios green. `angreal test
+  gherkin` runs api+android; `test all` adds `_android_unit` (`8e7a299`). *Instrumented/Compose
+  interaction deferred — no emulator in this env; the store-level behavior is covered on the JVM.*
+- ▶ **LAST — [[SQUIRE-T-0116]]** full-stack phone→API→store integration. **Design fork (needs a call):**
+  (a) *pragmatic, runnable now* — Rust full-stack Gherkin over a real socket + **persistence/restart
+  durability** (reopen the store, balance persists) using the phone's exact wire payloads
+  (currency:null, cash-omitted); or (b) *literal* — the Kotlin SDK driving a booted Rust server
+  (gradle↔cargo process orchestration; heaviest; may not run headless here).
+  Then green `angreal test all` → bundled release.
 
 ## Alternatives Considered
 - *GWT-structured tests in existing frameworks* (no Cucumber) — rejected by operator in favor of true
