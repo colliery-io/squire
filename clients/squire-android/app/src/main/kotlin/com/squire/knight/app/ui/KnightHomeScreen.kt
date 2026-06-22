@@ -733,7 +733,7 @@ private fun AddFundsDialog(squireName: String, onDismiss: () -> Unit, onConfirm:
     )
 }
 
-/** The body of [AddFundsDialog]: the ⭐ Coins / $ Dollars toggle + amount + reason. Stateless so it
+/** The body of [AddFundsDialog]: the 🪙 Coins / $ Dollars toggle + amount + reason. Stateless so it
  *  can be previewed/snapshotted (Paparazzi can't capture the AlertDialog popup). */
 @Composable
 internal fun AddFundsFields(
@@ -747,7 +747,7 @@ internal fun AddFundsFields(
     val isCash = currency == Currency.Cash
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = !isCash, onClick = { onCurrency(Currency.Coins) }, label = { Text("⭐ Coins") })
+            FilterChip(selected = !isCash, onClick = { onCurrency(Currency.Coins) }, label = { Text("🪙 Coins") })
             FilterChip(selected = isCash, onClick = { onCurrency(Currency.Cash) }, label = { Text("\$ Dollars") })
         }
         OutlinedTextField(
