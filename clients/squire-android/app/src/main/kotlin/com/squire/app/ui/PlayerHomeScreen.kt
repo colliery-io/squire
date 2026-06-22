@@ -535,7 +535,7 @@ private fun StreakCardRow(streak: StreakView, onClick: () -> Unit) {
 @Composable
 private fun ClaimRow(claim: ClaimStatus) {
     when (claim.state.state) {
-        ClaimStateKind.Approved -> CompactRow("✓", claim.questTitle, "+${claim.state.points ?: 0} ⭐", MaterialTheme.colorScheme.primary)
+        ClaimStateKind.Approved -> CompactRow("✓", claim.questTitle, "+${claim.state.points ?: 0} 🪙", MaterialTheme.colorScheme.primary)
         ClaimStateKind.Rejected -> CompactRow("✗", claim.questTitle, "rejected", MaterialTheme.colorScheme.error)
         ClaimStateKind.Pending -> CompactRow("⏳", claim.questTitle, "pending", MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -549,7 +549,7 @@ private fun AdjustmentRow(adj: AdjustmentView) {
     CompactRow(
         icon = "🪙",
         what = adj.reason.ifBlank { if (positive) "Coins from a grown-up" else "Coins taken away" },
-        amount = (if (positive) "+" else "−") + "$mag ⭐",
+        amount = (if (positive) "+" else "−") + "$mag 🪙",
         amountColor = if (positive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
     )
 }
@@ -557,7 +557,7 @@ private fun AdjustmentRow(adj: AdjustmentView) {
 @Composable
 private fun RequestRow(request: RedemptionStatus) {
     when (request.state.state) {
-        RedemptionStateKind.Approved -> CompactRow("🎁", request.itemName, "−${request.cost} ⭐", MaterialTheme.colorScheme.onSurface)
+        RedemptionStateKind.Approved -> CompactRow("🎁", request.itemName, "−${request.cost} 🪙", MaterialTheme.colorScheme.onSurface)
         RedemptionStateKind.Rejected -> CompactRow("✗", request.itemName, "rejected", MaterialTheme.colorScheme.error)
         RedemptionStateKind.Pending -> CompactRow("⏳", request.itemName, "pending", MaterialTheme.colorScheme.onSurfaceVariant)
     }
