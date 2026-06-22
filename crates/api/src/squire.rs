@@ -421,6 +421,7 @@ fn quests_today(snap: &Snapshot, squire: UserId, today: Date) -> Vec<QuestCard> 
             Some(QuestCard {
                 quest_id: q.id,
                 title: q.title.clone(),
+                description: q.description.clone(),
                 reward: q.reward,
                 category: q.category.clone(),
                 icon: q.icon.clone(),
@@ -542,6 +543,7 @@ fn rewards(snap: &Snapshot, squire: UserId) -> Vec<RewardCard> {
             RewardCard {
                 item_id: item.id,
                 name: item.name.clone(),
+                description: item.description.clone(),
                 cost: item.cost,
                 icon: item.icon.clone(),
                 affordable,

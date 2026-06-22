@@ -1,10 +1,25 @@
 package com.squire.app.screenshots
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.android.resources.NightMode
+import com.squire.app.ui.DetailCard
 import com.squire.app.ui.PlayerHomeScreen
 import com.squire.app.ui.SquireTab
+import com.squire.app.ui.badgeDetail
+import com.squire.app.ui.goalDetail
+import com.squire.app.ui.questDetail
+import com.squire.app.ui.rewardDetail
+import com.squire.app.ui.streakDetail
 import com.squire.app.ui.theme.SquireTheme
 import com.squire.core.PlayerUiState
 import com.squire.knight.app.data.KnightApiAdapter
@@ -147,6 +162,31 @@ class ScreenshotTests {
                     onPay = { _, _, _ -> },
                     onRedeem = { _, _ -> }, onMarkDone = { _, _, _ -> },
                 )
+            }
+        }
+    }
+
+    @Test
+    fun squireDetailCards() {
+        // The tap-to-expand detail views (SQUIRE-T-0094 #8), one per card type, rendered as cards
+        // (Paparazzi can't capture the real AlertDialog popups).
+        val quest = QuestCard(on = 1, questId = 1L, reward = 5, status = QuestStatus.Pending, title = "Tidy your room", icon = "🧹", category = "Chores", description = "Make your bed, put your clothes away, and clear the floor.")
+        val reward = RewardCard(affordable = true, cost = 3, itemId = 1L, name = "Ice cream", icon = "🍦", description = "A scoop of your favourite ice cream after dinner.")
+        val streak = StreakView(name = "Room Master", current = 3, best = 5, alive = true, nextMilestone = 7)
+        val badge = BadgeView(at = 0L, bonus = 25, id = 1L, name = "Century Club")
+        val goal = GoalView(id = 7L, name = "Best Friends", description = "Complete 10 chores together", bonus = 25)
+        paparazzi.snapshot {
+            SquireTheme {
+                Column(
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    DetailCard(questDetail(quest), Modifier.fillMaxWidth())
+                    DetailCard(rewardDetail(reward), Modifier.fillMaxWidth())
+                    DetailCard(streakDetail(streak), Modifier.fillMaxWidth())
+                    DetailCard(badgeDetail(badge), Modifier.fillMaxWidth())
+                    DetailCard(goalDetail(goal), Modifier.fillMaxWidth())
+                }
             }
         }
     }

@@ -86,6 +86,10 @@ pub struct AdjustmentView {
 pub struct QuestCard {
     pub quest_id: QuestId,
     pub title: String,
+    /// The quest's authored blurb, shown in the tap-to-expand detail (SQUIRE-T-0094 #8). `serde(default)`
+    /// for back-compat with older servers / clients.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub description: Option<String>,
     pub reward: Points,
     pub category: Option<Category>,
     pub icon: Option<String>,
@@ -142,6 +146,10 @@ pub struct GoalView {
 pub struct RewardCard {
     pub item_id: ItemId,
     pub name: String,
+    /// The reward's authored blurb, shown in the tap-to-expand detail (SQUIRE-T-0094 #8). `serde(default)`
+    /// for back-compat with older servers / clients.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub description: Option<String>,
     pub cost: Points,
     pub icon: Option<String>,
     pub affordable: bool,
