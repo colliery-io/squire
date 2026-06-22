@@ -31,6 +31,10 @@ pub struct StateView {
     pub rewards: Vec<RewardCard>,
     pub my_claims: Vec<ClaimStatus>,
     pub my_requests: Vec<RedemptionStatus>,
+    /// Cash-out requests the Squire has made (SQUIRE-T-0118) — drawing down owed Cash, parent-approved.
+    /// `#[serde(default)]` for back-compat with older servers.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub my_cashouts: Vec<CashOutStatus>,
     /// Point adjustments the child should *see* in their activity feed — coins a grown-up granted
     /// ("+", e.g. for being a gofur) or took away ("−", e.g. a hazard), each with the reason
     /// (SQUIRE-T-0094 / SQUIRE-T-0096). `#[serde(default)]` for back-compat with older servers.
@@ -283,6 +287,37 @@ pub struct RequestRedemptionReq { pub request_id: RequestId, pub item_id: ItemId
 #[derive(Clone, Debug)]
 pub struct RequestRedemptionResp { pub request_id: RequestId, pub state: RedemptionState }
 
+/// A Squire's cash-out request + its review state (SQUIRE-T-0118); `state` reuses [`RedemptionState`].
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct CashOutStatus {
+    pub request_id: RequestId,
+    pub amount: i64,
+    pub state: RedemptionState,
+}
+
+/// A pending cash-out in the Knight's review queue (SQUIRE-T-0118), labeled with its Squire.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct PendingCashOut {
+    pub request_id: RequestId,
+    pub squire: UserId,
+    pub amount: i64,
+}
+
+/// POST /cash-out-requests — idempotent on `request_id` (phone-minted). `amount` is whole dollars of
+/// owed Cash to draw down; re-checked at approval, mirroring a redemption (SQUIRE-T-0118).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct RequestCashOutReq { pub request_id: RequestId, pub amount: i64 }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct RequestCashOutResp { pub request_id: RequestId, pub state: RedemptionState }
+
 /// Parent (Knight) review read — pending work across ALL Squires, each labeled with its
 /// Squire, plus per-Squire balances. The Knight renders/triages this; the exact shape is
 /// still an open decision in SQUIRE-S-0003 / S-0006.
@@ -294,6 +329,10 @@ pub struct HouseholdReview {
     pub squires: Vec<SquireSummary>,
     pub pending_claims: Vec<PendingClaim>,
     pub pending_requests: Vec<PendingRequest>,
+    /// Pending cash-out requests across all Squires (SQUIRE-T-0118), each labeled with its Squire.
+    /// `#[serde(default)]` for back-compat with older servers.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub pending_cashouts: Vec<PendingCashOut>,
     /// Active redeemable items the Knight can direct-redeem on a Squire's behalf (REQ-K5).
     pub items: Vec<ItemOption>,
     /// Active quests the Knight can mark done for a Squire (REQ-K3), paired with [`today`].

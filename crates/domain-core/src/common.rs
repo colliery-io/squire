@@ -335,6 +335,25 @@ pub fn request_resolved(snap: &Snapshot, request_id: RequestId) -> bool {
     })
 }
 
+/// `(squire, amount)` of a cash-out request, from its `CashOutRequested` — `None` if none (T-0118).
+pub fn cashout_meta(snap: &Snapshot, request_id: RequestId) -> Option<(UserId, i64)> {
+    snap.events.iter().find_map(|e| match e {
+        Event::CashOutRequested { request_id: r, squire, amount, .. } if *r == request_id => {
+            Some((*squire, *amount))
+        }
+        _ => None,
+    })
+}
+
+/// Has a cash-out request been resolved (approved → `CashOutApproved`, or rejected)?
+pub fn cashout_resolved(snap: &Snapshot, request_id: RequestId) -> bool {
+    snap.events.iter().any(|e| match e {
+        Event::CashOutApproved { request_id: r, .. } if *r == request_id => true,
+        Event::CashOutRejected { request_id: r, .. } if *r == request_id => true,
+        _ => false,
+    })
+}
+
 /// Has a privileged command with this `command_id` already been committed (direct redeem or
 /// adjustment)? The basis of `RedeemItem` / `AdjustPoints` idempotency (ADR SQUIRE-A-0001) —
 /// derived from the log, not a side table.

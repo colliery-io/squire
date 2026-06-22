@@ -63,6 +63,7 @@ struct ApiWorld {
     /// quest title → id (authored straight into the store, off the wire)
     quests: HashMap<String, u128>,
     last_claim_id: u128,
+    last_request_id: u128,
     next_id: u128,
     last_status: u16,
     last_body: Value,
@@ -260,6 +261,53 @@ async fn knight_approves(world: &mut ApiWorld) {
     let knight = world.knight.clone();
     let body = json!({ "claim_id": world.last_claim_id, "decision": { "verdict": "approve" } });
     world.send("POST", "/admin/review-claim", Some(&knight), Some(body)).await;
+}
+
+// ─── cash-out (SQUIRE-T-0118): a Squire draws down owed Cash, parent-approved ──────────────────
+
+#[given(regex = r#"^the Knight grants (\w+) (\d+) dollars$"#)]
+async fn knight_grants_cash(world: &mut ApiWorld, name: String, amount: i64) {
+    let (id, _) = world.squire(&name);
+    let knight = world.knight.clone();
+    world.adjust(knight, id, amount, "owed for chores", Some("Cash")).await;
+}
+
+#[when(regex = r#"^(\w+) requests to cash out (\d+) dollars$"#)]
+async fn requests_cashout(world: &mut ApiWorld, name: String, amount: i64) {
+    let (_, token) = world.squire(&name);
+    let request_id = world.mint_id();
+    world.last_request_id = request_id;
+    let body = json!({ "request_id": request_id, "amount": amount });
+    world.send("POST", "/cash-out-requests", Some(&token), Some(body)).await;
+}
+
+#[when("the Knight approves the cash-out")]
+async fn knight_approves_cashout(world: &mut ApiWorld) {
+    let knight = world.knight.clone();
+    let body = json!({ "request_id": world.last_request_id, "decision": { "verdict": "approve" } });
+    world.send("POST", "/admin/review-cashout", Some(&knight), Some(body)).await;
+}
+
+#[when("the Knight rejects the cash-out")]
+async fn knight_rejects_cashout(world: &mut ApiWorld) {
+    let knight = world.knight.clone();
+    let body = json!({ "request_id": world.last_request_id, "decision": { "verdict": "reject" } });
+    world.send("POST", "/admin/review-cashout", Some(&knight), Some(body)).await;
+}
+
+#[then(regex = r#"^(\w+)'s owed cash is (-?\d+)$"#)]
+async fn owed_cash_is(world: &mut ApiWorld, name: String, expected: i64) {
+    let (_, token) = world.squire(&name);
+    world.send("GET", "/state", Some(&token), None).await;
+    assert_eq!(world.last_status, 200, "GET /state should be 200");
+    let cash = world.last_body["balances"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|b| b["currency"] == "Cash")
+        .map(|b| b["balance"].as_i64().unwrap_or(0))
+        .unwrap_or(0);
+    assert_eq!(cash, expected, "owed cash for {name} ({})", world.last_body);
 }
 
 #[when(regex = r#"^(\w+) requests the household review$"#)]

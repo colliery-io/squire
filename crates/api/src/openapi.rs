@@ -60,9 +60,11 @@ impl Modify for SecurityAddon {
         crate::squire::get_state,
         crate::squire::submit_claim,
         crate::squire::request_redemption,
+        crate::squire::request_cashout,
         // Knight-role surface (SQUIRE-T-0016)
         crate::knight::review_claim,
         crate::knight::review_redemption,
+        crate::knight::review_cashout,
         crate::knight::redeem,
         crate::knight::adjust,
         crate::knight::list_hazards,
@@ -114,6 +116,11 @@ impl Modify for SecurityAddon {
         domain_core::contract::SubmitClaimResp,
         domain_core::contract::RequestRedemptionReq,
         domain_core::contract::RequestRedemptionResp,
+        // ── Cash-out (SQUIRE-T-0118) ──
+        domain_core::contract::CashOutStatus,
+        domain_core::contract::PendingCashOut,
+        domain_core::contract::RequestCashOutReq,
+        domain_core::contract::RequestCashOutResp,
         // ── Knight review read ──
         domain_core::contract::HouseholdReview,
         domain_core::contract::SquireSummary,
@@ -149,6 +156,7 @@ impl Modify for SecurityAddon {
         // ── api's own Knight request envelopes ──
         crate::knight::ReviewClaimReq,
         crate::knight::ReviewRedemptionReq,
+        crate::knight::ReviewCashOutReq,
         crate::knight::RedeemReq,
         crate::knight::AdjustReq,
         crate::knight::MarkDoneReq,

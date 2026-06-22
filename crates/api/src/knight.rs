@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
     ClaimId, Clock, Command, CommandId, Currency, Date, Decision, Event, Hazard, HouseholdReview,
-    ItemId, ItemOption, PendingClaim, PendingRequest, Projections, QuestId, QuestOption, Repository,
+    ItemId, ItemOption, PendingCashOut, PendingClaim, PendingRequest, Projections, QuestId, QuestOption, Repository,
     RequestId, Role, Snapshot, SquireSummary, StateView, UserId,
 };
 use domain_core::Proj;
@@ -89,6 +89,13 @@ pub struct ReviewClaimReq {
 /// `POST /admin/review-redemption` body.
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewRedemptionReq {
+    pub request_id: RequestId,
+    pub decision: DecisionDto,
+}
+
+/// `POST /admin/review-cashout` body (SQUIRE-T-0118).
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ReviewCashOutReq {
     pub request_id: RequestId,
     pub decision: DecisionDto,
 }
@@ -202,6 +209,39 @@ pub async fn review_redemption(
     Json(req): Json<ReviewRedemptionReq>,
 ) -> Result<Json<Ack>, StatusCode> {
     let cmd = Command::ReviewRedemption {
+        actor: principal.user,
+        request_id: req.request_id,
+        decision: req.decision.into(),
+    };
+    handle_command(&state, None, cmd).map_err(domain_status)?;
+    Ok(Ack::ok())
+}
+
+/// `POST /admin/review-cashout` — approve (→ `CashOutApproved`, drawing down owed Cash) / reject a
+/// Squire's cash-out request (SQUIRE-T-0118). A second review is `AlreadyReviewed` → 409.
+#[utoipa::path(
+    post,
+    path = "/admin/review-cashout",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+    ),
+    request_body = ReviewCashOutReq,
+    responses(
+        (status = 200, description = "Acknowledged", body = Ack),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "Request not found"),
+        (status = 409, description = "Request already reviewed, or owed Cash no longer covers it"),
+    ),
+)]
+pub async fn review_cashout(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(principal): RequireKnight,
+    Json(req): Json<ReviewCashOutReq>,
+) -> Result<Json<Ack>, StatusCode> {
+    let cmd = Command::ReviewCashOut {
         actor: principal.user,
         request_id: req.request_id,
         decision: req.decision.into(),
@@ -478,6 +518,7 @@ fn assemble_review(
         squires: squire_summaries(snap),
         pending_claims: pending_claims(snap),
         pending_requests: pending_requests(snap),
+        pending_cashouts: pending_cashouts(snap),
         items: item_options(snap),
         quests: quest_options(snap),
         today,
@@ -582,6 +623,33 @@ fn request_resolved(snap: &Snapshot, request_id: RequestId) -> bool {
         matches!(
             e,
             Event::ItemRedeemed { request_id: Some(r), .. } | Event::RedemptionRejected { request_id: r, .. }
+                if *r == request_id
+        )
+    })
+}
+
+/// Every `CashOutRequested` not yet approved/rejected — the pending cash-out queue (SQUIRE-T-0118),
+/// labelled with Squire + the dollar amount.
+fn pending_cashouts(snap: &Snapshot) -> Vec<PendingCashOut> {
+    snap.events
+        .iter()
+        .filter_map(|e| match e {
+            Event::CashOutRequested { request_id, squire, amount, .. }
+                if !cashout_resolved(snap, *request_id) =>
+            {
+                Some(PendingCashOut { request_id: *request_id, squire: *squire, amount: *amount })
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// Whether a cash-out `request_id` has been approved (`CashOutApproved`) or rejected.
+fn cashout_resolved(snap: &Snapshot, request_id: RequestId) -> bool {
+    snap.events.iter().any(|e| {
+        matches!(
+            e,
+            Event::CashOutApproved { request_id: r, .. } | Event::CashOutRejected { request_id: r, .. }
                 if *r == request_id
         )
     })

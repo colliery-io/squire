@@ -31,4 +31,11 @@ pub enum Event {
     /// it never spends on its own; approval emits `ItemRedeemed`.
     RedemptionRequested{ request_id: RequestId, squire: UserId, item_id: ItemId, at: Timestamp },
     RedemptionRejected { request_id: RequestId, squire: UserId, actor: Option<UserId>, reason: Option<String>, at: Timestamp },
+    /// Squire-initiated "cash out" of owed Cash (SQUIRE-T-0118), via the API. Reviewed like a
+    /// redemption — it never pays out on its own; approval emits `CashOutApproved`.
+    CashOutRequested   { request_id: RequestId, squire: UserId, amount: i64, at: Timestamp },
+    /// Approved cash-out: the Cash ledger debit (−`amount`) AND the request's resolution marker,
+    /// mirroring how `ItemRedeemed` is both the coin debit and the redemption's resolution.
+    CashOutApproved    { request_id: RequestId, squire: UserId, actor: Option<UserId>, amount: i64, at: Timestamp },
+    CashOutRejected    { request_id: RequestId, squire: UserId, actor: Option<UserId>, reason: Option<String>, at: Timestamp },
 }
