@@ -104,14 +104,20 @@ and `/api/config`, but the LAN API does not expose them yet) → SDK regen → A
   vocabulary; 3 features / 8 scenarios / 38 steps green (adjust incl. the **null-currency T-0109
   regression**, claims submit→approve→credit, auth role boundary); `angreal test gherkin` wired;
   folded into `cargo test`/`test all` (`d86ad21`).
-- ▶ **NEXT — Phase 4 client Gherkin (3 suites left):**
-  1. [[SQUIRE-T-0114]] Keep web Gherkin (Cucumber over Playwright; wrap the 21 specs).
-  2. [[SQUIRE-T-0115]] Android Gherkin (cucumber-jvm / instrumented; **covers the new Pay / Settings /
+- ✅ **2026-06-21** [[SQUIRE-T-0114]] **DONE** — Keep web Gherkin via **playwright-bdd** (v9.2; v8
+  was incompatible with Playwright 1.61). `.feature` + step defs reusing the demo webServer; a `bdd`
+  project beside `specs`; `npm test` runs `bddgen` first. Converted keep-review.spec → Gherkin
+  (approve/reject/adjust). **Bonus:** caught + fixed a real pre-existing bug — `Quest.cash` had no
+  serde default, so the Keep's library import (omits cash) 400'd (the **cash analog of T-0109**);
+  `#[serde(default)]` added. Full e2e green: **23 passed** (`60b8dfc`, `f25a57a`).
+- ▶ **NEXT — Phase 4 (2 suites left):**
+  1. [[SQUIRE-T-0115]] Android Gherkin (cucumber-jvm / instrumented; **covers the new Pay / Settings /
      History screens** behaviorally).
-  3. [[SQUIRE-T-0116]] full-stack phone→API→store integration as Gherkin.
+  2. [[SQUIRE-T-0116]] full-stack phone→API→store integration as Gherkin.
   Then green `angreal test all` → hand back for the bundled release.
-  Note: reuse the **same scenario vocabulary** from the api `.feature` files across these to avoid
-  three Gherkin dialects.
+  Pattern proven twice (cucumber-rs + playwright-bdd): reuse the **same scenario vocabulary**.
+  Remaining Keep specs (keep-admin/achievements/rewards/quests) can convert to `.feature` the same
+  way as a follow-up — not blocking.
 
 ## Alternatives Considered
 - *GWT-structured tests in existing frameworks* (no Cucumber) — rejected by operator in favor of true
