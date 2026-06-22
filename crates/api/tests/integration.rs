@@ -312,6 +312,47 @@ async fn ac1_full_flow_over_http() {
     assert_eq!(claims[0]["state"]["points"], 5);
 }
 
+/// A quest authored with a description (over HTTP via `create_quest`) surfaces that description on the
+/// Squire's quest card (SQUIRE-T-0094 #8) — the full authoring → projection path, not a fixture.
+#[tokio::test]
+async fn authored_quest_description_reaches_the_card() {
+    let (state, _store, _dir, _today) = app();
+    let reg = register(&state, "The Round Table", "Arthur", "excalibur").await;
+    let handle = reg.household.0.clone();
+    let knight = reg.token.0.clone();
+    let (_squire_id, squire) = add_squire_and_login(&state, &knight, &handle, "Lancelot", "lake").await;
+
+    let blurb = "Make your bed, put your clothes away, and clear the floor.";
+    let (st, body) = post_json(
+        &state,
+        "/admin/quests",
+        &knight,
+        &handle,
+        json!({
+            "title": "Tidy your room",
+            "description": blurb,
+            "reward": 5,
+            "cadence": "Daily",
+            "completion": "EachAssignee",
+            "assign_all": true,
+            "repeatable_within_day": false,
+            "auto_approve": false,
+        }),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "create quest should be 200, got {st}: {body}");
+
+    let (st, view) = get(&state, "/state", &squire, &handle).await;
+    assert_eq!(st, StatusCode::OK);
+    let card = view["quests_today"]
+        .as_array()
+        .expect("quests_today")
+        .iter()
+        .find(|q| q["title"] == "Tidy your room")
+        .expect("the authored quest is on today's list");
+    assert_eq!(card["description"], blurb, "the card carries the authored description");
+}
+
 // ═════════════════════════════════════════════════════════════════════════════════════════════
 // Trust boundary (the crux).
 // ═════════════════════════════════════════════════════════════════════════════════════════════
