@@ -2860,6 +2860,13 @@
               }
             ]
           },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The quest's authored blurb, shown in the tap-to-expand detail (SQUIRE-T-0094 #8). `serde(default)`\nfor back-compat with older servers / clients."
+          },
           "icon": {
             "type": [
               "string",
@@ -3202,6 +3209,13 @@
           },
           "cost": {
             "$ref": "#/components/schemas/u32"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reward's authored blurb, shown in the tap-to-expand detail (SQUIRE-T-0094 #8). `serde(default)`\nfor back-compat with older servers / clients."
           },
           "icon": {
             "type": [

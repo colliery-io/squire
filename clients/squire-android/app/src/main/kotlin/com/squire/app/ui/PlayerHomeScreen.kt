@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -583,12 +584,53 @@ private fun CompactRow(icon: String, what: String, amount: String, amountColor: 
 }
 
 /** Content for the tap-to-open detail dialog (SQUIRE-T-0094 #8). */
-private data class DetailContent(
+internal data class DetailContent(
     val icon: String?,
     val title: String,
+    val description: String? = null,
     val lines: List<Pair<String, String>>,
     val note: String? = null,
 )
+
+/** The detail content rendered as a standalone card — the body of [DetailDialog] without the popup,
+ *  so it can be previewed/snapshotted (Paparazzi can't capture Dialog windows). */
+@Composable
+internal fun DetailCard(content: DetailContent, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(20.dp),
+        shadowElevation = 2.dp,
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                content.icon?.let {
+                    Text(it, style = MaterialTheme.typography.headlineSmall)
+                    Spacer(Modifier.width(10.dp))
+                }
+                Text(content.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+            }
+            content.description?.takeIf { it.isNotBlank() }?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            }
+            Spacer(Modifier.height(12.dp))
+            content.lines.forEach { (label, value) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(value, fontWeight = FontWeight.Medium)
+                }
+            }
+            content.note?.let {
+                Spacer(Modifier.height(10.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
 
 @Composable
 private fun DetailDialog(content: DetailContent, onDismiss: () -> Unit) {
@@ -606,6 +648,10 @@ private fun DetailDialog(content: DetailContent, onDismiss: () -> Unit) {
         },
         text = {
             Column {
+                content.description?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(10.dp))
+                }
                 content.lines.forEach { (label, value) ->
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
@@ -624,9 +670,10 @@ private fun DetailDialog(content: DetailContent, onDismiss: () -> Unit) {
     )
 }
 
-private fun questDetail(q: QuestCard) = DetailContent(
+internal fun questDetail(q: QuestCard) = DetailContent(
     icon = q.icon,
     title = q.title,
+    description = q.description,
     lines = buildList {
         add("Reward" to "${q.reward} coins")
         q.category?.let { add("Category" to it) }
@@ -642,9 +689,10 @@ private fun questDetail(q: QuestCard) = DetailContent(
     note = "Tap “Done” on the quest when you’ve finished it.",
 )
 
-private fun rewardDetail(r: RewardCard) = DetailContent(
+internal fun rewardDetail(r: RewardCard) = DetailContent(
     icon = r.icon,
     title = r.name,
+    description = r.description,
     lines = buildList {
         add("Cost" to "${r.cost} coins")
         val lock = r.lock
@@ -671,7 +719,7 @@ private fun rewardDetail(r: RewardCard) = DetailContent(
     },
 )
 
-private fun streakDetail(s: StreakView) = DetailContent(
+internal fun streakDetail(s: StreakView) = DetailContent(
     icon = "🔥",
     title = s.name,
     lines = buildList {
@@ -695,7 +743,7 @@ private fun streakDetail(s: StreakView) = DetailContent(
 private fun formatDate(epochMs: Long): String =
     java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault()).format(java.util.Date(epochMs))
 
-private fun badgeDetail(b: BadgeView) = DetailContent(
+internal fun badgeDetail(b: BadgeView) = DetailContent(
     icon = "🏅",
     title = b.name,
     lines = buildList {
@@ -704,7 +752,7 @@ private fun badgeDetail(b: BadgeView) = DetailContent(
     },
 )
 
-private fun goalDetail(g: GoalView) = DetailContent(
+internal fun goalDetail(g: GoalView) = DetailContent(
     icon = "🎯",
     title = g.name,
     lines = buildList {
