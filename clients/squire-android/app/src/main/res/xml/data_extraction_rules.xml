@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SQUIRE-T-0108 bundle: never back up or transfer this app's data. Squire is an offline-first cache
+  of server state (Room DB + paired session); restoring a stale copy onto a reinstalled/newer app
+  crashed it on launch (operator's S23, 2026-06-21). Excluding every domain from both cloud backup
+  and device-to-device transfer guarantees a reinstall always starts clean and re-pairs/re-syncs.
+  Pairs with android:allowBackup="false" (which covers Android < 12).
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>
