@@ -11,10 +11,10 @@ archived: false
 
 tags:
   - "#initiative"
-  - "#phase/decompose"
+  - "#phase/completed"
 
 
-exit_criteria_met: false
+exit_criteria_met: true
 estimated_complexity: L
 initiative_id: pre-release-hardening-surface
 ---
@@ -115,12 +115,20 @@ and `/api/config`, but the LAN API does not expose them yet) → SDK regen → A
   payout (pay → Cash adjust of −amount) + coin grant + guards; 3 scenarios green. `angreal test
   gherkin` runs api+android; `test all` adds `_android_unit` (`8e7a299`). *Instrumented/Compose
   interaction deferred — no emulator in this env; the store-level behavior is covered on the JVM.*
-- ▶ **LAST — [[SQUIRE-T-0116]]** full-stack phone→API→store integration. **Design fork (needs a call):**
-  (a) *pragmatic, runnable now* — Rust full-stack Gherkin over a real socket + **persistence/restart
-  durability** (reopen the store, balance persists) using the phone's exact wire payloads
-  (currency:null, cash-omitted); or (b) *literal* — the Kotlin SDK driving a booted Rust server
-  (gradle↔cargo process orchestration; heaviest; may not run headless here).
-  Then green `angreal test all` → bundled release.
+- ✅ **2026-06-21** [[SQUIRE-T-0116]] **DONE** — full-stack durability Gherkin (phone→API→store):
+  `durability.feature` proves a granted balance + an approved claim's credit survive a **server
+  restart** (fresh SQLite connection over the same file → on-disk durability, not in-memory). api
+  cucumber: 4 features / 10 scenarios / 50 steps green (`9e85034`).
+- ✅ **2026-06-21 — `angreal test all` GREEN.** Rust (all crates + cucumber) + e2e (23, incl. Keep BDD)
+  + Paparazzi + Android unit/Gherkin all pass. **Initiative complete.**
+
+## Outcome
+All 4 Gherkin suites live (cucumber-rs api, playwright-bdd Keep, cucumber-jvm Android, full-stack
+durability) + all 3 parity gaps closed on Android (Pay / Settings / History). Two real bugs caught &
+fixed along the way: the null-currency adjust ([[SQUIRE-T-0109]]) and its `Quest.cash` twin. Gate is
+green. **Ready to fold into the bundled "make it solid" release** with [[SQUIRE-T-0108]] (stable
+signing), `allowBackup=false`, and the version alignment — pending operator go (no build/push yet, per
+direction).
 
 ## Alternatives Considered
 - *GWT-structured tests in existing frameworks* (no Cucumber) — rejected by operator in favor of true
