@@ -43,6 +43,17 @@ Verify: `gh secret list` should show all five.
 That's the whole publish — no manual `cp`/manifest editing. Home servers pick up the new APK on their
 next pull (see ADR SQUIRE-A-0012, server startup-pull); phones update over LAN via content-hash OTA.
 
+## Publishing the docs
+
+The public doc site (`docs/`, mdBook) is **decoupled from releases**. Any push to `main` that
+touches `docs/**` triggers **Publish docs** (`.github/workflows/docs.yml`), which builds the book and
+force-pushes the rendered site to the `gh-pages` branch of `colliery-io/squire` using the **same
+`DIST_REPO_TOKEN`** — no extra secret. Edit docs and merge to `main`; that's the whole publish.
+
+One-time on `colliery-io/squire`: enable **Pages** with source = `gh-pages` branch (root). Refresh
+the in-repo screenshots with `angreal docs shots` (re-runs the Keep Playwright gallery and copies the
+Android Paparazzi goldens into `docs/src/images/`); build/preview locally with `angreal docs serve`.
+
 ## What's NOT here yet (tracked under SQUIRE-I-0002)
 
 - Server startup-pull from `colliery-io/squire` (auto-populate the OTA updates dir + manifest).

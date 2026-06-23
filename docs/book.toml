@@ -1,0 +1,20 @@
+[book]
+title = "Squire"
+description = "Squire — a self-hosted chores & allowance app for families. Docs for households and self-hosters."
+authors = ["Colliery"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/colliery-io/squire"
+edit-url-template = "https://github.com/colliery-io/squire-core/edit/main/docs/{path}"
+no-section-label = true
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.search]
+enable = true

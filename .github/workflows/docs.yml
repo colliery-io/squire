@@ -1,0 +1,67 @@
+name: Publish docs
+
+# Build the mdBook doc site (docs/) and publish it to GitHub Pages on the PUBLIC dist repo
+# (colliery-io/squire), per ADR SQUIRE-A-0012 — source stays private, the rendered site is an
+# artifact in the public repo. Runs on docs changes only, decoupled from release tags so docs ship
+# independently of APKs/server binaries. See .github/RELEASING.md and SQUIRE-T-0119.
+#
+# Required repository secret (already set for the APK release — same PAT, no new secret):
+#   DIST_REPO_TOKEN   fine-grained PAT with Contents: read+write on colliery-io/squire
+#
+# One-time on colliery-io/squire: enable Pages with source = gh-pages branch (root).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-publish
+  cancel-in-progress: true
+
+env:
+  DIST_REPO: colliery-io/squire
+  MDBOOK_VERSION: "0.5.2"
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mdBook
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          url="https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL "$url" | tar -xz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build the book
+        run: |
+          mdbook build docs
+          test -f docs/book/index.html || { echo "::error::mdbook produced no index.html"; exit 1; }
+
+      - name: Publish to gh-pages on the public dist repo
+        env:
+          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::DIST_REPO_TOKEN is empty — set the cross-repo PAT (see .github/RELEASING.md)"
+            exit 1
+          fi
+          cd docs/book
+          touch .nojekyll                       # serve files verbatim; don't run Jekyll
+          git init -q
+          git config user.name  "squire-docs-bot"
+          git config user.email "docs@colliery.io"
+          git checkout -q -b gh-pages
+          git add -A
+          git commit -q -m "docs: deploy from squire-core@${SHA}"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${DIST_REPO}.git" gh-pages
