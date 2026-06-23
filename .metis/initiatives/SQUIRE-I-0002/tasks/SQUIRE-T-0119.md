@@ -4,14 +4,14 @@ level: task
 title: "Public doc site on GitHub Pages (mdBook, Diátaxis, cross-repo push to colliery-io/squire)"
 short_code: "SQUIRE-T-0119"
 created_at: 2026-06-23T17:26:11.210858+00:00
-updated_at: 2026-06-23T17:26:11.210858+00:00
+updated_at: 2026-06-23T22:32:27.187494+00:00
 parent: SQUIRE-I-0002
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -51,12 +51,12 @@ screenshots** sourced from the existing Playwright Keep gallery and the Android 
 
 ## Acceptance Criteria
 
-- [ ] `docs/` mdBook builds locally (`angreal docs build`) and serves (`angreal docs serve`).
-- [ ] Diátaxis IA in `src/SUMMARY.md`, both audiences, real screenshots rendered.
-- [ ] `angreal docs shots` regenerates screenshots into `docs/src/images/`.
-- [ ] `.github/workflows/docs.yml` builds + cross-pushes to `gh-pages` of `colliery-io/squire`.
-- [ ] GitHub Pages enabled on `colliery-io/squire`; site reachable.
-- [ ] `.github/RELEASING.md` notes the docs publish path.
+- [x] `docs/` mdBook builds locally (`angreal docs build`) and serves (`angreal docs serve`).
+- [x] Diátaxis IA in `src/SUMMARY.md`, both audiences, real screenshots rendered.
+- [x] `angreal docs shots` regenerates screenshots into `docs/src/images/`.
+- [x] `.github/workflows/docs.yml` builds + cross-pushes to `gh-pages` of `colliery-io/squire`.
+- [x] GitHub Pages enabled on `colliery-io/squire`; site reachable.
+- [x] `.github/RELEASING.md` notes the docs publish path.
 
 ## Implementation Notes
 
@@ -88,10 +88,12 @@ the install/tunnel/backup tickets ([[SQUIRE-T-0091]], [[SQUIRE-T-0100]], [[SQUIR
 - `.gitignore` excludes `docs/book/`; `RELEASING.md` documents the publish path.
 - Verified: `mdbook build docs` clean; rendered site screenshotted and looks correct.
 
-**Remaining (outward-facing — needs the user / a push to main):**
-1. Commit + push these changes to `main` (triggers the workflow, which creates `gh-pages` on the
-   public repo).
-2. One-time: enable **Pages** on `colliery-io/squire` (source = `gh-pages`, root).
-3. Optional: custom domain (CNAME) — placeholder left in the workflow.
-</content>
-</invoke>
+**Shipped:**
+1. Committed + pushed to `main` (`95491e0`). The **Publish docs** workflow ran green (13s) and
+   created `gh-pages` on `colliery-io/squire`.
+2. **Pages enabled** on `colliery-io/squire` (source = `gh-pages`, root). Live and verified:
+   **https://colliery-io.github.io/squire/** returns 200 (homepage, subpages, and images).
+3. Custom domain — **not doing** (user decision).
+
+All acceptance criteria met. The publish path is now self-sustaining: any future push to `main`
+touching `docs/**` rebuilds and redeploys automatically.
