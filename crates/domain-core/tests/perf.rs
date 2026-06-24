@@ -131,7 +131,7 @@ fn projection_sweep_under_budget() {
     }
     let elapsed = start.elapsed();
     // Keep `sink` observable so the loop isn't elided.
-    assert!(sink >= 0 || sink < 0);
+    std::hint::black_box(sink);
     println!(
         "perf sweep: {n_events} events, {} squires, {} quests → {:?}",
         SQUIRES.len(),
