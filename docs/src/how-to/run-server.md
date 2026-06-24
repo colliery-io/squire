@@ -20,15 +20,18 @@ angreal serve            # debug
 angreal serve --release  # what production uses
 ```
 
-On first run, set the initial admin (once):
-
-```sh
-SQUIRE_ADMIN_NAME="Mom" SQUIRE_ADMIN_SECRET="choose-a-secret" squire-serve
-```
+> **On macOS the installer already runs the server as a background service** (see the
+> [tutorial](../tutorials/self-host-setup.md)). Running `squire-serve` by hand as well will collide
+> on the ports — stop the service first (`launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/io.colliery.squire.plist`)
+> if you want to run it in the foreground.
 
 It listens on **`API_PORT`** (default `8080`) for the phones and **`KEEP_PORT`** (default `4920`)
 for the Keep, and stores data under `SQUIRE_DATA_DIR` (an OS data dir by default). See the
 [configuration reference](../reference/configuration.md) for the full list.
+
+A fresh household has no admin until you create one in the Keep's first-run form (you don't set it on
+the command line). If you ever need to inject one, see
+[Add an admin to a running household](#add-an-admin-to-a-running-household) below.
 
 ## Stop it
 
@@ -42,13 +45,20 @@ angreal stop --ports 8080,4920
 You want the server to start at boot and restart if it exits — otherwise the phones can't sync while
 the computer is logged out or asleep.
 
-- **macOS** — a `launchd` LaunchAgent runs it in the background without the app open. (Tracked in
-  the project as the always-on background-server work.)
-- **Linux** — a `systemd` user (or system) service achieves the same: set `Restart=on-failure` and
-  your `SQUIRE_*` environment in the unit file.
+- **macOS** — **already done for you.** The installer registers a `launchd` LaunchAgent
+  (`io.colliery.squire`) that runs the server in the background on login, auto-restarts it within
+  ~10s if it exits, and survives reboots. Manage it with:
 
-Whichever you use, put your first-run admin and any overrides in the service's environment, not on an
-interactive command line.
+  ```sh
+  launchctl kickstart -k gui/$(id -u)/io.colliery.squire   # restart
+  launchctl bootout    gui/$(id -u) ~/Library/LaunchAgents/io.colliery.squire.plist   # stop/remove
+  ```
+
+  Logs go to `~/Library/Logs/squire-serve.log`.
+
+- **Linux** — set this up yourself with a `systemd` user (or system) service: point `ExecStart` at
+  `~/.local/bin/squire-serve`, set `Restart=on-failure`, and put any `SQUIRE_*` overrides in the
+  unit's environment.
 
 ## Add an admin to a running household
 

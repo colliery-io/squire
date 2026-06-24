@@ -22,31 +22,34 @@ On the home computer (macOS or Linux), run the one-line installer:
 curl -fsSL https://raw.githubusercontent.com/colliery-io/squire/main/install.sh | sh
 ```
 
-This fetches the latest signed server build from the public release repo and drops a clickable
-launcher in place. (Prefer to run from source? See [Run the home server](../how-to/run-server.md).)
+This downloads the latest signed `squire-serve` for your machine into `~/.local/bin`. What happens
+next depends on your OS:
 
-## 2. First run
+- **macOS** — the installer also sets the server up as a **background service** (a `launchd`
+  LaunchAgent, `io.colliery.squire`) that starts on login, auto-restarts if it ever exits, and
+  survives reboots. **The home server starts running immediately** — you don't launch it by hand. It
+  also creates a double-clickable **`Squire.app`** in `~/Applications`, which is simply a shortcut
+  that opens the Keep (the background service is what keeps the server running). Skip the service
+  with `SQUIRE_NO_SERVICE=1`.
+- **Linux** — you get the binary only. Start it with `squire-serve`, and set up your own service to
+  keep it running — see [Run the home server](../how-to/run-server.md).
 
-Start the server. On **first run only**, set the initial admin so you can log into the Keep:
+(Prefer to run from source instead? See [Run the home server](../how-to/run-server.md).)
 
-```sh
-SQUIRE_ADMIN_NAME="Mom" SQUIRE_ADMIN_SECRET="choose-a-secret" squire-serve
-```
+## 2. Open the Keep & create your admin
 
-On every later start, just run `squire-serve` — it opens the existing household untouched. (You can
-also skip the env vars and create the first admin from the Keep's first-run form.)
+On macOS the server is already up. Open **`Squire.app`** (or just visit `http://localhost:4920`).
+On Linux, run `squire-serve` first, then open that URL.
 
-You should see it print the API and Keep ports and the data directory it's using.
+A fresh install has **no admin yet**. The Keep greets you with a *"First run? Create the admin
+Knight"* form — fill it in to create your parent login. (That's the normal path; you don't pass admin
+credentials on the command line.)
 
-## 3. Open the Keep
+## 3. You're ready
 
-Visit `http://localhost:4920` on the same machine and log in with the admin you just set. You're now
-ready to [add members and create chores](family-setup.md).
-
-## 4. Keep it running
-
-For day-to-day use you'll want the server to start on its own and stay up. See
-[Run the home server](../how-to/run-server.md) for running it as a background service.
+Logged into the Keep, you can now [add members and create chores](family-setup.md). The server keeps
+running in the background (macOS) or under whatever service you set up (Linux), so phones can sync
+whenever they're on the network.
 
 ## Next steps
 
