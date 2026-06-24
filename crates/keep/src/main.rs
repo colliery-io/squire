@@ -12,19 +12,17 @@
 use std::path::PathBuf;
 
 use domain_core::contract::HouseholdHandle;
+use identity::TokenSigner;
 use keep::{serve, KeepState};
 use store::tenant::Backend;
-use identity::TokenSigner;
 
 /// One hour, in milliseconds — the operator token lifetime.
 const TOKEN_TTL_MS: i64 = 60 * 60 * 1000;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let data_dir =
-        std::env::var("KEEP_DATA_DIR").unwrap_or_else(|_| "./squire-data".to_string());
-    let household =
-        std::env::var("KEEP_HOUSEHOLD").unwrap_or_else(|_| "keep".to_string());
+    let data_dir = std::env::var("KEEP_DATA_DIR").unwrap_or_else(|_| "./squire-data".to_string());
+    let household = std::env::var("KEEP_HOUSEHOLD").unwrap_or_else(|_| "keep".to_string());
     let port: u16 = std::env::var("KEEP_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
@@ -32,7 +30,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let signing_key = std::env::var("KEEP_SIGNING_KEY")
         .unwrap_or_else(|_| "dev-keep-signing-key-change-me".to_string());
 
-    let backend = Backend::Sqlite { dir: PathBuf::from(data_dir) };
+    let backend = Backend::Sqlite {
+        dir: PathBuf::from(data_dir),
+    };
     let state = KeepState::local(
         backend,
         HouseholdHandle(household),

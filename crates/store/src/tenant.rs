@@ -79,7 +79,10 @@ impl std::fmt::Display for ProvisionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ProvisionError::InvalidHandle(h) => {
-                write!(f, "invalid household handle {h:?}: only [a-z0-9_], 1..=48 chars allowed")
+                write!(
+                    f,
+                    "invalid household handle {h:?}: only [a-z0-9_], 1..=48 chars allowed"
+                )
             }
             ProvisionError::Io(e) => write!(f, "tenant filesystem error: {e}"),
             ProvisionError::Backend(e) => write!(f, "tenant backend error: {e}"),

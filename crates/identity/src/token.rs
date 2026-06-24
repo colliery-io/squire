@@ -92,7 +92,8 @@ impl TokenSigner {
         let mut mac =
             HmacSha256::new_from_slice(&self.key).expect("HMAC accepts a key of any length");
         mac.update(payload.as_bytes());
-        mac.verify_slice(&presented).map_err(|_| AuthError::BadToken)?;
+        mac.verify_slice(&presented)
+            .map_err(|_| AuthError::BadToken)?;
 
         // Signature is good: decode the claims.
         let json = URL_SAFE_NO_PAD

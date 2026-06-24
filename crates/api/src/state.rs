@@ -58,8 +58,17 @@ impl AppState {
     /// Like [`AppState::new`] but with an explicit, **shared** [`LocalClock`] — used by the home
     /// server so the api and the Keep read (and hot-swap) the SAME live-config cell (so a Keep
     /// timezone change applies to the api without a restart).
-    pub fn with_clock(store: SharedStore, identity: Arc<dyn Identity>, clock: LocalClock) -> Arc<Self> {
-        Arc::new(Self { store, engine: DomainEngine, clock, identity })
+    pub fn with_clock(
+        store: SharedStore,
+        identity: Arc<dyn Identity>,
+        clock: LocalClock,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            store,
+            engine: DomainEngine,
+            clock,
+            identity,
+        })
     }
 
     /// Wire a **production** `AppState` for a single local tenant (the LAN-local MVP posture).

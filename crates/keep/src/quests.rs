@@ -59,7 +59,10 @@ pub struct IdResp {
 
 /// `GET /api/quests` (Knight-only) — every quest (active and archived), each with its last-editor
 /// audit so the form can show "who set / last changed this".
-pub async fn list_quests(State(state): State<Arc<KeepState>>, _op: Operator) -> Json<Vec<QuestRow>> {
+pub async fn list_quests(
+    State(state): State<Arc<KeepState>>,
+    _op: Operator,
+) -> Json<Vec<QuestRow>> {
     let snap = state.snapshot();
     let mut guard = state.store.lock().expect("store mutex poisoned");
     let rows = snap
@@ -71,7 +74,10 @@ pub async fn list_quests(State(state): State<Arc<KeepState>>, _op: Operator) -> 
                 .flatten()
                 .map(AuditView::from)
                 .unwrap_or_default();
-            QuestRow { quest: q.clone(), audit }
+            QuestRow {
+                quest: q.clone(),
+                audit,
+            }
         })
         .collect();
     Json(rows)
@@ -89,7 +95,9 @@ pub async fn create_quest(
     state
         .commit(Some(op.user), Command::DefineQuest(quest))
         .map_err(domain_status)?;
-    Ok(Json(IdResp { id: id.0.to_string() }))
+    Ok(Json(IdResp {
+        id: id.0.to_string(),
+    }))
 }
 
 /// `POST /api/quests/{id}/archive` (Knight-only) — archive a quest (`ArchiveQuest` →

@@ -16,11 +16,9 @@ pub mod settings;
 pub mod tenant;
 
 pub use conn::AnyConnection;
-pub use settings::{date_in_zone, live_config, valid_timezone, ConfigView, LiveConfig, LocalClock};
 pub use migrations::{run_migrations, MIGRATIONS};
-pub use rows::{
-    AchievementRow, Audit, EventRow, ItemRow, QuestRow, RowError, UserRow,
-};
+pub use rows::{AchievementRow, Audit, EventRow, ItemRow, QuestRow, RowError, UserRow};
+pub use settings::{date_in_zone, live_config, valid_timezone, ConfigView, LiveConfig, LocalClock};
 
 /// Postgres-backend helpers, compiled only under the `postgres` feature (which links libpq).
 /// Used by the dual-backend integration tests run against the docker-compose Postgres service
@@ -60,7 +58,9 @@ use domain_core::contract::{
 };
 
 use crate::rows::id_to_text;
-use crate::schema::{achievements, config, credentials, events, items, pairing_codes, quests, users};
+use crate::schema::{
+    achievements, config, credentials, events, items, pairing_codes, quests, users,
+};
 
 // ─── error mapping ───────────────────────────────────────────────────────────
 
@@ -159,7 +159,10 @@ pub struct Store<C: Clock> {
 impl<C: Clock> Store<C> {
     /// Wrap an already-migrated connection with a clock.
     pub fn new(conn: AnyConnection, clock: C) -> Self {
-        Self { conn: std::cell::RefCell::new(conn), clock }
+        Self {
+            conn: std::cell::RefCell::new(conn),
+            clock,
+        }
     }
 
     /// Borrow the clock.
@@ -514,7 +517,13 @@ fn load_snapshot(conn: &mut AnyConnection) -> Result<Snapshot, RepoError> {
         .collect::<Result<Vec<_>, _>>()
         .map_err(map_row_err)?;
 
-    Ok(Snapshot { users, quests, items, achievements, events })
+    Ok(Snapshot {
+        users,
+        quests,
+        items,
+        achievements,
+        events,
+    })
 }
 
 /// Apply a batch of [`Change`]s inside the caller's transaction. Single-writer + in-txn, so
@@ -558,7 +567,12 @@ fn apply_changes(
 /// conflict the `.set(...)` clauses below deliberately omit `created_*`, so those keep
 /// their existing values and only `updated_*` move.
 fn fresh_audit(by: Option<UserId>, now: Timestamp) -> Audit {
-    Audit { created_by: by, created_at: now, updated_by: by, updated_at: now }
+    Audit {
+        created_by: by,
+        created_at: now,
+        updated_by: by,
+        updated_at: now,
+    }
 }
 
 fn append_event(conn: &mut AnyConnection, seq: i64, ev: &Event) -> Result<(), RepoError> {
@@ -584,13 +598,19 @@ fn upsert_user(
     now: Timestamp,
     u: &User,
 ) -> Result<(), RepoError> {
-    run_upsert!(conn, users::table, users::id, UserRow::from_user(u, fresh_audit(by, now)), |row: &UserRow| (
-        users::role.eq(row.role.clone()),
-        users::display_name.eq(row.display_name.clone()),
-        users::active.eq(row.active),
-        users::updated_by.eq(row.updated_by.clone()),
-        users::updated_at.eq(row.updated_at),
-    ));
+    run_upsert!(
+        conn,
+        users::table,
+        users::id,
+        UserRow::from_user(u, fresh_audit(by, now)),
+        |row: &UserRow| (
+            users::role.eq(row.role.clone()),
+            users::display_name.eq(row.display_name.clone()),
+            users::active.eq(row.active),
+            users::updated_by.eq(row.updated_by.clone()),
+            users::updated_at.eq(row.updated_at),
+        )
+    );
     Ok(())
 }
 
@@ -600,26 +620,32 @@ fn upsert_quest(
     now: Timestamp,
     q: &Quest,
 ) -> Result<(), RepoError> {
-    run_upsert!(conn, quests::table, quests::id, QuestRow::from_quest(q, fresh_audit(by, now)), |row: &QuestRow| (
-        quests::title.eq(row.title.clone()),
-        quests::description.eq(row.description.clone()),
-        quests::category.eq(row.category.clone()),
-        quests::reward.eq(row.reward),
-        quests::cadence_kind.eq(row.cadence_kind.clone()),
-        quests::cadence_due.eq(row.cadence_due),
-        quests::cadence_weekdays.eq(row.cadence_weekdays.clone()),
-        quests::cadence_n.eq(row.cadence_n),
-        quests::cadence_anchor.eq(row.cadence_anchor),
-        quests::assignment_kind.eq(row.assignment_kind.clone()),
-        quests::assignment_squires.eq(row.assignment_squires.clone()),
-        quests::completion.eq(row.completion.clone()),
-        quests::auto_approve.eq(row.auto_approve),
-        quests::repeatable_within_day.eq(row.repeatable_within_day),
-        quests::icon.eq(row.icon.clone()),
-        quests::active.eq(row.active),
-        quests::updated_by.eq(row.updated_by.clone()),
-        quests::updated_at.eq(row.updated_at),
-    ));
+    run_upsert!(
+        conn,
+        quests::table,
+        quests::id,
+        QuestRow::from_quest(q, fresh_audit(by, now)),
+        |row: &QuestRow| (
+            quests::title.eq(row.title.clone()),
+            quests::description.eq(row.description.clone()),
+            quests::category.eq(row.category.clone()),
+            quests::reward.eq(row.reward),
+            quests::cadence_kind.eq(row.cadence_kind.clone()),
+            quests::cadence_due.eq(row.cadence_due),
+            quests::cadence_weekdays.eq(row.cadence_weekdays.clone()),
+            quests::cadence_n.eq(row.cadence_n),
+            quests::cadence_anchor.eq(row.cadence_anchor),
+            quests::assignment_kind.eq(row.assignment_kind.clone()),
+            quests::assignment_squires.eq(row.assignment_squires.clone()),
+            quests::completion.eq(row.completion.clone()),
+            quests::auto_approve.eq(row.auto_approve),
+            quests::repeatable_within_day.eq(row.repeatable_within_day),
+            quests::icon.eq(row.icon.clone()),
+            quests::active.eq(row.active),
+            quests::updated_by.eq(row.updated_by.clone()),
+            quests::updated_at.eq(row.updated_at),
+        )
+    );
     Ok(())
 }
 
@@ -629,17 +655,23 @@ fn upsert_item(
     now: Timestamp,
     it: &RedeemableItem,
 ) -> Result<(), RepoError> {
-    run_upsert!(conn, items::table, items::id, ItemRow::from_item(it, fresh_audit(by, now)), |row: &ItemRow| (
-        items::name.eq(row.name.clone()),
-        items::description.eq(row.description.clone()),
-        items::cost.eq(row.cost),
-        items::gate.eq(row.gate.clone()),
-        items::availability.eq(row.availability.clone()),
-        items::icon.eq(row.icon.clone()),
-        items::active.eq(row.active),
-        items::updated_by.eq(row.updated_by.clone()),
-        items::updated_at.eq(row.updated_at),
-    ));
+    run_upsert!(
+        conn,
+        items::table,
+        items::id,
+        ItemRow::from_item(it, fresh_audit(by, now)),
+        |row: &ItemRow| (
+            items::name.eq(row.name.clone()),
+            items::description.eq(row.description.clone()),
+            items::cost.eq(row.cost),
+            items::gate.eq(row.gate.clone()),
+            items::availability.eq(row.availability.clone()),
+            items::icon.eq(row.icon.clone()),
+            items::active.eq(row.active),
+            items::updated_by.eq(row.updated_by.clone()),
+            items::updated_at.eq(row.updated_at),
+        )
+    );
     Ok(())
 }
 
@@ -649,22 +681,28 @@ fn upsert_achievement(
     now: Timestamp,
     a: &Achievement,
 ) -> Result<(), RepoError> {
-    run_upsert!(conn, achievements::table, achievements::id, AchievementRow::from_achievement(a, fresh_audit(by, now)), |row: &AchievementRow| (
-        achievements::name.eq(row.name.clone()),
-        achievements::description.eq(row.description.clone()),
-        achievements::criterion_kind.eq(row.criterion_kind.clone()),
-        achievements::scope_kind.eq(row.scope_kind.clone()),
-        achievements::scope_quest.eq(row.scope_quest.clone()),
-        achievements::scope_category.eq(row.scope_category.clone()),
-        achievements::streak_length.eq(row.streak_length),
-        achievements::streak_basis.eq(row.streak_basis.clone()),
-        achievements::total_count.eq(row.total_count),
-        achievements::points_total.eq(row.points_total),
-        achievements::bonus_points.eq(row.bonus_points),
-        achievements::active.eq(row.active),
-        achievements::updated_by.eq(row.updated_by.clone()),
-        achievements::updated_at.eq(row.updated_at),
-    ));
+    run_upsert!(
+        conn,
+        achievements::table,
+        achievements::id,
+        AchievementRow::from_achievement(a, fresh_audit(by, now)),
+        |row: &AchievementRow| (
+            achievements::name.eq(row.name.clone()),
+            achievements::description.eq(row.description.clone()),
+            achievements::criterion_kind.eq(row.criterion_kind.clone()),
+            achievements::scope_kind.eq(row.scope_kind.clone()),
+            achievements::scope_quest.eq(row.scope_quest.clone()),
+            achievements::scope_category.eq(row.scope_category.clone()),
+            achievements::streak_length.eq(row.streak_length),
+            achievements::streak_basis.eq(row.streak_basis.clone()),
+            achievements::total_count.eq(row.total_count),
+            achievements::points_total.eq(row.points_total),
+            achievements::bonus_points.eq(row.bonus_points),
+            achievements::active.eq(row.active),
+            achievements::updated_by.eq(row.updated_by.clone()),
+            achievements::updated_at.eq(row.updated_at),
+        )
+    );
     Ok(())
 }
 
@@ -748,15 +786,14 @@ fn set_achievement_active(
     id: AchievementId,
     active: bool,
 ) -> Result<(), RepoError> {
-    let n =
-        diesel::update(achievements::table.filter(achievements::id.eq(id_to_text(id.0))))
-            .set((
-                achievements::active.eq(i32::from(active)),
-                achievements::updated_by.eq(updated_by_text(by)),
-                achievements::updated_at.eq(now.0),
-            ))
-            .execute(conn)
-            .map_err(map_err)?;
+    let n = diesel::update(achievements::table.filter(achievements::id.eq(id_to_text(id.0))))
+        .set((
+            achievements::active.eq(i32::from(active)),
+            achievements::updated_by.eq(updated_by_text(by)),
+            achievements::updated_at.eq(now.0),
+        ))
+        .execute(conn)
+        .map_err(map_err)?;
     require_one(n)
 }
 
@@ -810,7 +847,8 @@ pub fn quest_audit(conn: &mut AnyConnection, id: QuestId) -> Result<Option<Audit
         .first(conn)
         .optional()
         .map_err(map_err)?;
-    row.map(|(cb, ca, ub, ua)| audit_from_parts(cb, ca, ub, ua)).transpose()
+    row.map(|(cb, ca, ub, ua)| audit_from_parts(cb, ca, ub, ua))
+        .transpose()
 }
 
 /// Read the audit columns of the `users` row with this id (`None` if absent).
@@ -826,7 +864,8 @@ pub fn user_audit(conn: &mut AnyConnection, id: UserId) -> Result<Option<AuditCo
         .first(conn)
         .optional()
         .map_err(map_err)?;
-    row.map(|(cb, ca, ub, ua)| audit_from_parts(cb, ca, ub, ua)).transpose()
+    row.map(|(cb, ca, ub, ua)| audit_from_parts(cb, ca, ub, ua))
+        .transpose()
 }
 
 /// Read the audit columns of the `items` row with this id (`None` if absent).
@@ -842,7 +881,8 @@ pub fn item_audit(conn: &mut AnyConnection, id: ItemId) -> Result<Option<AuditCo
         .first(conn)
         .optional()
         .map_err(map_err)?;
-    row.map(|(cb, ca, ub, ua)| audit_from_parts(cb, ca, ub, ua)).transpose()
+    row.map(|(cb, ca, ub, ua)| audit_from_parts(cb, ca, ub, ua))
+        .transpose()
 }
 
 /// Read the audit columns of the `achievements` row with this id (`None` if absent).
@@ -861,7 +901,8 @@ pub fn achievement_audit(
         .first(conn)
         .optional()
         .map_err(map_err)?;
-    row.map(|(cb, ca, ub, ua)| audit_from_parts(cb, ca, ub, ua)).transpose()
+    row.map(|(cb, ca, ub, ua)| audit_from_parts(cb, ca, ub, ua))
+        .transpose()
 }
 
 // ─── SQLite convenience store ─────────────────────────────────────────────────
@@ -877,9 +918,7 @@ impl SqliteStore {
     /// Open (or create) a SQLite database at `database_url`, apply pending migrations, and
     /// wrap it with the real [`SystemClock`]. `database_url` may be a file path or
     /// `":memory:"`.
-    pub fn open(
-        database_url: &str,
-    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn open(database_url: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let mut conn = SqliteConnection::establish(database_url)?;
         conn.run_pending_migrations(MIGRATIONS)?;
         Ok(Self {
@@ -959,7 +998,10 @@ impl FixedClock {
     /// A clock fixed at `now` (unix millis); `today` is derived via the same Monday-aligned
     /// rule [`SystemClock`] uses.
     pub fn at(now: Timestamp) -> Self {
-        Self { today: date_from_unix_millis(now.0), now }
+        Self {
+            today: date_from_unix_millis(now.0),
+            now,
+        }
     }
 
     /// A clock with explicitly chosen `today` and `now`.

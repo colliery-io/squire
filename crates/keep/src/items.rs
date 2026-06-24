@@ -29,7 +29,11 @@ pub struct ItemRow {
 }
 
 /// Most-recent redemption timestamp + out-of-stock, derived from the event log for `item`.
-fn redemption_status(snap: &Snapshot, item: ItemId, availability: Availability) -> (Option<i64>, bool) {
+fn redemption_status(
+    snap: &Snapshot,
+    item: ItemId,
+    availability: Availability,
+) -> (Option<i64>, bool) {
     let last_redeemed = snap
         .events
         .iter()
@@ -56,7 +60,12 @@ pub async fn list_items(State(state): State<Arc<KeepState>>, _op: Operator) -> J
                 .map(AuditView::from)
                 .unwrap_or_default();
             let (last_redeemed, out_of_stock) = redemption_status(&snap, it.id, it.availability);
-            ItemRow { item: it.clone(), audit, last_redeemed, out_of_stock }
+            ItemRow {
+                item: it.clone(),
+                audit,
+                last_redeemed,
+                out_of_stock,
+            }
         })
         .collect();
     Json(rows)
@@ -73,7 +82,9 @@ pub async fn create_item(
     state
         .commit(Some(op.user), Command::DefineItem(item))
         .map_err(domain_status)?;
-    Ok(Json(IdResp { id: id.0.to_string() }))
+    Ok(Json(IdResp {
+        id: id.0.to_string(),
+    }))
 }
 
 /// `POST /api/items/{id}/archive` (Knight-only) — archive an item (`ArchiveItem`), never delete; a

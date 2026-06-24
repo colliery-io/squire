@@ -23,7 +23,10 @@ pub fn spawn_apk_sync(updates_dir: PathBuf) {
         return;
     }
     let repo = std::env::var("SQUIRE_DIST_REPO").unwrap_or_else(|_| DEFAULT_REPO.to_string());
-    println!("  App-update sync:         github.com/{repo} → {}", updates_dir.display());
+    println!(
+        "  App-update sync:         github.com/{repo} → {}",
+        updates_dir.display()
+    );
 
     tokio::spawn(async move {
         let client = match reqwest::Client::builder()
@@ -57,7 +60,9 @@ async fn sync_once(
 ) -> Result<Option<String>, String> {
     let url = format!("https://api.github.com/repos/{repo}/releases/latest");
     // Authenticate when a token is set (SQUIRE-T-0117) to dodge the 60 req/hr unauthenticated 403s.
-    let mut req = client.get(&url).header("Accept", "application/vnd.github+json");
+    let mut req = client
+        .get(&url)
+        .header("Accept", "application/vnd.github+json");
     if let Some(tok) = crate::updater::update_token() {
         req = req.header("Authorization", format!("Bearer {tok}"));
     }
@@ -68,13 +73,21 @@ async fn sync_once(
     if !resp.status().is_success() {
         return Err(format!("latest release: HTTP {}", resp.status()));
     }
-    let rel: serde_json::Value =
-        resp.json().await.map_err(|e| format!("parse release json: {e}"))?;
+    let rel: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("parse release json: {e}"))?;
 
-    let tag = rel.get("tag_name").and_then(|t| t.as_str()).unwrap_or_default();
+    let tag = rel
+        .get("tag_name")
+        .and_then(|t| t.as_str())
+        .unwrap_or_default();
     let version_name = tag.strip_prefix('v').unwrap_or(tag).to_string();
 
-    let assets = rel.get("assets").and_then(|a| a.as_array()).ok_or("release has no assets")?;
+    let assets = rel
+        .get("assets")
+        .and_then(|a| a.as_array())
+        .ok_or("release has no assets")?;
     let (file, dl_url, version_code) = assets
         .iter()
         .find_map(|a| {
@@ -107,13 +120,19 @@ async fn sync_once(
     std::fs::write(&tmp, &bytes).map_err(|e| format!("write {file}: {e}"))?;
     std::fs::rename(&tmp, &target).map_err(|e| format!("install {file}: {e}"))?;
     write_manifest(dir, &file, version_code, &version_name)?;
-    println!("apk-sync: pulled {file} (v{version_name}, {} bytes)", bytes.len());
+    println!(
+        "apk-sync: pulled {file} (v{version_name}, {} bytes)",
+        bytes.len()
+    );
     Ok(Some(file))
 }
 
 /// `squire-<digits>.apk` → the version code; `None` for anything else (e.g. server binaries).
 fn parse_version_code(name: &str) -> Option<u32> {
-    name.strip_prefix("squire-")?.strip_suffix(".apk")?.parse().ok()
+    name.strip_prefix("squire-")?
+        .strip_suffix(".apk")?
+        .parse()
+        .ok()
 }
 
 fn write_manifest(

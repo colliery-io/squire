@@ -18,7 +18,9 @@ use sha2::{Digest, Sha256};
 
 /// The configured APK directory, only if it's set and actually a directory.
 fn apk_dir() -> Option<PathBuf> {
-    std::env::var_os("SQUIRE_APK_DIR").map(PathBuf::from).filter(|p| p.is_dir())
+    std::env::var_os("SQUIRE_APK_DIR")
+        .map(PathBuf::from)
+        .filter(|p| p.is_dir())
 }
 
 /// Lower-hex SHA-256 of a file, memoised by (path, mtime, len) so the common no-change poll doesn't
@@ -40,7 +42,10 @@ fn apk_sha256(path: &FsPath) -> Option<String> {
 
     let bytes = std::fs::read(path).ok()?;
     let digest = Sha256::digest(&bytes);
-    let hex = digest.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    let hex = digest
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>();
     if let Ok(mut map) = cache.lock() {
         map.insert(path.to_path_buf(), (mtime, len, hex.clone()));
     }
@@ -60,11 +65,17 @@ pub async fn manifest() -> Response {
 
     // Parse + inject sha256 for every release whose `file` exists in the dir. On any parse failure
     // fall back to serving the raw body verbatim — never a 500.
-    let body = match (dir.as_ref(), serde_json::from_str::<serde_json::Value>(&raw)) {
+    let body = match (
+        dir.as_ref(),
+        serde_json::from_str::<serde_json::Value>(&raw),
+    ) {
         (Some(dir), Ok(mut v)) => {
             if let Some(obj) = v.as_object_mut() {
                 for release in obj.values_mut() {
-                    let file = release.get("file").and_then(|f| f.as_str()).map(str::to_owned);
+                    let file = release
+                        .get("file")
+                        .and_then(|f| f.as_str())
+                        .map(str::to_owned);
                     if let Some(file) = file {
                         if let Some(hash) = apk_sha256(&dir.join(&file)) {
                             if let Some(r) = release.as_object_mut() {
@@ -98,7 +109,10 @@ pub async fn download(Path(file): Path<String>) -> Response {
     }
     match std::fs::read(&path) {
         Ok(bytes) => (
-            [(header::CONTENT_TYPE, "application/vnd.android.package-archive")],
+            [(
+                header::CONTENT_TYPE,
+                "application/vnd.android.package-archive",
+            )],
             bytes,
         )
             .into_response(),

@@ -7,10 +7,20 @@ use domain_core::*;
 use std::collections::BTreeSet;
 
 fn squire(id: u128) -> User {
-    User { id: UserId(id), role: Role::Squire, display_name: format!("S{id}"), active: true }
+    User {
+        id: UserId(id),
+        role: Role::Squire,
+        display_name: format!("S{id}"),
+        active: true,
+    }
 }
 fn knight(id: u128) -> User {
-    User { id: UserId(id), role: Role::Knight, display_name: format!("K{id}"), active: true }
+    User {
+        id: UserId(id),
+        role: Role::Knight,
+        display_name: format!("K{id}"),
+        active: true,
+    }
 }
 
 struct QuestSpec {
@@ -39,10 +49,24 @@ fn quest(q: QuestSpec) -> Quest {
     }
 }
 fn each(id: u128, reward: Points, repeatable: bool, auto: bool) -> Quest {
-    quest(QuestSpec { id, reward, assignment: Assignment::AllSquires, completion: Completion::EachAssignee, auto_approve: auto, repeatable })
+    quest(QuestSpec {
+        id,
+        reward,
+        assignment: Assignment::AllSquires,
+        completion: Completion::EachAssignee,
+        auto_approve: auto,
+        repeatable,
+    })
 }
 fn race(id: u128, reward: Points) -> Quest {
-    quest(QuestSpec { id, reward, assignment: Assignment::AllSquires, completion: Completion::Race, auto_approve: false, repeatable: false })
+    quest(QuestSpec {
+        id,
+        reward,
+        assignment: Assignment::AllSquires,
+        completion: Completion::Race,
+        auto_approve: false,
+        repeatable: false,
+    })
 }
 fn squires_set(ids: &[u128]) -> Assignment {
     Assignment::Squires(ids.iter().map(|i| UserId(*i)).collect::<BTreeSet<_>>())
@@ -69,20 +93,39 @@ fn run(repo: &mut InMemoryRepository, cmd: Command) -> Result<Vec<Change>, Domai
 }
 
 fn submit(claim: u128, squire: u128, q: u128, day: i32) -> Command {
-    Command::SubmitClaim { claim_id: ClaimId(claim), squire: UserId(squire), quest_id: QuestId(q), on: Date(day) }
+    Command::SubmitClaim {
+        claim_id: ClaimId(claim),
+        squire: UserId(squire),
+        quest_id: QuestId(q),
+        on: Date(day),
+    }
 }
 fn approve(actor: u128, claim: u128) -> Command {
-    Command::ReviewClaim { actor: UserId(actor), claim_id: ClaimId(claim), decision: Decision::Approve }
+    Command::ReviewClaim {
+        actor: UserId(actor),
+        claim_id: ClaimId(claim),
+        decision: Decision::Approve,
+    }
 }
 fn reject(actor: u128, claim: u128) -> Command {
-    Command::ReviewClaim { actor: UserId(actor), claim_id: ClaimId(claim), decision: Decision::Reject { reason: Some("nope".into()) } }
+    Command::ReviewClaim {
+        actor: UserId(actor),
+        claim_id: ClaimId(claim),
+        decision: Decision::Reject {
+            reason: Some("nope".into()),
+        },
+    }
 }
 
 fn approved(repo: &InMemoryRepository, claim: u128) -> Option<(UserId, Option<UserId>, Points)> {
     repo.events.iter().find_map(|e| match e {
-        Event::CompletionApproved { claim_id, squire, actor, points, .. } if *claim_id == ClaimId(claim) => {
-            Some((*squire, *actor, *points))
-        }
+        Event::CompletionApproved {
+            claim_id,
+            squire,
+            actor,
+            points,
+            ..
+        } if *claim_id == ClaimId(claim) => Some((*squire, *actor, *points)),
         _ => None,
     })
 }
@@ -94,9 +137,16 @@ fn submit_emits_completion_claimed_only() {
     let changes = run(&mut r, submit(1, 1, 10, 0)).unwrap();
     assert!(matches!(
         changes.as_slice(),
-        [Change::Append(Event::CompletionClaimed { squire: UserId(1), .. })]
+        [Change::Append(Event::CompletionClaimed {
+            squire: UserId(1),
+            ..
+        })]
     ));
-    assert_eq!(approved(&r, 1), None, "a plain claim is zero-value until reviewed");
+    assert_eq!(
+        approved(&r, 1),
+        None,
+        "a plain claim is zero-value until reviewed"
+    );
 }
 
 #[test]
@@ -114,18 +164,31 @@ fn submit_is_idempotent_on_claim_id() {
 fn subject_validation() {
     let mut r = repo();
     r.seed(&[Change::PutQuest(each(10, 10, false, false))]);
-    assert!(matches!(run(&mut r, submit(1, 99, 10, 0)), Err(DomainError::UserNotFound)));
-    assert!(matches!(run(&mut r, submit(1, 2, 10, 0)), Err(DomainError::NotASquire))); // 2 = Knight
+    assert!(matches!(
+        run(&mut r, submit(1, 99, 10, 0)),
+        Err(DomainError::UserNotFound)
+    ));
+    assert!(matches!(
+        run(&mut r, submit(1, 2, 10, 0)),
+        Err(DomainError::NotASquire)
+    )); // 2 = Knight
 }
 
 #[test]
 fn non_assignee_rejected() {
     let mut r = repo();
     r.seed(&[Change::PutQuest(quest(QuestSpec {
-        id: 10, reward: 10, assignment: squires_set(&[1]),
-        completion: Completion::EachAssignee, auto_approve: false, repeatable: false,
+        id: 10,
+        reward: 10,
+        assignment: squires_set(&[1]),
+        completion: Completion::EachAssignee,
+        auto_approve: false,
+        repeatable: false,
     }))]);
-    assert!(matches!(run(&mut r, submit(1, 3, 10, 0)), Err(DomainError::NotAssigned))); // 3 not assigned
+    assert!(matches!(
+        run(&mut r, submit(1, 3, 10, 0)),
+        Err(DomainError::NotAssigned)
+    )); // 3 not assigned
     assert!(run(&mut r, submit(1, 1, 10, 0)).is_ok()); // 1 is assigned
 }
 
@@ -135,7 +198,10 @@ fn already_claimed_today_is_per_squire() {
     r.seed(&[Change::PutQuest(each(10, 10, false, false))]);
     run(&mut r, submit(1, 1, 10, 0)).unwrap();
     // same squire, same day, new claim_id → blocked
-    assert!(matches!(run(&mut r, submit(2, 1, 10, 0)), Err(DomainError::AlreadyClaimedToday)));
+    assert!(matches!(
+        run(&mut r, submit(2, 1, 10, 0)),
+        Err(DomainError::AlreadyClaimedToday)
+    ));
     // different squire, same day → allowed
     assert!(run(&mut r, submit(3, 3, 10, 0)).is_ok());
     // same squire, different day → allowed
@@ -147,7 +213,10 @@ fn repeatable_within_day_allows_multiple() {
     let mut r = repo();
     r.seed(&[Change::PutQuest(each(11, 5, true, false))]);
     assert!(run(&mut r, submit(1, 1, 11, 0)).is_ok());
-    assert!(run(&mut r, submit(2, 1, 11, 0)).is_ok(), "repeatable: a second same-day claim is allowed");
+    assert!(
+        run(&mut r, submit(2, 1, 11, 0)).is_ok(),
+        "repeatable: a second same-day claim is allowed"
+    );
 }
 
 #[test]
@@ -155,7 +224,11 @@ fn auto_approve_credits_immediately_with_no_actor() {
     let mut r = repo();
     r.seed(&[Change::PutQuest(each(13, 7, false, true))]);
     run(&mut r, submit(1, 1, 13, 0)).unwrap();
-    assert_eq!(approved(&r, 1), Some((UserId(1), None, 7)), "auto-approve: actor None, reward snapshotted");
+    assert_eq!(
+        approved(&r, 1),
+        Some((UserId(1), None, 7)),
+        "auto-approve: actor None, reward snapshotted"
+    );
 }
 
 #[test]
@@ -164,10 +237,23 @@ fn review_approve_then_reject_and_already_reviewed() {
     r.seed(&[Change::PutQuest(each(10, 10, false, false))]);
     run(&mut r, submit(1, 1, 10, 0)).unwrap();
     run(&mut r, approve(2, 1)).unwrap();
-    assert_eq!(approved(&r, 1), Some((UserId(1), Some(UserId(2)), 10)), "actor = Knight, reward snapshotted");
-    assert!(matches!(run(&mut r, approve(2, 1)), Err(DomainError::AlreadyReviewed)));
-    assert!(matches!(run(&mut r, reject(2, 1)), Err(DomainError::AlreadyReviewed)));
-    assert!(matches!(run(&mut r, approve(2, 404)), Err(DomainError::ClaimNotFound)));
+    assert_eq!(
+        approved(&r, 1),
+        Some((UserId(1), Some(UserId(2)), 10)),
+        "actor = Knight, reward snapshotted"
+    );
+    assert!(matches!(
+        run(&mut r, approve(2, 1)),
+        Err(DomainError::AlreadyReviewed)
+    ));
+    assert!(matches!(
+        run(&mut r, reject(2, 1)),
+        Err(DomainError::AlreadyReviewed)
+    ));
+    assert!(matches!(
+        run(&mut r, approve(2, 404)),
+        Err(DomainError::ClaimNotFound)
+    ));
 }
 
 #[test]
@@ -210,9 +296,15 @@ fn race_first_approved_wins_and_closes_occurrence() {
     run(&mut r, approve(2, 1)).unwrap();
     assert_eq!(approved(&r, 1).unwrap().2, 20);
     // The other pending claim can no longer be approved.
-    assert!(matches!(run(&mut r, approve(2, 2)), Err(DomainError::OccurrenceTaken)));
+    assert!(matches!(
+        run(&mut r, approve(2, 2)),
+        Err(DomainError::OccurrenceTaken)
+    ));
     // And no new claim can be submitted for the closed occurrence.
-    assert!(matches!(run(&mut r, submit(9, 3, 12, 0)), Err(DomainError::OccurrenceTaken)));
+    assert!(matches!(
+        run(&mut r, submit(9, 3, 12, 0)),
+        Err(DomainError::OccurrenceTaken)
+    ));
 }
 
 #[test]
@@ -221,7 +313,10 @@ fn race_rejected_claim_reopens_the_occurrence() {
     r.seed(&[Change::PutQuest(race(12, 20))]);
     run(&mut r, submit(1, 1, 12, 0)).unwrap();
     // Same Squire can't double-claim a live race occurrence.
-    assert!(matches!(run(&mut r, submit(2, 1, 12, 0)), Err(DomainError::AlreadyClaimedToday)));
+    assert!(matches!(
+        run(&mut r, submit(2, 1, 12, 0)),
+        Err(DomainError::AlreadyClaimedToday)
+    ));
     // Reject the first claim → occurrence reopens.
     run(&mut r, reject(2, 1)).unwrap();
     // Another assignee can now claim and win.
@@ -238,7 +333,10 @@ fn total_achievement(id: u128, count: u32, bonus: Points) -> Achievement {
         id: AchievementId(id),
         name: "First chore".into(),
         description: None,
-        criterion: Criterion::TotalCompletions { scope: Scope::Any, count },
+        criterion: Criterion::TotalCompletions {
+            scope: Scope::Any,
+            count,
+        },
         bonus_points: bonus,
         active: true,
     }
@@ -258,11 +356,17 @@ fn approving_a_claim_that_completes_a_criterion_unlocks_and_credits_bonus() {
     run(&mut r, approve(2, 1)).unwrap();
 
     // The reward (10) plus the unlock bonus (50) are both on the balance.
-    assert_eq!(Proj::balance(&r.snapshot(), UserId(1)), 60, "reward + achievement bonus");
-    let unlocked = r.events.iter().any(|e| matches!(
-        e, Event::AchievementUnlocked { squire, id, bonus, .. }
-            if *squire == UserId(1) && *id == AchievementId(900) && *bonus == 50
-    ));
+    assert_eq!(
+        Proj::balance(&r.snapshot(), UserId(1)),
+        60,
+        "reward + achievement bonus"
+    );
+    let unlocked = r.events.iter().any(|e| {
+        matches!(
+            e, Event::AchievementUnlocked { squire, id, bonus, .. }
+                if *squire == UserId(1) && *id == AchievementId(900) && *bonus == 50
+        )
+    });
     assert!(unlocked, "approval emits the AchievementUnlocked event");
 }
 
@@ -278,14 +382,27 @@ fn approving_a_cash_quest_accrues_dollars_separately() {
     run(&mut r, approve(2, 1)).unwrap();
 
     let snap = r.snapshot();
-    assert_eq!(Proj::balance_in(&snap, UserId(1), Currency::Coins), 10, "coins = reward");
-    assert_eq!(Proj::balance_in(&snap, UserId(1), Currency::Cash), 5, "cash = the dollar award");
+    assert_eq!(
+        Proj::balance_in(&snap, UserId(1), Currency::Coins),
+        10,
+        "coins = reward"
+    );
+    assert_eq!(
+        Proj::balance_in(&snap, UserId(1), Currency::Cash),
+        5,
+        "cash = the dollar award"
+    );
     // The cash accrual is one Adjusted{Cash} carrying the quest title as its reason.
-    let cash_credit = snap.events.iter().any(|e| matches!(
-        e, Event::Adjusted { squire, currency: Currency::Cash, amount, .. }
-            if *squire == UserId(1) && *amount == 5
-    ));
-    assert!(cash_credit, "approval emits an Adjusted{{Cash}} for the dollar reward");
+    let cash_credit = snap.events.iter().any(|e| {
+        matches!(
+            e, Event::Adjusted { squire, currency: Currency::Cash, amount, .. }
+                if *squire == UserId(1) && *amount == 5
+        )
+    });
+    assert!(
+        cash_credit,
+        "approval emits an Adjusted{{Cash}} for the dollar reward"
+    );
 }
 
 /// A quest with no cash (`cash = 0`) accrues no dollars — the Cash balance stays zero.
@@ -295,7 +412,11 @@ fn approving_a_cashless_quest_accrues_no_dollars() {
     r.seed(&[Change::PutQuest(each(10, 10, false, false))]);
     run(&mut r, submit(1, 1, 10, 0)).unwrap();
     run(&mut r, approve(2, 1)).unwrap();
-    assert_eq!(Proj::balance_in(&r.snapshot(), UserId(1), Currency::Cash), 0, "no cash quest ⇒ no dollars");
+    assert_eq!(
+        Proj::balance_in(&r.snapshot(), UserId(1), Currency::Cash),
+        0,
+        "no cash quest ⇒ no dollars"
+    );
 }
 
 /// The full reject → re-claim → approve cycle: a rejected claim credits nothing and re-opens the
@@ -306,12 +427,24 @@ fn reject_then_reclaim_then_approve_credits_once() {
     r.seed(&[Change::PutQuest(each(10, 10, false, false))]);
     run(&mut r, submit(1, 1, 10, 0)).unwrap();
     run(&mut r, reject(2, 1)).unwrap();
-    assert_eq!(Proj::balance(&r.snapshot(), UserId(1)), 0, "a rejected claim credits nothing");
+    assert_eq!(
+        Proj::balance(&r.snapshot(), UserId(1)),
+        0,
+        "a rejected claim credits nothing"
+    );
 
     // Re-claim the same (squire, quest, day) with a fresh claim id, then approve it.
     run(&mut r, submit(2, 1, 10, 0)).unwrap();
     run(&mut r, approve(2, 2)).unwrap();
-    assert_eq!(Proj::balance(&r.snapshot(), UserId(1)), 10, "the re-claim credits exactly once");
-    let approvals = r.events.iter().filter(|e| matches!(e, Event::CompletionApproved { squire, .. } if *squire == UserId(1))).count();
+    assert_eq!(
+        Proj::balance(&r.snapshot(), UserId(1)),
+        10,
+        "the re-claim credits exactly once"
+    );
+    let approvals = r
+        .events
+        .iter()
+        .filter(|e| matches!(e, Event::CompletionApproved { squire, .. } if *squire == UserId(1)))
+        .count();
     assert_eq!(approvals, 1, "only the second claim was approved");
 }

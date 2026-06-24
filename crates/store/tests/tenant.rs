@@ -20,7 +20,9 @@ fn each_backend(handles: &[&str], test: impl Fn(&Provisioner)) {
     // SQLite — always. Base dir is a TempDir that drops (and deletes) at scope end.
     {
         let dir = tempfile::tempdir().expect("tempdir");
-        let prov = Provisioner::new(Backend::Sqlite { dir: dir.path().to_path_buf() });
+        let prov = Provisioner::new(Backend::Sqlite {
+            dir: dir.path().to_path_buf(),
+        });
         test(&prov);
     }
 
@@ -100,14 +102,20 @@ fn full_isolation_between_two_households() {
         assert_eq!(a.users[0].id, UserId(1));
         assert_eq!(a.users[0].display_name, "user-1");
         assert_eq!(a.events.len(), 1, "alpha should have exactly its own event");
-        assert!(a.users.iter().all(|u| u.id != UserId(2)), "alpha must not see beta's user");
+        assert!(
+            a.users.iter().all(|u| u.id != UserId(2)),
+            "alpha must not see beta's user"
+        );
 
         // Beta has beta's data, none of alpha's.
         assert_eq!(b.users.len(), 1, "beta should have exactly its own user");
         assert_eq!(b.users[0].id, UserId(2));
         assert_eq!(b.users[0].display_name, "user-2");
         assert_eq!(b.events.len(), 1, "beta should have exactly its own event");
-        assert!(b.users.iter().all(|u| u.id != UserId(1)), "beta must not see alpha's user");
+        assert!(
+            b.users.iter().all(|u| u.id != UserId(1)),
+            "beta must not see alpha's user"
+        );
     });
 }
 
@@ -120,8 +128,14 @@ fn provision_deprovision_lifecycle() {
         {
             let store = prov.open("gamma", SystemClock).expect("open gamma");
             let snap = store.snapshot();
-            assert!(snap.users.is_empty(), "fresh tenant snapshot should be empty");
-            assert!(snap.events.is_empty(), "fresh tenant snapshot should be empty");
+            assert!(
+                snap.users.is_empty(),
+                "fresh tenant snapshot should be empty"
+            );
+            assert!(
+                snap.events.is_empty(),
+                "fresh tenant snapshot should be empty"
+            );
         }
 
         // Write some data so we can prove deprovision removes it.
@@ -136,13 +150,17 @@ fn provision_deprovision_lifecycle() {
         assert_tenant_absent(prov, "gamma");
 
         // Deprovision again is a no-op (idempotent).
-        prov.deprovision("gamma").expect("deprovision gamma (idempotent)");
+        prov.deprovision("gamma")
+            .expect("deprovision gamma (idempotent)");
 
         // Re-provision works and starts empty again (old data gone).
         prov.provision("gamma").expect("re-provision gamma");
         let store = prov.open("gamma", SystemClock).expect("reopen gamma");
         let snap = store.snapshot();
-        assert!(snap.users.is_empty(), "re-provisioned tenant should be empty");
+        assert!(
+            snap.users.is_empty(),
+            "re-provisioned tenant should be empty"
+        );
     });
 }
 
@@ -150,7 +168,9 @@ fn provision_deprovision_lifecycle() {
 #[test]
 fn rejects_unsafe_handles() {
     each_backend(&[], |prov| {
-        for bad in ["", "Alpha", "a-b", "a.b", "../etc", "a b", "a'; DROP", "a/b"] {
+        for bad in [
+            "", "Alpha", "a-b", "a.b", "../etc", "a b", "a'; DROP", "a/b",
+        ] {
             let r = prov.provision(bad);
             assert!(
                 matches!(r, Err(ProvisionError::InvalidHandle(_))),
@@ -169,7 +189,11 @@ fn assert_tenant_absent(prov: &Provisioner, handle: &str) {
     match prov.backend() {
         Backend::Sqlite { dir } => {
             let path = dir.join(format!("{handle}.sqlite"));
-            assert!(!path.exists(), "SQLite tenant file should be gone: {}", path.display());
+            assert!(
+                !path.exists(),
+                "SQLite tenant file should be gone: {}",
+                path.display()
+            );
         }
         #[cfg(feature = "postgres")]
         Backend::Postgres { base_url } => {

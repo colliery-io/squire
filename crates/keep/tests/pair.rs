@@ -19,7 +19,9 @@ use tower::ServiceExt;
 
 fn keep() -> (Arc<KeepState>, HouseholdHandle, String, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("tempdir");
-    let backend = Backend::Sqlite { dir: dir.path().to_path_buf() };
+    let backend = Backend::Sqlite {
+        dir: dir.path().to_path_buf(),
+    };
     let handle = HouseholdHandle("keep".into());
     let state = KeepState::local(
         backend,
@@ -88,12 +90,24 @@ async fn knight_mints_a_pairing_qr_and_the_code_consumes_to_that_member() {
     let squire_id = squire["user"].as_str().unwrap().to_string();
 
     // Knight mints a pairing code + QR for the Squire.
-    let (st, p) =
-        send(&state, "POST", "/api/pair/codes", Some(&token), Some(json!({ "user": squire_id }))).await;
+    let (st, p) = send(
+        &state,
+        "POST",
+        "/api/pair/codes",
+        Some(&token),
+        Some(json!({ "user": squire_id })),
+    )
+    .await;
     assert_eq!(st, StatusCode::OK);
     let code = p["code"].as_str().unwrap().to_string();
-    assert!(!code.is_empty(), "a plaintext code is returned (once) for the QR");
-    assert!(p["qr_svg"].as_str().unwrap().contains("<svg"), "renders an SVG QR");
+    assert!(
+        !code.is_empty(),
+        "a plaintext code is returned (once) for the QR"
+    );
+    assert!(
+        p["qr_svg"].as_str().unwrap().contains("<svg"),
+        "renders an SVG QR"
+    );
     assert!(
         p["payload"].as_str().unwrap().starts_with("squire://pair?"),
         "the QR encodes a squire://pair URI"
@@ -101,12 +115,18 @@ async fn knight_mints_a_pairing_qr_and_the_code_consumes_to_that_member() {
     assert!(p["expires_at"].as_i64().unwrap() > 0);
 
     // The minted code consumes (the SAME path the api's POST /pair calls) to the Squire's token.
-    let paired = state.identity.consume_pairing_code(&handle, &code).expect("code consumes");
+    let paired = state
+        .identity
+        .consume_pairing_code(&handle, &code)
+        .expect("code consumes");
     assert_eq!(paired.user.0.to_string(), squire_id);
     assert_eq!(paired.role, domain_core::contract::Role::Squire);
 
     // Single-use: a second mint+consume needs a fresh code; replaying the old one fails.
-    assert!(state.identity.consume_pairing_code(&handle, &code).is_err(), "code is single-use");
+    assert!(
+        state.identity.consume_pairing_code(&handle, &code).is_err(),
+        "code is single-use"
+    );
 }
 
 #[tokio::test]
@@ -130,7 +150,13 @@ async fn a_squire_operator_cannot_mint_pairing_codes() {
 #[tokio::test]
 async fn unauthenticated_mint_is_401() {
     let (state, _handle, _token, _dir) = keep();
-    let (st, _) =
-        send(&state, "POST", "/api/pair/codes", Some("garbage"), Some(json!({ "user": "1" }))).await;
+    let (st, _) = send(
+        &state,
+        "POST",
+        "/api/pair/codes",
+        Some("garbage"),
+        Some(json!({ "user": "1" })),
+    )
+    .await;
     assert_eq!(st, StatusCode::UNAUTHORIZED);
 }

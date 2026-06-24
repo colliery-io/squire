@@ -23,7 +23,8 @@ fn apply_then_snapshot_round_trips() {
         display_name: "Kid".into(),
         active: true,
     };
-    repo.apply(Some(UserId(9)), &[Change::PutUser(kid)]).unwrap();
+    repo.apply(Some(UserId(9)), &[Change::PutUser(kid)])
+        .unwrap();
     repo.apply(
         Some(UserId(2)),
         &[Change::Append(Event::Adjusted {
@@ -65,14 +66,23 @@ fn upsert_replaces_definition_by_id() {
         active: true,
         icon: None,
     };
-    repo.apply(Some(UserId(2)), &[Change::PutQuest(q.clone())]).unwrap();
+    repo.apply(Some(UserId(2)), &[Change::PutQuest(q.clone())])
+        .unwrap();
     q.reward = 15;
-    repo.apply(Some(UserId(3)), &[Change::PutQuest(q.clone())]).unwrap();
+    repo.apply(Some(UserId(3)), &[Change::PutQuest(q.clone())])
+        .unwrap();
     assert_eq!(repo.quests.len(), 1, "upsert, not append");
     assert_eq!(repo.quests[0].reward, 15);
 
-    repo.apply(Some(UserId(2)), &[Change::SetQuestActive(QuestId(7), false)]).unwrap();
-    assert!(!repo.quests[0].active, "archive flips active, never deletes");
+    repo.apply(
+        Some(UserId(2)),
+        &[Change::SetQuestActive(QuestId(7), false)],
+    )
+    .unwrap();
+    assert!(
+        !repo.quests[0].active,
+        "archive flips active, never deletes"
+    );
 }
 
 #[test]
@@ -140,10 +150,30 @@ fn handle_dispatches_every_command_family_without_panicking() {
             icon: None,
         }),
         Command::ArchiveQuest(QuestId(1)),
-        Command::SubmitClaim { claim_id: ClaimId(1), squire: UserId(1), quest_id: QuestId(1), on: Date(0) },
-        Command::ReviewClaim { actor: UserId(2), claim_id: ClaimId(1), decision: Decision::Approve },
-        Command::RequestRedemption { request_id: RequestId(1), squire: UserId(1), item_id: ItemId(1) },
-        Command::AdjustPoints { command_id: CommandId(1), actor: UserId(2), squire: UserId(1), currency: Currency::Coins, amount: 1, reason: "r".into() },
+        Command::SubmitClaim {
+            claim_id: ClaimId(1),
+            squire: UserId(1),
+            quest_id: QuestId(1),
+            on: Date(0),
+        },
+        Command::ReviewClaim {
+            actor: UserId(2),
+            claim_id: ClaimId(1),
+            decision: Decision::Approve,
+        },
+        Command::RequestRedemption {
+            request_id: RequestId(1),
+            squire: UserId(1),
+            item_id: ItemId(1),
+        },
+        Command::AdjustPoints {
+            command_id: CommandId(1),
+            actor: UserId(2),
+            squire: UserId(1),
+            currency: Currency::Coins,
+            amount: 1,
+            reason: "r".into(),
+        },
     ];
     for cmd in cmds {
         // The point is dispatch reaches a handler for each family without panicking. The

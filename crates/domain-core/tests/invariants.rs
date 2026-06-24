@@ -22,10 +22,20 @@ const Q_RACE: u128 = 3; // q3 is the Race quest
 const ITEM_ONCE: u128 = 2; // i2 is the `Once` item
 
 fn squire(id: u128) -> User {
-    User { id: UserId(id), role: Role::Squire, display_name: format!("S{id}"), active: true }
+    User {
+        id: UserId(id),
+        role: Role::Squire,
+        display_name: format!("S{id}"),
+        active: true,
+    }
 }
 fn knight(id: u128) -> User {
-    User { id: UserId(id), role: Role::Knight, display_name: format!("K{id}"), active: true }
+    User {
+        id: UserId(id),
+        role: Role::Knight,
+        display_name: format!("K{id}"),
+        active: true,
+    }
 }
 
 fn quest(
@@ -54,11 +64,24 @@ fn quest(
 }
 
 fn item(id: u128, cost: Points, avail: Availability) -> RedeemableItem {
-    RedeemableItem { id: ItemId(id), name: format!("I{id}"), description: None, cost, gate: None, availability: avail, active: true, icon: None }
+    RedeemableItem {
+        id: ItemId(id),
+        name: format!("I{id}"),
+        description: None,
+        cost,
+        gate: None,
+        availability: avail,
+        active: true,
+        icon: None,
+    }
 }
 
 fn all_squires() -> Assignment {
-    Assignment::Squires([UserId(1), UserId(2), UserId(3)].into_iter().collect::<BTreeSet<_>>())
+    Assignment::Squires(
+        [UserId(1), UserId(2), UserId(3)]
+            .into_iter()
+            .collect::<BTreeSet<_>>(),
+    )
 }
 
 /// Fresh fixture: squires 1/2/3, knight 9; q1..q4, i1/i2, one Streak achievement.
@@ -70,13 +93,41 @@ fn fixture() -> InMemoryRepository {
         Change::PutUser(squire(3)),
         Change::PutUser(knight(KNIGHT)),
         // q1: daily EachAssignee non-repeatable reward 10 (manual)
-        Change::PutQuest(quest(1, 10, Completion::EachAssignee, Assignment::AllSquires, false, false)),
+        Change::PutQuest(quest(
+            1,
+            10,
+            Completion::EachAssignee,
+            Assignment::AllSquires,
+            false,
+            false,
+        )),
         // q2: daily EachAssignee repeatable reward 5 (manual)
-        Change::PutQuest(quest(2, 5, Completion::EachAssignee, Assignment::AllSquires, false, true)),
+        Change::PutQuest(quest(
+            2,
+            5,
+            Completion::EachAssignee,
+            Assignment::AllSquires,
+            false,
+            true,
+        )),
         // q3: daily Race reward 20 AllSquires (manual)
-        Change::PutQuest(quest(Q_RACE, 20, Completion::Race, all_squires(), false, false)),
+        Change::PutQuest(quest(
+            Q_RACE,
+            20,
+            Completion::Race,
+            all_squires(),
+            false,
+            false,
+        )),
         // q4: daily EachAssignee auto_approve reward 7
-        Change::PutQuest(quest(4, 7, Completion::EachAssignee, Assignment::AllSquires, true, false)),
+        Change::PutQuest(quest(
+            4,
+            7,
+            Completion::EachAssignee,
+            Assignment::AllSquires,
+            true,
+            false,
+        )),
         // i1 Repeatable cost 10, i2 Once cost 15
         Change::PutItem(item(1, 10, Availability::Repeatable)),
         Change::PutItem(item(ITEM_ONCE, 15, Availability::Once)),
@@ -101,21 +152,60 @@ fn fixture() -> InMemoryRepository {
 
 #[derive(Clone, Debug)]
 enum Action {
-    Submit { claim: u8, squire: u128, quest: u128, day: i32 },
-    Redeem { cmd: u8, squire: u128, item: u128 },
-    Adjust { cmd: u8, squire: u128, amount: i64 },
-    Request { req: u8, squire: u128, item: u128 },
-    ReviewClaim { approve: bool },
-    ReviewRequest { approve: bool },
+    Submit {
+        claim: u8,
+        squire: u128,
+        quest: u128,
+        day: i32,
+    },
+    Redeem {
+        cmd: u8,
+        squire: u128,
+        item: u128,
+    },
+    Adjust {
+        cmd: u8,
+        squire: u128,
+        amount: i64,
+    },
+    Request {
+        req: u8,
+        squire: u128,
+        item: u128,
+    },
+    ReviewClaim {
+        approve: bool,
+    },
+    ReviewRequest {
+        approve: bool,
+    },
 }
 
 fn action_strategy() -> impl Strategy<Value = Action> {
     prop_oneof![
-        (0u8..12, 1u128..=3, 1u128..=4, 0i32..5)
-            .prop_map(|(claim, squire, quest, day)| Action::Submit { claim, squire, quest, day }),
-        (0u8..12, 1u128..=3, 1u128..=2).prop_map(|(cmd, squire, item)| Action::Redeem { cmd, squire, item }),
-        (0u8..12, 1u128..=3, -30i64..30).prop_map(|(cmd, squire, amount)| Action::Adjust { cmd, squire, amount }),
-        (0u8..12, 1u128..=3, 1u128..=2).prop_map(|(req, squire, item)| Action::Request { req, squire, item }),
+        (0u8..12, 1u128..=3, 1u128..=4, 0i32..5).prop_map(|(claim, squire, quest, day)| {
+            Action::Submit {
+                claim,
+                squire,
+                quest,
+                day,
+            }
+        }),
+        (0u8..12, 1u128..=3, 1u128..=2).prop_map(|(cmd, squire, item)| Action::Redeem {
+            cmd,
+            squire,
+            item
+        }),
+        (0u8..12, 1u128..=3, -30i64..30).prop_map(|(cmd, squire, amount)| Action::Adjust {
+            cmd,
+            squire,
+            amount
+        }),
+        (0u8..12, 1u128..=3, 1u128..=2).prop_map(|(req, squire, item)| Action::Request {
+            req,
+            squire,
+            item
+        }),
         any::<bool>().prop_map(|approve| Action::ReviewClaim { approve }),
         any::<bool>().prop_map(|approve| Action::ReviewRequest { approve }),
     ]
@@ -135,7 +225,9 @@ fn oldest_pending_claim(repo: &InMemoryRepository) -> Option<ClaimId> {
         })
         .collect();
     repo.events.iter().find_map(|e| match e {
-        Event::CompletionClaimed { claim_id, .. } if !resolved.contains(&claim_id.0) => Some(*claim_id),
+        Event::CompletionClaimed { claim_id, .. } if !resolved.contains(&claim_id.0) => {
+            Some(*claim_id)
+        }
         _ => None,
     })
 }
@@ -146,13 +238,18 @@ fn oldest_unresolved_request(repo: &InMemoryRepository) -> Option<RequestId> {
         .events
         .iter()
         .filter_map(|e| match e {
-            Event::ItemRedeemed { request_id: Some(r), .. } => Some(r.0),
+            Event::ItemRedeemed {
+                request_id: Some(r),
+                ..
+            } => Some(r.0),
             Event::RedemptionRejected { request_id: r, .. } => Some(r.0),
             _ => None,
         })
         .collect();
     repo.events.iter().find_map(|e| match e {
-        Event::RedemptionRequested { request_id, .. } if !resolved.contains(&request_id.0) => Some(*request_id),
+        Event::RedemptionRequested { request_id, .. } if !resolved.contains(&request_id.0) => {
+            Some(*request_id)
+        }
         _ => None,
     })
 }
@@ -161,7 +258,9 @@ fn decision(approve: bool) -> Decision {
     if approve {
         Decision::Approve
     } else {
-        Decision::Reject { reason: Some("nope".into()) }
+        Decision::Reject {
+            reason: Some("nope".into()),
+        }
     }
 }
 
@@ -173,7 +272,12 @@ fn replay(actions: &[Action]) -> InMemoryRepository {
         // Timestamp = action index → strictly monotone; date fixed at Date(0) = Monday.
         let clock = FakeClock::at(Date(0), Timestamp(i as i64));
         let cmd: Option<Command> = match action {
-            Action::Submit { claim, squire, quest, day } => Some(Command::SubmitClaim {
+            Action::Submit {
+                claim,
+                squire,
+                quest,
+                day,
+            } => Some(Command::SubmitClaim {
                 claim_id: ClaimId(*claim as u128),
                 squire: UserId(*squire),
                 quest_id: QuestId(*quest),
@@ -185,7 +289,11 @@ fn replay(actions: &[Action]) -> InMemoryRepository {
                 squire: UserId(*squire),
                 item_id: ItemId(*item),
             }),
-            Action::Adjust { cmd, squire, amount } => Some(Command::AdjustPoints {
+            Action::Adjust {
+                cmd,
+                squire,
+                amount,
+            } => Some(Command::AdjustPoints {
                 command_id: CommandId(1000 + *cmd as u128), // disjoint id space
                 actor: UserId(KNIGHT),
                 squire: UserId(*squire),
@@ -198,12 +306,20 @@ fn replay(actions: &[Action]) -> InMemoryRepository {
                 squire: UserId(*squire),
                 item_id: ItemId(*item),
             }),
-            Action::ReviewClaim { approve } => oldest_pending_claim(&repo).map(|claim_id| {
-                Command::ReviewClaim { actor: UserId(KNIGHT), claim_id, decision: decision(*approve) }
-            }),
-            Action::ReviewRequest { approve } => oldest_unresolved_request(&repo).map(|request_id| {
-                Command::ReviewRedemption { actor: UserId(KNIGHT), request_id, decision: decision(*approve) }
-            }),
+            Action::ReviewClaim { approve } => {
+                oldest_pending_claim(&repo).map(|claim_id| Command::ReviewClaim {
+                    actor: UserId(KNIGHT),
+                    claim_id,
+                    decision: decision(*approve),
+                })
+            }
+            Action::ReviewRequest { approve } => {
+                oldest_unresolved_request(&repo).map(|request_id| Command::ReviewRedemption {
+                    actor: UserId(KNIGHT),
+                    request_id,
+                    decision: decision(*approve),
+                })
+            }
         };
         if let Some(cmd) = cmd {
             let snap = repo.snapshot();
@@ -223,14 +339,26 @@ fn snapshot_for_squire(repo: &InMemoryRepository, squire: UserId) -> Snapshot {
         .events
         .iter()
         .filter_map(|e| match e {
-            Event::CompletionClaimed { claim_id, squire: s, .. } if *s == squire => Some(claim_id.0),
+            Event::CompletionClaimed {
+                claim_id,
+                squire: s,
+                ..
+            } if *s == squire => Some(claim_id.0),
             _ => None,
         })
         .collect();
     snap.events.retain(|e| match e {
         Event::CompletionClaimed { squire: s, .. } => *s == squire,
-        Event::CompletionApproved { squire: s, claim_id, .. } => *s == squire || own_claims.contains(&claim_id.0),
-        Event::CompletionRejected { squire: s, claim_id, .. } => *s == squire || own_claims.contains(&claim_id.0),
+        Event::CompletionApproved {
+            squire: s,
+            claim_id,
+            ..
+        } => *s == squire || own_claims.contains(&claim_id.0),
+        Event::CompletionRejected {
+            squire: s,
+            claim_id,
+            ..
+        } => *s == squire || own_claims.contains(&claim_id.0),
         Event::ItemRedeemed { squire: s, .. } => *s == squire,
         Event::AchievementUnlocked { squire: s, .. } => *s == squire,
         Event::Adjusted { squire: s, .. } => *s == squire,
@@ -355,13 +483,28 @@ fn run(repo: &mut InMemoryRepository, cmd: Command, t: i64) -> Result<Vec<Change
 }
 
 fn submit(claim: u128, squire: u128, q: u128, day: i32) -> Command {
-    Command::SubmitClaim { claim_id: ClaimId(claim), squire: UserId(squire), quest_id: QuestId(q), on: Date(day) }
+    Command::SubmitClaim {
+        claim_id: ClaimId(claim),
+        squire: UserId(squire),
+        quest_id: QuestId(q),
+        on: Date(day),
+    }
 }
 fn approve(claim: u128) -> Command {
-    Command::ReviewClaim { actor: UserId(KNIGHT), claim_id: ClaimId(claim), decision: Decision::Approve }
+    Command::ReviewClaim {
+        actor: UserId(KNIGHT),
+        claim_id: ClaimId(claim),
+        decision: Decision::Approve,
+    }
 }
 fn reject(claim: u128) -> Command {
-    Command::ReviewClaim { actor: UserId(KNIGHT), claim_id: ClaimId(claim), decision: Decision::Reject { reason: Some("no".into()) } }
+    Command::ReviewClaim {
+        actor: UserId(KNIGHT),
+        claim_id: ClaimId(claim),
+        decision: Decision::Reject {
+            reason: Some("no".into()),
+        },
+    }
 }
 
 fn approvals_for_occurrence(repo: &InMemoryRepository, quest: u128, on: i32) -> usize {
@@ -369,14 +512,21 @@ fn approvals_for_occurrence(repo: &InMemoryRepository, quest: u128, on: i32) -> 
         .events
         .iter()
         .filter_map(|e| match e {
-            Event::CompletionClaimed { claim_id, quest_id, on, .. } => Some((claim_id.0, (quest_id.0, on.0))),
+            Event::CompletionClaimed {
+                claim_id,
+                quest_id,
+                on,
+                ..
+            } => Some((claim_id.0, (quest_id.0, on.0))),
             _ => None,
         })
         .collect();
     repo.events
         .iter()
         .filter(|e| match e {
-            Event::CompletionApproved { claim_id, .. } => claim_occ.get(&claim_id.0) == Some(&(quest, on)),
+            Event::CompletionApproved { claim_id, .. } => {
+                claim_occ.get(&claim_id.0) == Some(&(quest, on))
+            }
             _ => false,
         })
         .count()
@@ -391,9 +541,19 @@ fn race_exactly_one_winner_others_taken() {
     run(&mut r, submit(2, 2, Q_RACE, 0), 1).unwrap();
     run(&mut r, submit(3, 3, Q_RACE, 0), 2).unwrap();
     run(&mut r, approve(1), 3).unwrap();
-    assert!(matches!(run(&mut r, approve(2), 4), Err(DomainError::OccurrenceTaken)));
-    assert!(matches!(run(&mut r, approve(3), 5), Err(DomainError::OccurrenceTaken)));
-    assert_eq!(approvals_for_occurrence(&r, Q_RACE, 0), 1, "exactly one payout for the occurrence");
+    assert!(matches!(
+        run(&mut r, approve(2), 4),
+        Err(DomainError::OccurrenceTaken)
+    ));
+    assert!(matches!(
+        run(&mut r, approve(3), 5),
+        Err(DomainError::OccurrenceTaken)
+    ));
+    assert_eq!(
+        approvals_for_occurrence(&r, Q_RACE, 0),
+        1,
+        "exactly one payout for the occurrence"
+    );
 }
 
 #[test]
@@ -404,7 +564,11 @@ fn race_reject_reopens_lets_a_later_squire_win() {
     run(&mut r, reject(1), 1).unwrap();
     run(&mut r, submit(2, 2, Q_RACE, 0), 2).unwrap();
     run(&mut r, approve(2), 3).unwrap();
-    assert_eq!(approvals_for_occurrence(&r, Q_RACE, 0), 1, "the reopened occurrence is won once");
+    assert_eq!(
+        approvals_for_occurrence(&r, Q_RACE, 0),
+        1,
+        "the reopened occurrence is won once"
+    );
 }
 
 #[test]
@@ -412,15 +576,62 @@ fn once_item_redeemable_exactly_once_householdwide() {
     // (c) The Once item (i2) can be redeemed exactly once across the household.
     let mut r = fixture();
     // Fund squires 1 and 3.
-    run(&mut r, Command::AdjustPoints { command_id: CommandId(900), actor: UserId(KNIGHT), squire: UserId(1), currency: Currency::Coins, amount: 100, reason: "seed".into() }, 0).unwrap();
-    run(&mut r, Command::AdjustPoints { command_id: CommandId(901), actor: UserId(KNIGHT), squire: UserId(3), currency: Currency::Coins, amount: 100, reason: "seed".into() }, 1).unwrap();
-    run(&mut r, Command::RedeemItem { command_id: CommandId(1), actor: UserId(KNIGHT), squire: UserId(1), item_id: ItemId(ITEM_ONCE) }, 2).unwrap();
+    run(
+        &mut r,
+        Command::AdjustPoints {
+            command_id: CommandId(900),
+            actor: UserId(KNIGHT),
+            squire: UserId(1),
+            currency: Currency::Coins,
+            amount: 100,
+            reason: "seed".into(),
+        },
+        0,
+    )
+    .unwrap();
+    run(
+        &mut r,
+        Command::AdjustPoints {
+            command_id: CommandId(901),
+            actor: UserId(KNIGHT),
+            squire: UserId(3),
+            currency: Currency::Coins,
+            amount: 100,
+            reason: "seed".into(),
+        },
+        1,
+    )
+    .unwrap();
+    run(
+        &mut r,
+        Command::RedeemItem {
+            command_id: CommandId(1),
+            actor: UserId(KNIGHT),
+            squire: UserId(1),
+            item_id: ItemId(ITEM_ONCE),
+        },
+        2,
+    )
+    .unwrap();
     // Second redeem (different squire, fresh command_id) → OutOfStock.
     assert!(matches!(
-        run(&mut r, Command::RedeemItem { command_id: CommandId(2), actor: UserId(KNIGHT), squire: UserId(3), item_id: ItemId(ITEM_ONCE) }, 3),
+        run(
+            &mut r,
+            Command::RedeemItem {
+                command_id: CommandId(2),
+                actor: UserId(KNIGHT),
+                squire: UserId(3),
+                item_id: ItemId(ITEM_ONCE)
+            },
+            3
+        ),
         Err(DomainError::Redeem(Blocked::OutOfStock))
     ));
-    let count = r.events.iter().filter(|e| matches!(e, Event::ItemRedeemed { item_id, .. } if item_id.0 == ITEM_ONCE)).count();
+    let count = r
+        .events
+        .iter()
+        .filter(|e| matches!(e, Event::ItemRedeemed { item_id, .. } if item_id.0 == ITEM_ONCE))
+        .count();
     assert_eq!(count, 1);
 }
 
@@ -428,16 +639,81 @@ fn once_item_redeemable_exactly_once_householdwide() {
 fn replaying_identical_keys_is_a_no_op() {
     // (d) Replaying the same claim_id / request_id / command_id appends nothing.
     let mut r = fixture();
-    run(&mut r, Command::AdjustPoints { command_id: CommandId(900), actor: UserId(KNIGHT), squire: UserId(1), currency: Currency::Coins, amount: 100, reason: "seed".into() }, 0).unwrap();
+    run(
+        &mut r,
+        Command::AdjustPoints {
+            command_id: CommandId(900),
+            actor: UserId(KNIGHT),
+            squire: UserId(1),
+            currency: Currency::Coins,
+            amount: 100,
+            reason: "seed".into(),
+        },
+        0,
+    )
+    .unwrap();
     // Establish each fact once.
     run(&mut r, submit(1, 1, 1, 0), 1).unwrap();
-    run(&mut r, Command::RequestRedemption { request_id: RequestId(7), squire: UserId(1), item_id: ItemId(1) }, 2).unwrap();
-    run(&mut r, Command::RedeemItem { command_id: CommandId(5), actor: UserId(KNIGHT), squire: UserId(1), item_id: ItemId(1) }, 3).unwrap();
+    run(
+        &mut r,
+        Command::RequestRedemption {
+            request_id: RequestId(7),
+            squire: UserId(1),
+            item_id: ItemId(1),
+        },
+        2,
+    )
+    .unwrap();
+    run(
+        &mut r,
+        Command::RedeemItem {
+            command_id: CommandId(5),
+            actor: UserId(KNIGHT),
+            squire: UserId(1),
+            item_id: ItemId(1),
+        },
+        3,
+    )
+    .unwrap();
     let before = r.events.len();
     // Replay identical keys.
     assert!(run(&mut r, submit(1, 1, 1, 0), 4).unwrap().is_empty());
-    assert!(run(&mut r, Command::RequestRedemption { request_id: RequestId(7), squire: UserId(1), item_id: ItemId(1) }, 5).unwrap().is_empty());
-    assert!(run(&mut r, Command::RedeemItem { command_id: CommandId(5), actor: UserId(KNIGHT), squire: UserId(1), item_id: ItemId(1) }, 6).unwrap().is_empty());
-    assert!(run(&mut r, Command::AdjustPoints { command_id: CommandId(900), actor: UserId(KNIGHT), squire: UserId(1), currency: Currency::Coins, amount: 100, reason: "seed".into() }, 7).unwrap().is_empty());
+    assert!(run(
+        &mut r,
+        Command::RequestRedemption {
+            request_id: RequestId(7),
+            squire: UserId(1),
+            item_id: ItemId(1)
+        },
+        5
+    )
+    .unwrap()
+    .is_empty());
+    assert!(run(
+        &mut r,
+        Command::RedeemItem {
+            command_id: CommandId(5),
+            actor: UserId(KNIGHT),
+            squire: UserId(1),
+            item_id: ItemId(1)
+        },
+        6
+    )
+    .unwrap()
+    .is_empty());
+    assert!(run(
+        &mut r,
+        Command::AdjustPoints {
+            command_id: CommandId(900),
+            actor: UserId(KNIGHT),
+            squire: UserId(1),
+            currency: Currency::Coins,
+            amount: 100,
+            reason: "seed".into()
+        },
+        7
+    )
+    .unwrap()
+    .is_empty());
     assert_eq!(r.events.len(), before, "no new events appended on replay");
 }

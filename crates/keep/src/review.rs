@@ -101,7 +101,10 @@ fn ack() -> Json<Ack> {
 /// `GET /api/review` (Knight-only) — the cross-Squire triage view: every active Squire with a
 /// clamped balance, plus the household-wide pending claims and redemption requests (each labelled
 /// with its Squire and the quest/item name).
-pub async fn get_review(State(state): State<Arc<KeepState>>, _op: Operator) -> Json<HouseholdReview> {
+pub async fn get_review(
+    State(state): State<Arc<KeepState>>,
+    _op: Operator,
+) -> Json<HouseholdReview> {
     let snap = state.snapshot();
     let now = state.clock.now();
     let today = state.clock.today();
@@ -117,7 +120,11 @@ pub async fn review_claim(
     Operator(op): Operator,
     Json(req): Json<ReviewClaimReq>,
 ) -> Result<Json<Ack>, StatusCode> {
-    let cmd = Command::ReviewClaim { actor: op.user, claim_id: req.claim_id, decision: req.decision.into() };
+    let cmd = Command::ReviewClaim {
+        actor: op.user,
+        claim_id: req.claim_id,
+        decision: req.decision.into(),
+    };
     state.commit(None, cmd).map_err(domain_status)?;
     Ok(ack())
 }
@@ -129,7 +136,11 @@ pub async fn review_redemption(
     Operator(op): Operator,
     Json(req): Json<ReviewRedemptionReq>,
 ) -> Result<Json<Ack>, StatusCode> {
-    let cmd = Command::ReviewRedemption { actor: op.user, request_id: req.request_id, decision: req.decision.into() };
+    let cmd = Command::ReviewRedemption {
+        actor: op.user,
+        request_id: req.request_id,
+        decision: req.decision.into(),
+    };
     state.commit(None, cmd).map_err(domain_status)?;
     Ok(ack())
 }
@@ -141,7 +152,11 @@ pub async fn review_cashout(
     Operator(op): Operator,
     Json(req): Json<ReviewCashOutReq>,
 ) -> Result<Json<Ack>, StatusCode> {
-    let cmd = Command::ReviewCashOut { actor: op.user, request_id: req.request_id, decision: req.decision.into() };
+    let cmd = Command::ReviewCashOut {
+        actor: op.user,
+        request_id: req.request_id,
+        decision: req.decision.into(),
+    };
     state.commit(None, cmd).map_err(domain_status)?;
     Ok(ack())
 }
@@ -153,7 +168,12 @@ pub async fn redeem(
     Operator(op): Operator,
     Json(req): Json<RedeemReq>,
 ) -> Result<Json<Ack>, StatusCode> {
-    let cmd = Command::RedeemItem { command_id: req.command_id, actor: op.user, squire: req.squire, item_id: req.item_id };
+    let cmd = Command::RedeemItem {
+        command_id: req.command_id,
+        actor: op.user,
+        squire: req.squire,
+        item_id: req.item_id,
+    };
     state.commit(None, cmd).map_err(domain_status)?;
     Ok(ack())
 }
@@ -168,7 +188,14 @@ pub async fn adjust(
     if req.reason.trim().is_empty() {
         return Err(StatusCode::BAD_REQUEST);
     }
-    let cmd = Command::AdjustPoints { command_id: req.command_id, actor: op.user, squire: req.squire, currency: req.currency.unwrap_or(Currency::Coins), amount: req.amount, reason: req.reason };
+    let cmd = Command::AdjustPoints {
+        command_id: req.command_id,
+        actor: op.user,
+        squire: req.squire,
+        currency: req.currency.unwrap_or(Currency::Coins),
+        amount: req.amount,
+        reason: req.reason,
+    };
     state.commit(None, cmd).map_err(domain_status)?;
     Ok(ack())
 }
@@ -187,13 +214,20 @@ fn assemble_review(snap: &Snapshot, now: Timestamp, today: Date) -> HouseholdRev
             .items
             .iter()
             .filter(|i| i.active)
-            .map(|i| ItemOption { item_id: i.id, name: i.name.clone(), cost: i.cost })
+            .map(|i| ItemOption {
+                item_id: i.id,
+                name: i.name.clone(),
+                cost: i.cost,
+            })
             .collect(),
         quests: snap
             .quests
             .iter()
             .filter(|q| q.active)
-            .map(|q| QuestOption { quest_id: q.id, title: q.title.clone() })
+            .map(|q| QuestOption {
+                quest_id: q.id,
+                title: q.title.clone(),
+            })
             .collect(),
         today,
     }
@@ -208,7 +242,8 @@ fn squire_summaries(snap: &Snapshot) -> Vec<SquireSummary> {
             squire: u.id,
             display_name: u.display_name.clone(),
             balance: Proj::balance(snap, u.id).max(0) as domain_core::contract::Points,
-            cash_balance: Proj::balance_in(snap, u.id, domain_core::contract::Currency::Cash).max(0) as domain_core::contract::Points,
+            cash_balance: Proj::balance_in(snap, u.id, domain_core::contract::Currency::Cash).max(0)
+                as domain_core::contract::Points,
         })
         .collect()
 }
@@ -218,9 +253,25 @@ fn pending_claims(snap: &Snapshot) -> Vec<PendingClaim> {
     snap.events
         .iter()
         .filter_map(|e| match e {
-            Event::CompletionClaimed { claim_id, squire, quest_id, on, .. } if !claim_resolved(snap, *claim_id) => {
-                let quest_title = snap.quests.iter().find(|q| q.id == *quest_id).map(|q| q.title.clone()).unwrap_or_default();
-                Some(PendingClaim { claim_id: *claim_id, squire: *squire, quest_title, on: *on })
+            Event::CompletionClaimed {
+                claim_id,
+                squire,
+                quest_id,
+                on,
+                ..
+            } if !claim_resolved(snap, *claim_id) => {
+                let quest_title = snap
+                    .quests
+                    .iter()
+                    .find(|q| q.id == *quest_id)
+                    .map(|q| q.title.clone())
+                    .unwrap_or_default();
+                Some(PendingClaim {
+                    claim_id: *claim_id,
+                    squire: *squire,
+                    quest_title,
+                    on: *on,
+                })
             }
             _ => None,
         })
@@ -239,7 +290,12 @@ fn pending_requests(snap: &Snapshot) -> Vec<PendingRequest> {
     snap.events
         .iter()
         .filter_map(|e| match e {
-            Event::RedemptionRequested { request_id, squire, item_id, .. } if !request_resolved(snap, *request_id) => {
+            Event::RedemptionRequested {
+                request_id,
+                squire,
+                item_id,
+                ..
+            } if !request_resolved(snap, *request_id) => {
                 let it = snap.items.iter().find(|i| i.id == *item_id);
                 Some(PendingRequest {
                     request_id: *request_id,
@@ -264,9 +320,16 @@ fn pending_cashouts(snap: &Snapshot) -> Vec<PendingCashOut> {
     snap.events
         .iter()
         .filter_map(|e| match e {
-            Event::CashOutRequested { request_id, squire, amount, .. } if !cashout_resolved(snap, *request_id) => {
-                Some(PendingCashOut { request_id: *request_id, squire: *squire, amount: *amount })
-            }
+            Event::CashOutRequested {
+                request_id,
+                squire,
+                amount,
+                ..
+            } if !cashout_resolved(snap, *request_id) => Some(PendingCashOut {
+                request_id: *request_id,
+                squire: *squire,
+                amount: *amount,
+            }),
             _ => None,
         })
         .collect()

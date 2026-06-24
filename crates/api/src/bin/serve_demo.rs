@@ -13,9 +13,9 @@ use std::net::SocketAddr;
 
 use api::AppState;
 use domain_core::contract::{
-    Achievement, AchievementId, AddMemberReq, Assignment, Availability, Cadence, Change, Completion,
-    Criterion, HouseholdHandle, ItemId, Quest, QuestId, RedeemableItem, RegisterHouseholdReq,
-    Repository, Role, Schedule, Scope, StreakBasis, UserId,
+    Achievement, AchievementId, AddMemberReq, Assignment, Availability, Cadence, Change,
+    Completion, Criterion, HouseholdHandle, ItemId, Quest, QuestId, RedeemableItem,
+    RegisterHouseholdReq, Repository, Role, Schedule, Scope, StreakBasis, UserId,
 };
 use identity::{Principal, TokenSigner};
 use store::tenant::Backend;
@@ -37,7 +37,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // ── Wire a production AppState over a fixed-dir SQLite tenant ───────────────────────────────
     let state = AppState::local_prod(
-        Backend::Sqlite { dir: DEMO_DIR.into() },
+        Backend::Sqlite {
+            dir: DEMO_DIR.into(),
+        },
         handle.clone(),
         TokenSigner::new(b"squire-demo-signing-key"),
         24 * 60 * 60 * 1000, // 24h token TTL

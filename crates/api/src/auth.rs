@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use axum::extract::FromRequestParts;
-use axum::http::header::{AUTHORIZATION, HeaderMap};
+use axum::http::header::{HeaderMap, AUTHORIZATION};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 
@@ -88,9 +88,7 @@ impl FromRequestParts<Arc<AppState>> for Auth {
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        verify(state, &parts.headers)
-            .map(Auth)
-            .map_err(status_for)
+        verify(state, &parts.headers).map(Auth).map_err(status_for)
     }
 }
 

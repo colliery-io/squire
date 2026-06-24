@@ -34,8 +34,8 @@ use axum::{Form, Json, Router};
 use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
-    AuthToken, Change, Command, DomainError, Engine, HouseholdHandle, LoginReq, RegisterHouseholdReq,
-    Repository, Role, Snapshot, UserId,
+    AuthToken, Change, Command, DomainError, Engine, HouseholdHandle, LoginReq,
+    RegisterHouseholdReq, Repository, Role, Snapshot, UserId,
 };
 use domain_core::DomainEngine;
 use store::tenant::{Backend, ProvisionError, Provisioner};
@@ -104,7 +104,8 @@ impl KeepState {
         provisioner.provision(&handle.0)?;
         let store = provisioner.open(&handle.0, SystemClock)?;
         let store: SharedStore = Arc::new(Mutex::new(store));
-        let identity = ProdIdentity::shared_local(store.clone(), signer, handle.clone(), token_ttl_ms);
+        let identity =
+            ProdIdentity::shared_local(store.clone(), signer, handle.clone(), token_ttl_ms);
         let clock = clock_from_store(&store);
         Ok(Arc::new(Self {
             store,
@@ -135,7 +136,13 @@ impl KeepState {
         household: HouseholdHandle,
         clock: LocalClock,
     ) -> Arc<Self> {
-        Arc::new(Self { store, engine: DomainEngine, clock, identity, household })
+        Arc::new(Self {
+            store,
+            engine: DomainEngine,
+            clock,
+            identity,
+            household,
+        })
     }
 
     /// **The engine-direct command seam.** Lock the store, snapshot, run `cmd` through the engine,
@@ -168,7 +175,10 @@ impl KeepState {
         by: Option<UserId>,
         changes: &[Change],
     ) -> Result<(), domain_core::contract::RepoError> {
-        self.store.lock().expect("store mutex poisoned").apply(by, changes)
+        self.store
+            .lock()
+            .expect("store mutex poisoned")
+            .apply(by, changes)
     }
 }
 
@@ -224,7 +234,10 @@ impl FromRequestParts<Arc<KeepState>> for Operator {
 /// Pull the operator token from `Authorization: Bearer <tok>` or the `keep_session` cookie.
 fn token_from_headers(headers: &HeaderMap) -> Option<String> {
     if let Some(auth) = headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok()) {
-        if let Some(tok) = auth.strip_prefix("Bearer ").or_else(|| auth.strip_prefix("bearer ")) {
+        if let Some(tok) = auth
+            .strip_prefix("Bearer ")
+            .or_else(|| auth.strip_prefix("bearer "))
+        {
             let tok = tok.trim();
             if !tok.is_empty() {
                 return Some(tok.to_string());
@@ -232,7 +245,9 @@ fn token_from_headers(headers: &HeaderMap) -> Option<String> {
         }
     }
     // Cookie header: `keep_session=<tok>` among `; `-separated pairs.
-    let cookies = headers.get(axum::http::header::COOKIE).and_then(|v| v.to_str().ok())?;
+    let cookies = headers
+        .get(axum::http::header::COOKIE)
+        .and_then(|v| v.to_str().ok())?;
     cookies.split(';').find_map(|pair| {
         let (k, v) = pair.trim().split_once('=')?;
         (k == SESSION_COOKIE && !v.is_empty()).then(|| v.to_string())
@@ -255,10 +270,19 @@ async fn login(
 ) -> Result<Response, StatusCode> {
     // `user` arrives as a string: `serde_urlencoded` does not support `u128`, and a `UserId` is a
     // u128, so we take it as text and parse here (a non-numeric id is a 400).
-    let user = UserId(form.user.trim().parse().map_err(|_| StatusCode::BAD_REQUEST)?);
+    let user = UserId(
+        form.user
+            .trim()
+            .parse()
+            .map_err(|_| StatusCode::BAD_REQUEST)?,
+    );
     let resp = state
         .identity
-        .login(LoginReq { household: state.household.clone(), user, secret: form.secret })
+        .login(LoginReq {
+            household: state.household.clone(),
+            user,
+            secret: form.secret,
+        })
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
     if resp.role != Role::Knight {
         return Err(StatusCode::FORBIDDEN);
@@ -271,7 +295,11 @@ async fn login(
         .map(|u| u.display_name.clone())
         .unwrap_or_default();
 
-    let body = Json(Whoami { user: user.0, role: resp.role, display_name });
+    let body = Json(Whoami {
+        user: user.0,
+        role: resp.role,
+        display_name,
+    });
     let mut response = body.into_response();
     // HttpOnly + SameSite=Strict + Path=/; the Keep is loopback-only so this is a same-machine
     // session, but we still keep the cookie out of JS and off cross-site requests.
@@ -281,7 +309,9 @@ async fn login(
     );
     response.headers_mut().insert(
         SET_COOKIE,
-        cookie.parse().expect("session cookie is valid header value"),
+        cookie
+            .parse()
+            .expect("session cookie is valid header value"),
     );
     Ok(response)
 }
@@ -307,18 +337,31 @@ async fn register(
             _ => StatusCode::BAD_REQUEST,
         })?;
 
-    let body = Json(Whoami { user: resp.admin.0, role: Role::Knight, display_name: String::new() });
+    let body = Json(Whoami {
+        user: resp.admin.0,
+        role: Role::Knight,
+        display_name: String::new(),
+    });
     let mut response = body.into_response();
-    let cookie = format!("{SESSION_COOKIE}={}; HttpOnly; SameSite=Strict; Path=/", resp.token.0);
-    response
-        .headers_mut()
-        .insert(SET_COOKIE, cookie.parse().expect("session cookie is valid header value"));
+    let cookie = format!(
+        "{SESSION_COOKIE}={}; HttpOnly; SameSite=Strict; Path=/",
+        resp.token.0
+    );
+    response.headers_mut().insert(
+        SET_COOKIE,
+        cookie
+            .parse()
+            .expect("session cookie is valid header value"),
+    );
     Ok(response)
 }
 
 /// `GET /api/whoami` — echoes the verified acting Knight (proves the operator session works and is
 /// the principal handlers will stamp). Refused (401/403) without a valid Knight session.
-async fn whoami(State(state): State<Arc<KeepState>>, Operator(principal): Operator) -> Json<Whoami> {
+async fn whoami(
+    State(state): State<Arc<KeepState>>,
+    Operator(principal): Operator,
+) -> Json<Whoami> {
     let display_name = state
         .snapshot()
         .users
@@ -326,7 +369,11 @@ async fn whoami(State(state): State<Arc<KeepState>>, Operator(principal): Operat
         .find(|u| u.id == principal.user)
         .map(|u| u.display_name.clone())
         .unwrap_or_default();
-    Json(Whoami { user: principal.user.0, role: principal.role, display_name })
+    Json(Whoami {
+        user: principal.user.0,
+        role: principal.role,
+        display_name,
+    })
 }
 
 /// `GET /` — the embedded app shell.
@@ -402,18 +449,30 @@ pub fn router(state: Arc<KeepState>) -> Router {
         .route("/login", post(login))
         .route("/api/whoami", get(whoami))
         // ── Authoring: quests (SQUIRE-T-0026) ──────────────────────────────────
-        .route("/api/quests", get(quests::list_quests).post(quests::create_quest))
+        .route(
+            "/api/quests",
+            get(quests::list_quests).post(quests::create_quest),
+        )
         .route("/api/quests/{id}/archive", post(quests::archive_quest))
         // ── Authoring: items + achievements (SQUIRE-T-0027) ─────────────────────
-        .route("/api/items", get(items::list_items).post(items::create_item))
+        .route(
+            "/api/items",
+            get(items::list_items).post(items::create_item),
+        )
         .route("/api/items/{id}/archive", post(items::archive_item))
         .route(
             "/api/achievements",
             get(achievements::list_achievements).post(achievements::create_achievement),
         )
-        .route("/api/achievements/{id}/archive", post(achievements::archive_achievement))
+        .route(
+            "/api/achievements/{id}/archive",
+            post(achievements::archive_achievement),
+        )
         // ── Member administration (SQUIRE-T-0028) ──────────────────────────────
-        .route("/api/members", get(members::list_members).post(members::add_member))
+        .route(
+            "/api/members",
+            get(members::list_members).post(members::add_member),
+        )
         .route("/api/members/{id}/active", post(members::set_active))
         .route("/api/members/{id}/name", post(members::rename))
         // Device pairing (ADR A-0010): mint a one-time code + QR for a chosen member.
@@ -431,8 +490,14 @@ pub fn router(state: Arc<KeepState>) -> Router {
         .route("/api/log/quest/{id}", get(inspector::quest_log))
         .route("/api/log/item/{id}", get(inspector::item_log))
         // Household settings (ADR A-0011 / T-0068): read + change the timezone (applied live).
-        .route("/api/config", get(config::get_config).put(config::update_config))
-        .route("/api/hazards", get(hazards::list_hazards).put(hazards::set_hazards))
+        .route(
+            "/api/config",
+            get(config::get_config).put(config::update_config),
+        )
+        .route(
+            "/api/hazards",
+            get(hazards::list_hazards).put(hazards::set_hazards),
+        )
         .with_state(state)
 }
 

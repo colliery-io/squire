@@ -78,14 +78,23 @@ impl HistoryEntryDto {
         // leak as a bare id.
         dto.squire_name = user_name(snap, dto.squire);
         dto.actor_name = dto.actor.and_then(|a| user_name(snap, a));
-        dto.quest_title = dto
-            .quest_id
-            .and_then(|q| snap.quests.iter().find(|x| x.id.0 as i64 == q).map(|x| x.title.clone()));
-        dto.item_title = dto
-            .item_id
-            .and_then(|i| snap.items.iter().find(|x| x.id.0 as i64 == i).map(|x| x.name.clone()));
+        dto.quest_title = dto.quest_id.and_then(|q| {
+            snap.quests
+                .iter()
+                .find(|x| x.id.0 as i64 == q)
+                .map(|x| x.title.clone())
+        });
+        dto.item_title = dto.item_id.and_then(|i| {
+            snap.items
+                .iter()
+                .find(|x| x.id.0 as i64 == i)
+                .map(|x| x.name.clone())
+        });
         dto.achievement_name = dto.achievement_id.and_then(|a| {
-            snap.achievements.iter().find(|x| x.id.0 as i64 == a).map(|x| x.name.clone())
+            snap.achievements
+                .iter()
+                .find(|x| x.id.0 as i64 == a)
+                .map(|x| x.name.clone())
         });
         dto
     }
@@ -112,59 +121,121 @@ impl HistoryEntryDto {
             reason: None,
         };
         match e {
-            Event::CompletionClaimed { squire, quest_id, at, .. } => HistoryEntryDto {
+            Event::CompletionClaimed {
+                squire,
+                quest_id,
+                at,
+                ..
+            } => HistoryEntryDto {
                 quest_id: Some(quest_id.0 as i64),
                 ..base(at.0, "Claimed", squire.0)
             },
-            Event::CompletionApproved { squire, actor, points, at, .. } => HistoryEntryDto {
+            Event::CompletionApproved {
+                squire,
+                actor,
+                points,
+                at,
+                ..
+            } => HistoryEntryDto {
                 actor: actor.map(|u| u.0 as i64),
                 amount: Some(*points as i64),
                 ..base(at.0, "Approved", squire.0)
             },
-            Event::CompletionRejected { squire, actor, reason, at, .. } => HistoryEntryDto {
+            Event::CompletionRejected {
+                squire,
+                actor,
+                reason,
+                at,
+                ..
+            } => HistoryEntryDto {
                 actor: actor.map(|u| u.0 as i64),
                 reason: reason.clone(),
                 ..base(at.0, "Rejected", squire.0)
             },
-            Event::ItemRedeemed { squire, actor, item_id, cost, at, .. } => HistoryEntryDto {
+            Event::ItemRedeemed {
+                squire,
+                actor,
+                item_id,
+                cost,
+                at,
+                ..
+            } => HistoryEntryDto {
                 actor: actor.map(|u| u.0 as i64),
                 item_id: Some(item_id.0 as i64),
                 amount: Some(-(*cost as i64)),
                 ..base(at.0, "Redeemed", squire.0)
             },
-            Event::AchievementUnlocked { squire, id, bonus, at } => HistoryEntryDto {
+            Event::AchievementUnlocked {
+                squire,
+                id,
+                bonus,
+                at,
+            } => HistoryEntryDto {
                 achievement_id: Some(id.0 as i64),
                 amount: Some(*bonus as i64),
                 ..base(at.0, "Unlocked", squire.0)
             },
-            Event::Adjusted { squire, actor, currency, amount, reason, at, .. } => HistoryEntryDto {
+            Event::Adjusted {
+                squire,
+                actor,
+                currency,
+                amount,
+                reason,
+                at,
+                ..
+            } => HistoryEntryDto {
                 actor: actor.map(|u| u.0 as i64),
                 amount: Some(*amount),
                 currency: Some(*currency),
                 reason: Some(reason.clone()),
                 ..base(at.0, "Adjusted", squire.0)
             },
-            Event::RedemptionRequested { squire, item_id, at, .. } => HistoryEntryDto {
+            Event::RedemptionRequested {
+                squire,
+                item_id,
+                at,
+                ..
+            } => HistoryEntryDto {
                 item_id: Some(item_id.0 as i64),
                 ..base(at.0, "Requested", squire.0)
             },
-            Event::RedemptionRejected { squire, actor, reason, at, .. } => HistoryEntryDto {
+            Event::RedemptionRejected {
+                squire,
+                actor,
+                reason,
+                at,
+                ..
+            } => HistoryEntryDto {
                 actor: actor.map(|u| u.0 as i64),
                 reason: reason.clone(),
                 ..base(at.0, "RedemptionRejected", squire.0)
             },
-            Event::CashOutRequested { squire, amount, at, .. } => HistoryEntryDto {
+            Event::CashOutRequested {
+                squire, amount, at, ..
+            } => HistoryEntryDto {
                 amount: Some(*amount),
                 currency: Some(Currency::Cash),
                 ..base(at.0, "CashOutRequested", squire.0)
             },
-            Event::CashOutApproved { squire, actor, amount, at, .. } => HistoryEntryDto {
+            Event::CashOutApproved {
+                squire,
+                actor,
+                amount,
+                at,
+                ..
+            } => HistoryEntryDto {
                 actor: actor.map(|u| u.0 as i64),
                 amount: Some(-*amount),
                 currency: Some(Currency::Cash),
                 ..base(at.0, "CashedOut", squire.0)
             },
-            Event::CashOutRejected { squire, actor, reason, at, .. } => HistoryEntryDto {
+            Event::CashOutRejected {
+                squire,
+                actor,
+                reason,
+                at,
+                ..
+            } => HistoryEntryDto {
                 actor: actor.map(|u| u.0 as i64),
                 reason: reason.clone(),
                 ..base(at.0, "CashOutRejected", squire.0)
@@ -176,7 +247,10 @@ impl HistoryEntryDto {
 /// A member's display name by id, across ALL household users (active or not) so historical events
 /// referencing a renamed/deactivated member still resolve (SQUIRE-T-0121).
 fn user_name(snap: &Snapshot, id: i64) -> Option<String> {
-    snap.users.iter().find(|u| u.id.0 as i64 == id).map(|u| u.display_name.clone())
+    snap.users
+        .iter()
+        .find(|u| u.id.0 as i64 == id)
+        .map(|u| u.display_name.clone())
 }
 
 /// `GET /admin/history?limit=N` (Knight-only) — the most recent household events, newest first,
@@ -201,7 +275,12 @@ pub async fn history(
         let store = state.store.lock().expect("store mutex poisoned");
         (store.recent_events(limit), store.snapshot())
     };
-    Json(events.iter().map(|e| HistoryEntryDto::from_event(&snap, e)).collect())
+    Json(
+        events
+            .iter()
+            .map(|e| HistoryEntryDto::from_event(&snap, e))
+            .collect(),
+    )
 }
 
 #[cfg(test)]
@@ -242,16 +321,46 @@ mod tests {
         };
         Snapshot {
             users: vec![
-                User { id: UserId(1), role: Role::Knight, display_name: "Dad".into(), active: true },
-                User { id: UserId(2), role: Role::Squire, display_name: "Matrim".into(), active: true },
+                User {
+                    id: UserId(1),
+                    role: Role::Knight,
+                    display_name: "Dad".into(),
+                    active: true,
+                },
+                User {
+                    id: UserId(2),
+                    role: Role::Squire,
+                    display_name: "Matrim".into(),
+                    active: true,
+                },
             ],
             quests: vec![quest],
             items: vec![item],
             achievements: vec![],
             events: vec![
-                Event::CompletionClaimed { claim_id: ClaimId(9), squire: UserId(2), quest_id: QuestId(100), on: Date(1), at: Timestamp(10) },
-                Event::CompletionApproved { claim_id: ClaimId(9), squire: UserId(2), actor: Some(UserId(1)), points: 2, at: Timestamp(20) },
-                Event::ItemRedeemed { request_id: None, command_id: None, squire: UserId(2), actor: Some(UserId(1)), item_id: ItemId(200), cost: 3, at: Timestamp(30) },
+                Event::CompletionClaimed {
+                    claim_id: ClaimId(9),
+                    squire: UserId(2),
+                    quest_id: QuestId(100),
+                    on: Date(1),
+                    at: Timestamp(10),
+                },
+                Event::CompletionApproved {
+                    claim_id: ClaimId(9),
+                    squire: UserId(2),
+                    actor: Some(UserId(1)),
+                    points: 2,
+                    at: Timestamp(20),
+                },
+                Event::ItemRedeemed {
+                    request_id: None,
+                    command_id: None,
+                    squire: UserId(2),
+                    actor: Some(UserId(1)),
+                    item_id: ItemId(200),
+                    cost: 3,
+                    at: Timestamp(30),
+                },
             ],
         }
     }
@@ -263,7 +372,11 @@ mod tests {
         let dto = HistoryEntryDto::from_event(&s, approved);
         assert_eq!(dto.kind, "Approved");
         assert_eq!(dto.squire_name.as_deref(), Some("Matrim"));
-        assert_eq!(dto.actor_name.as_deref(), Some("Dad"), "the approving Knight is named");
+        assert_eq!(
+            dto.actor_name.as_deref(),
+            Some("Dad"),
+            "the approving Knight is named"
+        );
         // CompletionApproved is claim-keyed; the quest is recovered from the originating claim.
         assert_eq!(dto.quest_id, Some(100));
         assert_eq!(dto.quest_title.as_deref(), Some("Make your bed"));

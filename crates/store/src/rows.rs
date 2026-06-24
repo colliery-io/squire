@@ -25,7 +25,7 @@ use domain_core::contract::Currency;
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, ClaimId, CommandId,
     Completion, Criterion, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem, RequestId,
-    Role, Scope, Schedule, StreakBasis, Timestamp, User, UserId, Weekday,
+    Role, Schedule, Scope, StreakBasis, Timestamp, User, UserId, Weekday,
 };
 
 use crate::schema::{achievements, events, items, quests, users};
@@ -44,7 +44,10 @@ pub enum RowError {
     /// A `BigInt`/`Integer` column held an out-of-range value (e.g. a negative `Points`).
     BadInt { field: &'static str, value: i64 },
     /// A nullable column was `NULL` (or non-null) in a way the variant forbids.
-    MissingField { kind: &'static str, field: &'static str },
+    MissingField {
+        kind: &'static str,
+        field: &'static str,
+    },
     /// A `Weekday` token in a delimited set was not one of Mon..=Sun.
     BadWeekday { value: String },
 }
@@ -90,8 +93,10 @@ pub fn id_to_text(id: u128) -> String {
 
 /// Decimal-string `TEXT` → `u128`.
 pub fn text_to_id(field: &'static str, s: &str) -> Result<u128> {
-    s.parse::<u128>()
-        .map_err(|_| RowError::BadId { field, value: s.to_string() })
+    s.parse::<u128>().map_err(|_| RowError::BadId {
+        field,
+        value: s.to_string(),
+    })
 }
 
 fn bool_to_int(b: bool) -> i32 {
@@ -135,7 +140,10 @@ fn tag_to_role(s: &str) -> Result<Role> {
     match s {
         "Knight" => Ok(Role::Knight),
         "Squire" => Ok(Role::Squire),
-        _ => Err(RowError::BadTag { field: "role", value: s.to_string() }),
+        _ => Err(RowError::BadTag {
+            field: "role",
+            value: s.to_string(),
+        }),
     }
 }
 
@@ -162,7 +170,11 @@ fn tag_to_weekday(s: &str) -> Result<Weekday> {
         "Fri" => Weekday::Fri,
         "Sat" => Weekday::Sat,
         "Sun" => Weekday::Sun,
-        _ => return Err(RowError::BadWeekday { value: s.to_string() }),
+        _ => {
+            return Err(RowError::BadWeekday {
+                value: s.to_string(),
+            })
+        }
     })
 }
 
@@ -280,35 +292,31 @@ fn tag_to_completion(s: &str) -> Result<Completion> {
     match s {
         "EachAssignee" => Ok(Completion::EachAssignee),
         "Race" => Ok(Completion::Race),
-        _ => Err(RowError::BadTag { field: "completion", value: s.to_string() }),
+        _ => Err(RowError::BadTag {
+            field: "completion",
+            value: s.to_string(),
+        }),
     }
 }
 
 impl QuestRow {
     pub fn from_quest(q: &Quest, audit: Audit) -> Self {
         // Cadence → (kind, due, weekdays, n, anchor)
-        let (cadence_kind, cadence_due, cadence_weekdays, cadence_n, cadence_anchor) = match &q
-            .cadence
-        {
-            Cadence::OneOff { due } => (
-                "OneOff",
-                due.map(date_to_i64),
-                None,
-                None,
-                None,
-            ),
-            Cadence::Recurring(Schedule::Daily) => ("Daily", None, None, None, None),
-            Cadence::Recurring(Schedule::Weekly { days }) => {
-                ("Weekly", None, Some(weekdays_to_text(days)), None, None)
-            }
-            Cadence::Recurring(Schedule::EveryNDays { n, anchor }) => (
-                "EveryNDays",
-                None,
-                None,
-                Some(i64::from(*n)),
-                Some(date_to_i64(*anchor)),
-            ),
-        };
+        let (cadence_kind, cadence_due, cadence_weekdays, cadence_n, cadence_anchor) =
+            match &q.cadence {
+                Cadence::OneOff { due } => ("OneOff", due.map(date_to_i64), None, None, None),
+                Cadence::Recurring(Schedule::Daily) => ("Daily", None, None, None, None),
+                Cadence::Recurring(Schedule::Weekly { days }) => {
+                    ("Weekly", None, Some(weekdays_to_text(days)), None, None)
+                }
+                Cadence::Recurring(Schedule::EveryNDays { n, anchor }) => (
+                    "EveryNDays",
+                    None,
+                    None,
+                    Some(i64::from(*n)),
+                    Some(date_to_i64(*anchor)),
+                ),
+            };
 
         let (assignment_kind, assignment_squires) = match &q.assignment {
             Assignment::AllSquires => ("AllSquires", None),
@@ -352,19 +360,26 @@ impl QuestRow {
             }
             "Daily" => Cadence::Recurring(Schedule::Daily),
             "Weekly" => {
-                let raw = self.cadence_weekdays.as_deref().ok_or(RowError::MissingField {
-                    kind: "quest",
-                    field: "cadence_weekdays",
-                })?;
-                Cadence::Recurring(Schedule::Weekly { days: text_to_weekdays(raw)? })
+                let raw = self
+                    .cadence_weekdays
+                    .as_deref()
+                    .ok_or(RowError::MissingField {
+                        kind: "quest",
+                        field: "cadence_weekdays",
+                    })?;
+                Cadence::Recurring(Schedule::Weekly {
+                    days: text_to_weekdays(raw)?,
+                })
             }
             "EveryNDays" => {
                 let n_raw = self.cadence_n.ok_or(RowError::MissingField {
                     kind: "quest",
                     field: "cadence_n",
                 })?;
-                let n = u16::try_from(n_raw)
-                    .map_err(|_| RowError::BadInt { field: "quests.cadence_n", value: n_raw })?;
+                let n = u16::try_from(n_raw).map_err(|_| RowError::BadInt {
+                    field: "quests.cadence_n",
+                    value: n_raw,
+                })?;
                 let anchor_raw = self.cadence_anchor.ok_or(RowError::MissingField {
                     kind: "quest",
                     field: "cadence_anchor",
@@ -383,10 +398,13 @@ impl QuestRow {
         let assignment = match self.assignment_kind.as_str() {
             "AllSquires" => Assignment::AllSquires,
             "Squires" => {
-                let raw = self.assignment_squires.as_deref().ok_or(RowError::MissingField {
-                    kind: "quest",
-                    field: "assignment_squires",
-                })?;
+                let raw = self
+                    .assignment_squires
+                    .as_deref()
+                    .ok_or(RowError::MissingField {
+                        kind: "quest",
+                        field: "assignment_squires",
+                    })?;
                 Assignment::Squires(text_to_user_ids("quests.assignment_squires", raw)?)
             }
             other => {
@@ -446,7 +464,10 @@ fn tag_to_availability(s: &str) -> Result<Availability> {
     match s {
         "Once" => Ok(Availability::Once),
         "Repeatable" => Ok(Availability::Repeatable),
-        _ => Err(RowError::BadTag { field: "availability", value: s.to_string() }),
+        _ => Err(RowError::BadTag {
+            field: "availability",
+            value: s.to_string(),
+        }),
     }
 }
 
@@ -522,7 +543,10 @@ fn tag_to_streak_basis(s: &str) -> Result<StreakBasis> {
     match s {
         "ScheduledOccurrences" => Ok(StreakBasis::ScheduledOccurrences),
         "CalendarDays" => Ok(StreakBasis::CalendarDays),
-        _ => Err(RowError::BadTag { field: "streak_basis", value: s.to_string() }),
+        _ => Err(RowError::BadTag {
+            field: "streak_basis",
+            value: s.to_string(),
+        }),
     }
 }
 
@@ -535,18 +559,17 @@ fn scope_to_cols(scope: &Scope) -> (&'static str, Option<String>, Option<String>
     }
 }
 
-fn cols_to_scope(
-    kind: &str,
-    quest: &Option<String>,
-    category: &Option<String>,
-) -> Result<Scope> {
+fn cols_to_scope(kind: &str, quest: &Option<String>, category: &Option<String>) -> Result<Scope> {
     match kind {
         "Quest" => {
             let q = quest.as_deref().ok_or(RowError::MissingField {
                 kind: "achievement",
                 field: "scope_quest",
             })?;
-            Ok(Scope::Quest(QuestId(text_to_id("achievements.scope_quest", q)?)))
+            Ok(Scope::Quest(QuestId(text_to_id(
+                "achievements.scope_quest",
+                q,
+            )?)))
         }
         "Category" => {
             let c = category.as_deref().ok_or(RowError::MissingField {
@@ -556,7 +579,10 @@ fn cols_to_scope(
             Ok(Scope::Category(Category(c.to_string())))
         }
         "Any" => Ok(Scope::Any),
-        other => Err(RowError::BadTag { field: "scope_kind", value: other.to_string() }),
+        other => Err(RowError::BadTag {
+            field: "scope_kind",
+            value: other.to_string(),
+        }),
     }
 }
 
@@ -583,7 +609,11 @@ impl AchievementRow {
         };
 
         match &a.criterion {
-            Criterion::Streak { scope, length, basis } => {
+            Criterion::Streak {
+                scope,
+                length,
+                basis,
+            } => {
                 row.criterion_kind = "Streak".to_string();
                 let (sk, sq, sc) = scope_to_cols(scope);
                 row.scope_kind = Some(sk.to_string());
@@ -629,7 +659,11 @@ impl AchievementRow {
                     kind: "achievement",
                     field: "streak_basis",
                 })?;
-                Criterion::Streak { scope, length, basis: tag_to_streak_basis(basis_raw)? }
+                Criterion::Streak {
+                    scope,
+                    length,
+                    basis: tag_to_streak_basis(basis_raw)?,
+                }
             }
             "TotalCompletions" => {
                 let scope_kind = self.scope_kind.as_deref().ok_or(RowError::MissingField {
@@ -730,28 +764,54 @@ impl EventRow {
     /// the caller — `apply` sets it to `max(seq)+1`).
     pub fn from_event(seq: i64, ev: &Event) -> Self {
         match ev {
-            Event::CompletionClaimed { claim_id, squire, quest_id, on, at } => {
+            Event::CompletionClaimed {
+                claim_id,
+                squire,
+                quest_id,
+                on,
+                at,
+            } => {
                 let mut r = empty_event_row(seq, "CompletionClaimed", *squire, *at);
                 r.claim_id = Some(id_to_text(claim_id.0));
                 r.quest_id = Some(id_to_text(quest_id.0));
                 r.on_date = Some(date_to_i64(*on));
                 r
             }
-            Event::CompletionApproved { claim_id, squire, actor, points, at } => {
+            Event::CompletionApproved {
+                claim_id,
+                squire,
+                actor,
+                points,
+                at,
+            } => {
                 let mut r = empty_event_row(seq, "CompletionApproved", *squire, *at);
                 r.claim_id = Some(id_to_text(claim_id.0));
                 r.actor = opt_user_to_text(*actor);
                 r.points = Some(points_to_i64(*points));
                 r
             }
-            Event::CompletionRejected { claim_id, squire, actor, reason, at } => {
+            Event::CompletionRejected {
+                claim_id,
+                squire,
+                actor,
+                reason,
+                at,
+            } => {
                 let mut r = empty_event_row(seq, "CompletionRejected", *squire, *at);
                 r.claim_id = Some(id_to_text(claim_id.0));
                 r.actor = opt_user_to_text(*actor);
                 r.reason = reason.clone();
                 r
             }
-            Event::ItemRedeemed { request_id, command_id, squire, actor, item_id, cost, at } => {
+            Event::ItemRedeemed {
+                request_id,
+                command_id,
+                squire,
+                actor,
+                item_id,
+                cost,
+                at,
+            } => {
                 let mut r = empty_event_row(seq, "ItemRedeemed", *squire, *at);
                 r.request_id = request_id.map(|x| id_to_text(x.0));
                 r.command_id = command_id.map(|x| id_to_text(x.0));
@@ -760,13 +820,26 @@ impl EventRow {
                 r.points = Some(points_to_i64(*cost));
                 r
             }
-            Event::AchievementUnlocked { squire, id, bonus, at } => {
+            Event::AchievementUnlocked {
+                squire,
+                id,
+                bonus,
+                at,
+            } => {
                 let mut r = empty_event_row(seq, "AchievementUnlocked", *squire, *at);
                 r.achievement_id = Some(id_to_text(id.0));
                 r.points = Some(points_to_i64(*bonus));
                 r
             }
-            Event::Adjusted { command_id, squire, actor, currency, amount, reason, at } => {
+            Event::Adjusted {
+                command_id,
+                squire,
+                actor,
+                currency,
+                amount,
+                reason,
+                at,
+            } => {
                 let mut r = empty_event_row(seq, "Adjusted", *squire, *at);
                 r.command_id = Some(id_to_text(command_id.0));
                 r.actor = opt_user_to_text(*actor);
@@ -775,33 +848,61 @@ impl EventRow {
                 r.reason = Some(reason.clone());
                 r
             }
-            Event::RedemptionRequested { request_id, squire, item_id, at } => {
+            Event::RedemptionRequested {
+                request_id,
+                squire,
+                item_id,
+                at,
+            } => {
                 let mut r = empty_event_row(seq, "RedemptionRequested", *squire, *at);
                 r.request_id = Some(id_to_text(request_id.0));
                 r.item_id = Some(id_to_text(item_id.0));
                 r
             }
-            Event::RedemptionRejected { request_id, squire, actor, reason, at } => {
+            Event::RedemptionRejected {
+                request_id,
+                squire,
+                actor,
+                reason,
+                at,
+            } => {
                 let mut r = empty_event_row(seq, "RedemptionRejected", *squire, *at);
                 r.request_id = Some(id_to_text(request_id.0));
                 r.actor = opt_user_to_text(*actor);
                 r.reason = reason.clone();
                 r
             }
-            Event::CashOutRequested { request_id, squire, amount, at } => {
+            Event::CashOutRequested {
+                request_id,
+                squire,
+                amount,
+                at,
+            } => {
                 let mut r = empty_event_row(seq, "CashOutRequested", *squire, *at);
                 r.request_id = Some(id_to_text(request_id.0));
                 r.amount = Some(*amount);
                 r
             }
-            Event::CashOutApproved { request_id, squire, actor, amount, at } => {
+            Event::CashOutApproved {
+                request_id,
+                squire,
+                actor,
+                amount,
+                at,
+            } => {
                 let mut r = empty_event_row(seq, "CashOutApproved", *squire, *at);
                 r.request_id = Some(id_to_text(request_id.0));
                 r.actor = opt_user_to_text(*actor);
                 r.amount = Some(*amount);
                 r
             }
-            Event::CashOutRejected { request_id, squire, actor, reason, at } => {
+            Event::CashOutRejected {
+                request_id,
+                squire,
+                actor,
+                reason,
+                at,
+            } => {
                 let mut r = empty_event_row(seq, "CashOutRejected", *squire, *at);
                 r.request_id = Some(id_to_text(request_id.0));
                 r.actor = opt_user_to_text(*actor);
@@ -905,7 +1006,10 @@ impl EventRow {
                 at,
             },
             other => {
-                return Err(RowError::BadTag { field: "events.kind", value: other.to_string() })
+                return Err(RowError::BadTag {
+                    field: "events.kind",
+                    value: other.to_string(),
+                })
             }
         })
     }
@@ -930,7 +1034,10 @@ impl EventRow {
     }
 
     fn req_int(&self, field: &'static str, col: Option<i64>) -> Result<i64> {
-        col.ok_or(RowError::MissingField { kind: leak_kind(&self.kind), field })
+        col.ok_or(RowError::MissingField {
+            kind: leak_kind(&self.kind),
+            field,
+        })
     }
 
     /// Produce a `'static`-ish qualified field name for error reporting. The set of

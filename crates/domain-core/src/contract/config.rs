@@ -17,7 +17,9 @@ pub struct HouseholdConfig {
 
 impl Default for HouseholdConfig {
     fn default() -> Self {
-        Self { timezone: "UTC".to_string() }
+        Self {
+            timezone: "UTC".to_string(),
+        }
     }
 }
 

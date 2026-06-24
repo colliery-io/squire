@@ -17,7 +17,8 @@ pub fn maybe_self_update() {
         return; // never replace a `cargo run` build
     }
 
-    let repo = std::env::var("SQUIRE_DIST_REPO").unwrap_or_else(|_| "colliery-io/squire".to_string());
+    let repo =
+        std::env::var("SQUIRE_DIST_REPO").unwrap_or_else(|_| "colliery-io/squire".to_string());
     let (owner, name) = repo.split_once('/').unwrap_or(("colliery-io", "squire"));
 
     // Authenticate the GitHub API calls when a token is configured (SQUIRE-T-0117): unauthenticated
@@ -75,8 +76,7 @@ fn is_dev_build() -> bool {
 
 /// Re-exec the (now-replaced) binary with the same args + env, so the update takes effect immediately.
 fn reexec() -> ! {
-    let exe =
-        std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("squire-serve"));
+    let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("squire-serve"));
     let args: Vec<String> = std::env::args().skip(1).collect();
     #[cfg(unix)]
     {

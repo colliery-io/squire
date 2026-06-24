@@ -18,8 +18,15 @@ const HAZARDS_KEY: &str = "hazards";
 
 /// `GET /api/hazards` (Knight-only) — the household's hazard catalog; empty if unset.
 pub async fn list_hazards(State(state): State<Arc<KeepState>>, _op: Operator) -> Json<Vec<Hazard>> {
-    let raw = state.store.lock().expect("store mutex poisoned").get_setting(HAZARDS_KEY);
-    Json(raw.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default())
+    let raw = state
+        .store
+        .lock()
+        .expect("store mutex poisoned")
+        .get_setting(HAZARDS_KEY);
+    Json(
+        raw.and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default(),
+    )
 }
 
 /// `PUT /api/hazards` (Knight-only) — replace the catalog; blank-named entries dropped.
@@ -28,8 +35,10 @@ pub async fn set_hazards(
     Operator(op): Operator,
     Json(hazards): Json<Vec<Hazard>>,
 ) -> Result<Json<Vec<Hazard>>, StatusCode> {
-    let cleaned: Vec<Hazard> =
-        hazards.into_iter().filter(|h| !h.name.trim().is_empty()).collect();
+    let cleaned: Vec<Hazard> = hazards
+        .into_iter()
+        .filter(|h| !h.name.trim().is_empty())
+        .collect();
     let json = serde_json::to_string(&cleaned).map_err(|_| StatusCode::BAD_REQUEST)?;
     state
         .store

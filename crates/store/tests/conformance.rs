@@ -22,9 +22,9 @@ use diesel::sqlite::SqliteConnection;
 
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, ClaimId, Command,
-    CommandId, Completion, Criterion, Currency, Date, Decision, Engine, Event, ItemId, Points, Projections,
-    Quest, QuestId, RedeemableItem, RequestId, Repository, Role, Schedule, Scope, Snapshot,
-    StreakBasis, Timestamp, User, UserId,
+    CommandId, Completion, Criterion, Currency, Date, Decision, Engine, Event, ItemId, Points,
+    Projections, Quest, QuestId, RedeemableItem, Repository, RequestId, Role, Schedule, Scope,
+    Snapshot, StreakBasis, Timestamp, User, UserId,
 };
 use domain_core::testkit::InMemoryRepository;
 use domain_core::{DomainEngine, Proj};
@@ -85,7 +85,12 @@ const ITEM_GATED: u128 = 20; // gated by the streak achievement
 const ACH_STREAK: u128 = 30; // 2-day scheduled streak on QUEST_DAILY → unlock + bonus + gate lift
 
 fn user(id: u128, role: Role) -> User {
-    User { id: UserId(id), role, display_name: format!("U{id}"), active: true }
+    User {
+        id: UserId(id),
+        role,
+        display_name: format!("U{id}"),
+        active: true,
+    }
 }
 
 fn daily_quest() -> Quest {
@@ -167,20 +172,97 @@ fn scenario() -> Vec<(Option<UserId>, Command)> {
         (k, Command::DefineAchievement(streak_achievement())),
         (k, Command::DefineItem(gated_item())),
         // ── claim → approve → balance (Alice, daily quest, day 0) ──
-        (a, Command::SubmitClaim { claim_id: ClaimId(100), squire: UserId(ALICE), quest_id: QuestId(QUEST_DAILY), on: Date(0) }),
-        (k, Command::ReviewClaim { actor: UserId(KNIGHT), claim_id: ClaimId(100), decision: Decision::Approve }),
+        (
+            a,
+            Command::SubmitClaim {
+                claim_id: ClaimId(100),
+                squire: UserId(ALICE),
+                quest_id: QuestId(QUEST_DAILY),
+                on: Date(0),
+            },
+        ),
+        (
+            k,
+            Command::ReviewClaim {
+                actor: UserId(KNIGHT),
+                claim_id: ClaimId(100),
+                decision: Decision::Approve,
+            },
+        ),
         // ── second scheduled day → streak length 2 → AchievementUnlocked (+bonus + gate lift) ──
-        (a, Command::SubmitClaim { claim_id: ClaimId(101), squire: UserId(ALICE), quest_id: QuestId(QUEST_DAILY), on: Date(1) }),
-        (k, Command::ReviewClaim { actor: UserId(KNIGHT), claim_id: ClaimId(101), decision: Decision::Approve }),
+        (
+            a,
+            Command::SubmitClaim {
+                claim_id: ClaimId(101),
+                squire: UserId(ALICE),
+                quest_id: QuestId(QUEST_DAILY),
+                on: Date(1),
+            },
+        ),
+        (
+            k,
+            Command::ReviewClaim {
+                actor: UserId(KNIGHT),
+                claim_id: ClaimId(101),
+                decision: Decision::Approve,
+            },
+        ),
         // ── an AdjustPoints (Knight tops Alice up) ──
-        (k, Command::AdjustPoints { command_id: CommandId(300), actor: UserId(KNIGHT), squire: UserId(ALICE), currency: Currency::Coins, amount: 5, reason: "bonus chores".into() }),
+        (
+            k,
+            Command::AdjustPoints {
+                command_id: CommandId(300),
+                actor: UserId(KNIGHT),
+                squire: UserId(ALICE),
+                currency: Currency::Coins,
+                amount: 5,
+                reason: "bonus chores".into(),
+            },
+        ),
         // ── redemption: request → approve (Alice redeems the now-unlocked gated item) ──
-        (a, Command::RequestRedemption { request_id: RequestId(400), squire: UserId(ALICE), item_id: ItemId(ITEM_GATED) }),
-        (k, Command::ReviewRedemption { actor: UserId(KNIGHT), request_id: RequestId(400), decision: Decision::Approve }),
+        (
+            a,
+            Command::RequestRedemption {
+                request_id: RequestId(400),
+                squire: UserId(ALICE),
+                item_id: ItemId(ITEM_GATED),
+            },
+        ),
+        (
+            k,
+            Command::ReviewRedemption {
+                actor: UserId(KNIGHT),
+                request_id: RequestId(400),
+                decision: Decision::Approve,
+            },
+        ),
         // ── a Race quest: both squires claim on day 2, Alice wins ──
-        (a, Command::SubmitClaim { claim_id: ClaimId(500), squire: UserId(ALICE), quest_id: QuestId(QUEST_RACE), on: Date(2) }),
-        (b, Command::SubmitClaim { claim_id: ClaimId(501), squire: UserId(BORIS), quest_id: QuestId(QUEST_RACE), on: Date(2) }),
-        (k, Command::ReviewClaim { actor: UserId(KNIGHT), claim_id: ClaimId(500), decision: Decision::Approve }), // Alice wins
+        (
+            a,
+            Command::SubmitClaim {
+                claim_id: ClaimId(500),
+                squire: UserId(ALICE),
+                quest_id: QuestId(QUEST_RACE),
+                on: Date(2),
+            },
+        ),
+        (
+            b,
+            Command::SubmitClaim {
+                claim_id: ClaimId(501),
+                squire: UserId(BORIS),
+                quest_id: QuestId(QUEST_RACE),
+                on: Date(2),
+            },
+        ),
+        (
+            k,
+            Command::ReviewClaim {
+                actor: UserId(KNIGHT),
+                claim_id: ClaimId(500),
+                decision: Decision::Approve,
+            },
+        ), // Alice wins
     ]
 }
 
@@ -208,7 +290,12 @@ fn snap_dbg(s: &Snapshot) -> String {
 /// Assert the five projections agree across the two snapshots for `squire`. `today` drives
 /// `quests_due` / `current_streak`; we probe a couple of streak scopes and `can_redeem` over
 /// every item in the snapshot.
-fn assert_projections_agree(store_snap: &Snapshot, inmem_snap: &Snapshot, squire: UserId, today: Date) {
+fn assert_projections_agree(
+    store_snap: &Snapshot,
+    inmem_snap: &Snapshot,
+    squire: UserId,
+    today: Date,
+) {
     assert_eq!(
         Proj::balance(store_snap, squire),
         Proj::balance(inmem_snap, squire),
@@ -222,7 +309,10 @@ fn assert_projections_agree(store_snap: &Snapshot, inmem_snap: &Snapshot, squire
 
     // Quest-scoped scheduled streak + an Any calendar streak.
     let scopes: [(Scope, StreakBasis); 2] = [
-        (Scope::Quest(QuestId(QUEST_DAILY)), StreakBasis::ScheduledOccurrences),
+        (
+            Scope::Quest(QuestId(QUEST_DAILY)),
+            StreakBasis::ScheduledOccurrences,
+        ),
         (Scope::Any, StreakBasis::CalendarDays),
     ];
     for (scope, basis) in &scopes {
@@ -279,7 +369,11 @@ fn store_is_faithful_drop_in_for_in_memory() {
         inmem.apply(None, &seed_users).expect("seed users (inmem)");
 
         // Baseline parity right after seeding.
-        assert_eq!(snap_dbg(&store.snapshot()), snap_dbg(&inmem.snapshot()), "post-seed snapshot");
+        assert_eq!(
+            snap_dbg(&store.snapshot()),
+            snap_dbg(&inmem.snapshot()),
+            "post-seed snapshot"
+        );
 
         let today = clock.today;
         let squires = [UserId(ALICE), UserId(BORIS)];
@@ -306,11 +400,25 @@ fn store_is_faithful_drop_in_for_in_memory() {
         let snap = store.snapshot();
         // Alice: 10 + 10 (two approvals) + 25 (streak bonus) + 5 (adjust) + 20 (race win)
         //        - 15 (gated item redemption) = 55.
-        assert_eq!(Proj::balance(&snap, UserId(ALICE)), 55, "Alice final balance");
-        assert!(Proj::is_unlocked(&snap, UserId(ALICE), AchievementId(ACH_STREAK)), "Alice unlocked");
-        assert!(!Proj::is_unlocked(&snap, UserId(BORIS), AchievementId(ACH_STREAK)), "Boris not unlocked");
+        assert_eq!(
+            Proj::balance(&snap, UserId(ALICE)),
+            55,
+            "Alice final balance"
+        );
+        assert!(
+            Proj::is_unlocked(&snap, UserId(ALICE), AchievementId(ACH_STREAK)),
+            "Alice unlocked"
+        );
+        assert!(
+            !Proj::is_unlocked(&snap, UserId(BORIS), AchievementId(ACH_STREAK)),
+            "Boris not unlocked"
+        );
         // Boris lost the race and never completed the daily → balance 0.
-        assert_eq!(Proj::balance(&snap, UserId(BORIS)), 0, "Boris final balance");
+        assert_eq!(
+            Proj::balance(&snap, UserId(BORIS)),
+            0,
+            "Boris final balance"
+        );
 
         // ── NFR-11: raw per-quest / per-item event-log queries over the same history ──
         assert_raw_logs(&store, &snap);
@@ -328,12 +436,22 @@ fn assert_raw_logs(store: &Store<FixedClock>, snap: &Snapshot) {
         .filter(|e| event_item_id(e) == Some(ItemId(ITEM_GATED)))
         .collect();
     assert_eq!(
-        item_log.iter().map(|e| format!("{e:?}")).collect::<Vec<_>>(),
-        expected_item.iter().map(|e| format!("{e:?}")).collect::<Vec<_>>(),
+        item_log
+            .iter()
+            .map(|e| format!("{e:?}"))
+            .collect::<Vec<_>>(),
+        expected_item
+            .iter()
+            .map(|e| format!("{e:?}"))
+            .collect::<Vec<_>>(),
         "raw_log_for_item mismatch"
     );
     // Concretely: a RedemptionRequested then an ItemRedeemed, in that order.
-    assert_eq!(item_log.len(), 2, "expected request + redeemed for the gated item");
+    assert_eq!(
+        item_log.len(),
+        2,
+        "expected request + redeemed for the gated item"
+    );
     assert!(matches!(item_log[0], Event::RedemptionRequested { .. }));
     assert!(matches!(item_log[1], Event::ItemRedeemed { .. }));
 
@@ -344,7 +462,9 @@ fn assert_raw_logs(store: &Store<FixedClock>, snap: &Snapshot) {
         .events
         .iter()
         .filter_map(|e| match e {
-            Event::CompletionClaimed { claim_id, quest_id, .. } if *quest_id == QuestId(QUEST_DAILY) => Some(*claim_id),
+            Event::CompletionClaimed {
+                claim_id, quest_id, ..
+            } if *quest_id == QuestId(QUEST_DAILY) => Some(*claim_id),
             _ => None,
         })
         .collect();
@@ -359,12 +479,22 @@ fn assert_raw_logs(store: &Store<FixedClock>, snap: &Snapshot) {
         })
         .collect();
     assert_eq!(
-        quest_log.iter().map(|e| format!("{e:?}")).collect::<Vec<_>>(),
-        expected_quest.iter().map(|e| format!("{e:?}")).collect::<Vec<_>>(),
+        quest_log
+            .iter()
+            .map(|e| format!("{e:?}"))
+            .collect::<Vec<_>>(),
+        expected_quest
+            .iter()
+            .map(|e| format!("{e:?}"))
+            .collect::<Vec<_>>(),
         "raw_log_for_quest mismatch"
     );
     // Concretely: claim(100), approve(100), claim(101), approve(101) for the daily quest.
-    assert_eq!(quest_log.len(), 4, "two claim+approve pairs for the daily quest");
+    assert_eq!(
+        quest_log.len(),
+        4,
+        "two claim+approve pairs for the daily quest"
+    );
 
     // The race quest's log: both claims + Alice's approval (501 was never reviewed).
     let race_log = store.raw_log_for_quest(QuestId(QUEST_RACE));
