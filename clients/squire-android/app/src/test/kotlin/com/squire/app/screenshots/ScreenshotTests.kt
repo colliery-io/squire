@@ -45,6 +45,9 @@ import com.squire.knight.app.ui.RejectReasonDialog
 import com.squire.knight.app.ui.RewardAdminScreen
 import com.squire.knight.core.KnightUiState
 import com.squire.sdk.model.AchievementSummaryDto
+import com.squire.sdk.model.ActivityEntry
+import com.squire.sdk.model.ActivityKind
+import com.squire.sdk.model.AdjustmentView
 import com.squire.sdk.model.BadgeView
 import com.squire.sdk.model.HistoryEntryDto
 import com.squire.sdk.model.GoalView
@@ -54,6 +57,7 @@ import com.squire.sdk.model.ClaimStatus
 import com.squire.sdk.model.CompletionDto
 import com.squire.sdk.model.Currency
 import com.squire.sdk.model.CurrencyBalance
+import com.squire.sdk.model.AvailabilityKind
 import com.squire.sdk.model.ItemSummaryDto
 import com.squire.sdk.model.MemberSummaryDto
 import com.squire.sdk.model.PendingCashOut
@@ -156,12 +160,14 @@ class ScreenshotTests {
             pendingRequests = emptyList(), items = emptyList(), quests = emptyList(), today = 20624,
         )
         val at = 1_700_000_000_000L
+        // The server now resolves names/titles (SQUIRE-T-0121): the Squire, the acting Knight, and
+        // the quest/reward subject. Rows read "Gawain earned 5 coins for “Make your bed” · approved by Dad".
         val history = listOf(
-            HistoryEntryDto(at = at, kind = "CashedOut", squire = 2, amount = 5, currency = Currency.Cash),
-            HistoryEntryDto(at = at - 60_000, kind = "CashOutRequested", squire = 2, amount = 5, currency = Currency.Cash),
-            HistoryEntryDto(at = at - 120_000, kind = "Approved", squire = 2, amount = 5),
-            HistoryEntryDto(at = at - 180_000, kind = "Redeemed", squire = 2, amount = 3, itemId = 1),
-            HistoryEntryDto(at = at - 240_000, kind = "Adjusted", squire = 2, amount = 10, currency = Currency.Coins, reason = "gophering"),
+            HistoryEntryDto(at = at, kind = "CashedOut", squire = 2, squireName = "Gawain", amount = 5, currency = Currency.Cash, actorName = "Dad"),
+            HistoryEntryDto(at = at - 60_000, kind = "CashOutRequested", squire = 2, squireName = "Gawain", amount = 5, currency = Currency.Cash),
+            HistoryEntryDto(at = at - 120_000, kind = "Approved", squire = 2, squireName = "Gawain", amount = 5, questId = 1, questTitle = "Make your bed", actorName = "Dad"),
+            HistoryEntryDto(at = at - 180_000, kind = "Redeemed", squire = 2, squireName = "Gawain", amount = 3, itemId = 1, itemTitle = "Ice cream", actorName = "Dad"),
+            HistoryEntryDto(at = at - 240_000, kind = "Adjusted", squire = 2, squireName = "Gawain", amount = 10, currency = Currency.Coins, reason = "gophering", actorName = "Dad"),
         )
         paparazzi.snapshot {
             SquireTheme {
@@ -286,7 +292,7 @@ class ScreenshotTests {
         val reward = RewardCard(affordable = true, cost = 3, itemId = 1L, name = "Ice cream", icon = "🍦", description = "A scoop of your favourite ice cream after dinner.")
         val streak = StreakView(name = "Room Master", current = 3, best = 5, alive = true, nextMilestone = 7)
         val badge = BadgeView(at = 0L, bonus = 25, id = 1L, name = "Century Club")
-        val goal = GoalView(id = 7L, name = "Best Friends", description = "Complete 10 chores together", bonus = 25)
+        val goal = GoalView(id = 7L, name = "Best Friends", description = "Complete 10 chores together", bonus = 25, current = 6, target = 10)
         paparazzi.snapshot {
             SquireTheme {
                 Column(
@@ -297,6 +303,22 @@ class ScreenshotTests {
                     DetailCard(rewardDetail(reward), Modifier.fillMaxWidth())
                     DetailCard(streakDetail(streak), Modifier.fillMaxWidth())
                     DetailCard(badgeDetail(badge), Modifier.fillMaxWidth())
+                    DetailCard(goalDetail(goal), Modifier.fillMaxWidth())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun squireGoalDetail() {
+        // The goal detail on its own (SQUIRE-T-0122): "how to earn it" reads as a stacked, full-width
+        // block above the stats, and a Progress line shows how close the child is.
+        val goal = GoalView(id = 7L, name = "Best Friends", description = "Complete 10 chores together", bonus = 25, current = 6, target = 10)
+        paparazzi.snapshot {
+            SquireTheme {
+                Column(
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(16.dp),
+                ) {
                     DetailCard(goalDetail(goal), Modifier.fillMaxWidth())
                 }
             }
@@ -324,8 +346,8 @@ class ScreenshotTests {
             streaks = listOf(StreakView(name = "Room Master", current = 3, best = 5, alive = true, nextMilestone = 7)),
             badges = emptyList(),
             goals = listOf(
-                GoalView(id = 7L, name = "Best Friends", description = "Complete 10 chores together", bonus = 25),
-                GoalView(id = 8L, name = "Century", description = "Earn 100 coins", bonus = 0),
+                GoalView(id = 7L, name = "Best Friends", description = "Complete 10 chores together", bonus = 25, current = 6, target = 10),
+                GoalView(id = 8L, name = "Century", description = "Earn 100 coins", bonus = 0, current = 40, target = 100),
             ),
         )
         paparazzi.snapshot {
@@ -380,7 +402,7 @@ class ScreenshotTests {
                 StreakView(name = "Early Bird", current = 1, best = 4, alive = true, nextMilestone = 3),
             ),
             goals = listOf(
-                GoalView(id = 7L, name = "Best Friends", description = "Complete 10 chores together", bonus = 25),
+                GoalView(id = 7L, name = "Best Friends", description = "Complete 10 chores together", bonus = 25, current = 6, target = 10),
             ),
         )
         paparazzi.snapshot {
@@ -476,6 +498,28 @@ class ScreenshotTests {
     }
 
     @Test
+    fun knightEditCatalog() {
+        // The "Current rewards" list with the in-place Edit affordance (SQUIRE-T-0120/0126) — library
+        // omitted so the list (and its Edit/Archive buttons) renders in the captured viewport.
+        val adapter = KnightApiAdapter(baseUrl = "http://localhost", household = "demo", token = "t")
+        val items = listOf(
+            ItemSummaryDto(id = 1, name = "Extra screen time", cost = 10, summary = "Repeatable", active = true, availability = AvailabilityKind.Repeatable),
+            ItemSummaryDto(id = 2, name = "Movie night pick", cost = 25, summary = "Once · needs: Century Club", active = true, availability = AvailabilityKind.Once, gate = 1),
+        )
+        paparazzi.snapshot {
+            SquireTheme {
+                RewardAdminScreen(
+                    adapter = adapter,
+                    onBack = {},
+                    initialItems = items,
+                    libraryOverride = emptyList(),
+                    gateOverride = listOf(1L to "Century Club"),
+                )
+            }
+        }
+    }
+
+    @Test
     fun knightRejectReasonDialog() {
         // The parent can attach a reason when rejecting from the phone (SQUIRE-T-0078) — the dialog
         // the child's rejection note comes from.
@@ -520,6 +564,18 @@ class ScreenshotTests {
             badges = listOf(
                 BadgeView(at = 0L, bonus = 25, id = 1L, name = "Century Club"),
                 BadgeView(at = 0L, bonus = 50, id = 2L, name = "Chore Champion"),
+            ),
+            // One merged feed, newest-first across types — a coin grant interleaved between a claim
+            // and a request, not grouped by type (SQUIRE-T-0124).
+            recentActivity = listOf(
+                ActivityEntry(at = 400, kind = ActivityKind.Claim,
+                    claim = ClaimStatus(claimId = 12L, on = 1, questTitle = "Take out the trash", state = ClaimState(state = ClaimStateKind.Pending))),
+                ActivityEntry(at = 300, kind = ActivityKind.Adjustment,
+                    adjustment = AdjustmentView(amount = 10, reason = "gophering", at = 300)),
+                ActivityEntry(at = 200, kind = ActivityKind.Request,
+                    request = RedemptionStatus(cost = 25, itemName = "Movie night", requestId = 20L, state = RedemptionState(state = RedemptionStateKind.Rejected, reason = "After homework"))),
+                ActivityEntry(at = 100, kind = ActivityKind.Claim,
+                    claim = ClaimStatus(claimId = 10L, on = 1, questTitle = "Tidy your room", state = ClaimState(state = ClaimStateKind.Approved, points = 10))),
             ),
         )
         paparazzi.snapshot {

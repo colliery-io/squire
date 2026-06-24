@@ -17,7 +17,7 @@ use utoipa::ToSchema;
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, Change, Clock, Command,
     Completion, Criterion, Date, ItemId, Quest, QuestId, RedeemableItem, Repository, Role, Schedule,
-    Scope, Snapshot, StreakBasis, UserId, Weekday,
+    Scope, Snapshot, StreakBasis, User, UserId, Weekday,
 };
 
 use crate::auth::RequireKnight;
@@ -26,8 +26,9 @@ use crate::AppState;
 
 /// Quest cadence on the wire (flat). `weekdays` applies to `Weekly`; `due` (a `Date` day-count) to
 /// `OneOff`; `Daily` uses neither.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 pub enum CadenceKind {
+    #[default]
     Daily,
     Weekly,
     OneOff,
@@ -55,6 +56,20 @@ impl From<WeekdayDto> for Weekday {
             WeekdayDto::Fri => Weekday::Fri,
             WeekdayDto::Sat => Weekday::Sat,
             WeekdayDto::Sun => Weekday::Sun,
+        }
+    }
+}
+
+impl From<Weekday> for WeekdayDto {
+    fn from(d: Weekday) -> Self {
+        match d {
+            Weekday::Mon => WeekdayDto::Mon,
+            Weekday::Tue => WeekdayDto::Tue,
+            Weekday::Wed => WeekdayDto::Wed,
+            Weekday::Thu => WeekdayDto::Thu,
+            Weekday::Fri => WeekdayDto::Fri,
+            Weekday::Sat => WeekdayDto::Sat,
+            Weekday::Sun => WeekdayDto::Sun,
         }
     }
 }
@@ -141,6 +156,24 @@ pub struct QuestSummaryDto {
     pub repeatable_within_day: bool,
     pub auto_approve: bool,
     pub active: bool,
+    // Raw fields so the phone can pre-fill the edit form (SQUIRE-T-0120/0126) — the labels above are
+    // for display; these round-trip into `CreateQuestReq`. `serde(default)` for back-compat.
+    #[serde(default)]
+    pub cash: i64,
+    /// `Daily | Weekly | OneOff` (an `EveryNDays` quest reports `Daily` — not phone-authorable).
+    #[serde(default)]
+    pub cadence: CadenceKind,
+    #[serde(default)]
+    pub weekdays: Option<Vec<WeekdayDto>>,
+    #[serde(default)]
+    pub due: Option<Date>,
+    /// True = all squires; false = the explicit `squires` list.
+    #[serde(default)]
+    pub assign_all: bool,
+    #[serde(default)]
+    pub squires: Option<Vec<u64>>,
+    #[serde(default)]
+    pub icon: Option<String>,
 }
 
 /// `POST /admin/quests` (RequireKnight) — create or edit a quest. A bad definition (empty Weekly
@@ -228,18 +261,29 @@ pub async fn list_quests(
     let rows = snap
         .quests
         .iter()
-        .map(|q| QuestSummaryDto {
-            id: q.id,
-            title: q.title.clone(),
-            description: q.description.clone(),
-            reward: q.reward as i64,
-            category: q.category.as_ref().map(|c| c.0.clone()),
-            cadence_label: cadence_label(&q.cadence),
-            assignment_label: assignment_label(&snap, &q.assignment),
-            completion: q.completion.into(),
-            repeatable_within_day: q.repeatable_within_day,
-            auto_approve: q.auto_approve,
-            active: q.active,
+        .map(|q| {
+            let (cadence, weekdays, due) = quest_cadence_flat(&q.cadence);
+            let (assign_all, squires) = quest_assignment_flat(&q.assignment);
+            QuestSummaryDto {
+                id: q.id,
+                title: q.title.clone(),
+                description: q.description.clone(),
+                reward: q.reward as i64,
+                category: q.category.as_ref().map(|c| c.0.clone()),
+                cadence_label: cadence_label(&q.cadence),
+                assignment_label: assignment_label(&snap, &q.assignment),
+                completion: q.completion.into(),
+                repeatable_within_day: q.repeatable_within_day,
+                auto_approve: q.auto_approve,
+                active: q.active,
+                cash: q.cash as i64,
+                cadence,
+                weekdays,
+                due,
+                assign_all,
+                squires,
+                icon: q.icon.clone(),
+            }
         })
         .collect();
     Json(rows)
@@ -324,16 +368,18 @@ fn assignment_label(snap: &Snapshot, a: &Assignment) -> String {
 // by the engine's `validate_achievement` and surfaced via `domain_status`.
 
 /// Achievement criterion kind on the wire (flat).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 pub enum AchCriterionKind {
     Streak,
     TotalCompletions,
+    #[default]
     PointsEarned,
 }
 
 /// Achievement scope kind on the wire (flat).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 pub enum AchScopeKind {
+    #[default]
     Any,
     Quest,
     Category,
@@ -386,6 +432,24 @@ pub struct AchievementSummaryDto {
     pub summary: String,
     pub bonus: i64,
     pub active: bool,
+    // Raw fields so the phone can pre-fill the edit form (SQUIRE-T-0120/0126); the `summary` above is
+    // for display. `serde(default)` for back-compat.
+    #[serde(default)]
+    pub criterion: AchCriterionKind,
+    #[serde(default)]
+    pub scope: AchScopeKind,
+    #[serde(default)]
+    pub scope_quest: Option<QuestId>,
+    #[serde(default)]
+    pub scope_category: Option<String>,
+    #[serde(default)]
+    pub length: Option<i64>,
+    #[serde(default)]
+    pub basis: Option<AchBasisKind>,
+    #[serde(default)]
+    pub count: Option<i64>,
+    #[serde(default)]
+    pub total: Option<i64>,
 }
 
 /// `POST /admin/achievements` (RequireKnight) — create or edit an achievement.
@@ -462,12 +526,23 @@ pub async fn list_achievements(
     let rows = snap
         .achievements
         .iter()
-        .map(|a| AchievementSummaryDto {
-            id: a.id,
-            name: a.name.clone(),
-            summary: achievement_summary(&snap, &a.criterion),
-            bonus: a.bonus_points as i64,
-            active: a.active,
+        .map(|a| {
+            let f = ach_flat(&a.criterion);
+            AchievementSummaryDto {
+                id: a.id,
+                name: a.name.clone(),
+                summary: achievement_summary(&snap, &a.criterion),
+                bonus: a.bonus_points as i64,
+                active: a.active,
+                criterion: f.criterion,
+                scope: f.scope,
+                scope_quest: f.scope_quest,
+                scope_category: f.scope_category,
+                length: f.length,
+                basis: f.basis,
+                count: f.count,
+                total: f.total,
+            }
         })
         .collect();
     Json(rows)
@@ -529,9 +604,10 @@ fn achievement_summary(snap: &Snapshot, c: &Criterion) -> String {
 
 /// Reward availability on the wire (flat): `Repeatable` (a recurring privilege) or `Once` (a one-time
 /// treat, out of stock household-wide after the first redemption).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 pub enum AvailabilityKind {
     Once,
+    #[default]
     Repeatable,
 }
 
@@ -585,6 +661,16 @@ pub struct ItemSummaryDto {
     /// e.g. "Repeatable", "Once", "Once · needs: Saver".
     pub summary: String,
     pub active: bool,
+    // Raw fields so the phone can pre-fill the edit form (SQUIRE-T-0120/0126); the `summary` above is
+    // for display. `serde(default)` for back-compat.
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub availability: AvailabilityKind,
+    #[serde(default)]
+    pub gate: Option<AchievementId>,
+    #[serde(default)]
+    pub icon: Option<String>,
 }
 
 /// `POST /admin/items` (RequireKnight) — create or edit a reward. A gate to a missing achievement
@@ -651,6 +737,10 @@ pub async fn list_items(
             cost: i.cost as i64,
             summary: item_summary(&snap, i),
             active: i.active,
+            description: i.description.clone(),
+            availability: i.availability.into(),
+            gate: i.gate,
+            icon: i.icon.clone(),
         })
         .collect();
     Json(rows)
@@ -700,6 +790,95 @@ fn item_summary(snap: &Snapshot, item: &RedeemableItem) -> String {
             format!("{avail} · needs: {name}")
         }
         None => avail.to_string(),
+    }
+}
+
+// ─── Domain → flat round-trip helpers (SQUIRE-T-0120/0126) ───────────────────────────────────────
+// Inverse of the `create_*` builders: turn a stored domain object's enums back into the flat wire
+// fields the phone's edit form pre-fills from (the list `*_label`/`summary` strings are display-only).
+
+/// Domain quest cadence → flat `(kind, weekdays, due)`. `EveryNDays` isn't expressible in the flat
+/// phone form, so it reports `Daily` (the phone never authors `EveryNDays`).
+fn quest_cadence_flat(c: &Cadence) -> (CadenceKind, Option<Vec<WeekdayDto>>, Option<Date>) {
+    match c {
+        Cadence::Recurring(Schedule::Daily) => (CadenceKind::Daily, None, None),
+        Cadence::Recurring(Schedule::Weekly { days }) => {
+            (CadenceKind::Weekly, Some(days.iter().map(|d| WeekdayDto::from(*d)).collect()), None)
+        }
+        Cadence::OneOff { due } => (CadenceKind::OneOff, None, *due),
+        Cadence::Recurring(Schedule::EveryNDays { .. }) => (CadenceKind::Daily, None, None),
+    }
+}
+
+/// Domain quest assignment → flat `(assign_all, squires)`.
+fn quest_assignment_flat(a: &Assignment) -> (bool, Option<Vec<u64>>) {
+    match a {
+        Assignment::AllSquires => (true, None),
+        Assignment::Squires(ids) => (false, Some(ids.iter().map(|u| u.0 as u64).collect())),
+    }
+}
+
+/// The flat round-trip fields for an achievement criterion.
+struct AchFlat {
+    criterion: AchCriterionKind,
+    scope: AchScopeKind,
+    scope_quest: Option<QuestId>,
+    scope_category: Option<String>,
+    length: Option<i64>,
+    basis: Option<AchBasisKind>,
+    count: Option<i64>,
+    total: Option<i64>,
+}
+
+/// Domain achievement criterion → its flat round-trip fields.
+fn ach_flat(c: &Criterion) -> AchFlat {
+    let scope_flat = |s: &Scope| -> (AchScopeKind, Option<QuestId>, Option<String>) {
+        match s {
+            Scope::Any => (AchScopeKind::Any, None, None),
+            Scope::Quest(qid) => (AchScopeKind::Quest, Some(*qid), None),
+            Scope::Category(cat) => (AchScopeKind::Category, None, Some(cat.0.clone())),
+        }
+    };
+    match c {
+        Criterion::PointsEarned { total } => AchFlat {
+            criterion: AchCriterionKind::PointsEarned,
+            scope: AchScopeKind::Any,
+            scope_quest: None,
+            scope_category: None,
+            length: None,
+            basis: None,
+            count: None,
+            total: Some(*total as i64),
+        },
+        Criterion::TotalCompletions { scope, count } => {
+            let (sk, sq, sc) = scope_flat(scope);
+            AchFlat {
+                criterion: AchCriterionKind::TotalCompletions,
+                scope: sk,
+                scope_quest: sq,
+                scope_category: sc,
+                length: None,
+                basis: None,
+                count: Some(*count as i64),
+                total: None,
+            }
+        }
+        Criterion::Streak { scope, length, basis } => {
+            let (sk, sq, sc) = scope_flat(scope);
+            AchFlat {
+                criterion: AchCriterionKind::Streak,
+                scope: sk,
+                scope_quest: sq,
+                scope_category: sc,
+                length: Some(*length as i64),
+                basis: Some(match basis {
+                    StreakBasis::ScheduledOccurrences => AchBasisKind::ScheduledOccurrences,
+                    StreakBasis::CalendarDays => AchBasisKind::CalendarDays,
+                }),
+                count: None,
+                total: None,
+            }
+        }
     }
 }
 
@@ -794,6 +973,59 @@ pub async fn set_member_active(
     }
     store
         .apply(Some(principal.user), &[Change::SetUserActive(uid, req.active)])
+        .expect("apply: single-writer store write failed");
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `POST /admin/members/{id}/name` body — a member's new display name (SQUIRE-T-0120/0126).
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct RenameMemberReq {
+    pub display_name: String,
+}
+
+/// `POST /admin/members/{id}/name` (RequireKnight) — rename a member in place. Reuses the
+/// `PutUser` upsert (keeps the id, role, active flag, and `created_*` audit; moves `updated_*`),
+/// audited to the acting Knight. Blank name → 400; a missing member → 404.
+#[utoipa::path(
+    post,
+    path = "/admin/members/{id}/name",
+    tag = "knight",
+    security(("bearer_auth" = [])),
+    params(
+        ("X-Household" = String, Header, description = "Opaque household handle routing the request to its tenant"),
+        ("id" = i64, Path, description = "Member user id"),
+    ),
+    request_body = RenameMemberReq,
+    responses(
+        (status = 204, description = "Renamed"),
+        (status = 400, description = "Blank display name"),
+        (status = 401, description = "Missing or invalid credentials"),
+        (status = 403, description = "Authenticated but not a Knight"),
+        (status = 404, description = "Member not found"),
+    ),
+)]
+pub async fn rename_member(
+    State(state): State<Arc<AppState>>,
+    RequireKnight(principal): RequireKnight,
+    Path(id): Path<u64>,
+    Json(req): Json<RenameMemberReq>,
+) -> Result<StatusCode, StatusCode> {
+    let name = req.display_name.trim();
+    if name.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let uid = UserId(u128::from(id));
+    let mut store = state.store.lock().expect("store mutex poisoned");
+    let user = store
+        .snapshot()
+        .users
+        .iter()
+        .find(|u| u.id == uid)
+        .cloned()
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let updated = User { display_name: name.to_string(), ..user };
+    store
+        .apply(Some(principal.user), &[Change::PutUser(updated)])
         .expect("apply: single-writer store write failed");
     Ok(StatusCode::NO_CONTENT)
 }

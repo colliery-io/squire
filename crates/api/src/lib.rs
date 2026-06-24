@@ -80,6 +80,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         // mint-pair-code already live on the control-plane /members and /pair/codes, both Knight-gated.)
         .route("/admin/members", get(authoring::list_members))
         .route("/admin/members/{id}/active", post(authoring::set_member_active))
+        .route("/admin/members/{id}/name", post(authoring::rename_member))
         // Household settings from the phone (SQUIRE-T-0113): read + change the timezone, at parity
         // with the Keep's /api/config (hot-swaps the shared live cell).
         .route("/admin/config", get(config::get_config).put(config::update_config))

@@ -24,6 +24,7 @@ import com.squire.sdk.model.MintPairCodeReq
 import com.squire.sdk.model.MintPairCodeResp
 import com.squire.sdk.model.QuestSummaryDto
 import com.squire.sdk.model.Role
+import com.squire.sdk.model.RenameMemberReq
 import com.squire.sdk.model.SetActiveReq
 import com.squire.sdk.model.StateView
 import kotlinx.coroutines.Dispatchers
@@ -168,6 +169,11 @@ class KnightApiAdapter(
     /** De/reactivate a member (archive-not-delete). */
     suspend fun setMemberActive(id: Long, active: Boolean) = withContext(Dispatchers.IO) {
         api.setMemberActive(xHousehold = household, id = id, setActiveReq = SetActiveReq(active = active))
+    }
+
+    /** Rename a member in place (keeps id, role, and pairing) — SQUIRE-T-0120/0126. */
+    suspend fun renameMember(id: Long, displayName: String) = withContext(Dispatchers.IO) {
+        api.renameMember(xHousehold = household, id = id, renameMemberReq = RenameMemberReq(displayName = displayName))
     }
 
     /** Mint a one-time pairing code for a member (control-plane, Knight-gated). */

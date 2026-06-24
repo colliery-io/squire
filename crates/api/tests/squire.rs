@@ -287,6 +287,137 @@ async fn earned_achievements_surface_as_badges() {
     assert_eq!(b.bonus, 25);
 }
 
+/// Non-streak goals carry live progress toward their threshold (SQUIRE-T-0122): a `TotalCompletions`
+/// goal counts approved completions and a `PointsEarned` goal counts earned points — using the same
+/// helpers the unlock gate uses, so the displayed "x / y" can't disagree with when it unlocks.
+#[tokio::test]
+async fn goals_show_progress_toward_threshold() {
+    let completions = Achievement {
+        id: AchievementId(901),
+        name: "Triple Play".into(),
+        description: None,
+        criterion: Criterion::TotalCompletions { scope: Scope::Any, count: 3 },
+        bonus_points: 10,
+        active: true,
+    };
+    let points = Achievement {
+        id: AchievementId(902),
+        name: "Century Club".into(),
+        description: None,
+        criterion: Criterion::PointsEarned { total: 100 },
+        bonus_points: 25,
+        active: true,
+    };
+    let (state, _dir, today) =
+        test_state_with(&[Change::PutAchievement(completions), Change::PutAchievement(points)]);
+
+    // Before any activity: both goals present at 0 / target.
+    let view: StateView = json_body(
+        router(state.clone()).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap(),
+    )
+    .await;
+    let g = view.goals.iter().find(|g| g.id == AchievementId(901)).expect("completions goal");
+    assert_eq!((g.current, g.target), (0, 3));
+    let g = view.goals.iter().find(|g| g.id == AchievementId(902)).expect("points goal");
+    assert_eq!((g.current, g.target), (0, 100));
+
+    // Claim + approve the seeded daily quest (reward 5).
+    let claim = serde_json::json!({ "claim_id": 9200u128, "quest_id": QUEST_ID, "on": today.0 }).to_string();
+    router(state.clone()).oneshot(req("POST", "/claims", Some(SQUIRE_TOKEN), Some(claim))).await.unwrap();
+    let approve = serde_json::json!({ "claim_id": 9200u128, "decision": { "verdict": "approve" } }).to_string();
+    let resp = router(state.clone())
+        .oneshot(req("POST", "/admin/review-claim", Some(KNIGHT_TOKEN), Some(approve)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Now: one completion → 1/3; 5 points earned → 5/100. Neither threshold met, so both stay goals.
+    let view: StateView = json_body(
+        router(state).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap(),
+    )
+    .await;
+    let g = view.goals.iter().find(|g| g.id == AchievementId(901)).expect("completions goal");
+    assert_eq!((g.current, g.target), (1, 3), "one approved completion");
+    let g = view.goals.iter().find(|g| g.id == AchievementId(902)).expect("points goal");
+    assert_eq!((g.current, g.target), (5, 100), "5 points earned toward 100");
+}
+
+/// The `recent_activity` feed is ONE list, strictly newest-first across all entry types — an
+/// adjustment, a claim, and a request interleaved by event time, not grouped by type (SQUIRE-T-0124).
+#[tokio::test]
+async fn recent_activity_is_one_globally_time_ordered_feed() {
+    use domain_core::contract::{ActivityKind, ClaimId, CommandId, Currency, RequestId};
+    let t = Timestamp;
+    let extra = [
+        Change::Append(Event::Adjusted { command_id: CommandId(1), squire: UserId(SQUIRE_ID), actor: Some(UserId(KNIGHT_ID)), currency: Currency::Coins, amount: 5, reason: "gofur".into(), at: t(100) }),
+        Change::Append(Event::CompletionClaimed { claim_id: ClaimId(2), squire: UserId(SQUIRE_ID), quest_id: QuestId(QUEST_ID), on: Date(1), at: t(200) }),
+        Change::Append(Event::RedemptionRequested { request_id: RequestId(3), squire: UserId(SQUIRE_ID), item_id: ItemId(ITEM_ID), at: t(300) }),
+        Change::Append(Event::Adjusted { command_id: CommandId(4), squire: UserId(SQUIRE_ID), actor: Some(UserId(KNIGHT_ID)), currency: Currency::Coins, amount: -2, reason: "hazard".into(), at: t(400) }),
+    ];
+    let (state, _dir, _today) = test_state_with(&extra);
+    let view: StateView = json_body(
+        router(state).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap(),
+    )
+    .await;
+
+    let feed = &view.recent_activity;
+    assert_eq!(feed.len(), 4, "all four activity events surface in one feed");
+    // Strictly descending by time, with an adjustment correctly sandwiched between a request and a
+    // claim — impossible under the old type-grouped rendering.
+    assert_eq!(feed.iter().map(|a| a.at.0).collect::<Vec<_>>(), vec![400, 300, 200, 100]);
+    assert_eq!(
+        feed.iter().map(|a| a.kind).collect::<Vec<_>>(),
+        vec![ActivityKind::Adjustment, ActivityKind::Request, ActivityKind::Claim, ActivityKind::Adjustment],
+    );
+    // The tagged payload matches the kind.
+    assert!(feed[1].request.is_some(), "the request entry carries its payload");
+    assert!(feed[2].claim.is_some(), "the claim entry carries its payload");
+}
+
+/// The authoring **summary** DTOs carry the raw fields the phone edit form pre-fills from
+/// (SQUIRE-T-0120/0126) — not just the display labels. Create a Weekly, specific-squire, cash +
+/// auto-approve quest via the flat endpoint, then assert `GET /admin/quests` round-trips it.
+#[tokio::test]
+async fn quest_summary_carries_raw_round_trip_fields() {
+    let (state, _dir, _today) = test_state();
+    let body = serde_json::json!({
+        "title": "Vacuum",
+        "reward": 7,
+        "cash": 2,
+        "category": "Chores",
+        "cadence": "Weekly",
+        "weekdays": ["Mon", "Thu"],
+        "completion": "EachAssignee",
+        "assign_all": false,
+        "squires": [SQUIRE_ID],
+        "repeatable_within_day": false,
+        "auto_approve": true,
+    })
+    .to_string();
+    let resp = router(state.clone())
+        .oneshot(req("POST", "/admin/quests", Some(KNIGHT_TOKEN), Some(body)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let list: serde_json::Value = json_body(
+        router(state).oneshot(req("GET", "/admin/quests", Some(KNIGHT_TOKEN), None)).await.unwrap(),
+    )
+    .await;
+    let q = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|q| q["title"] == "Vacuum")
+        .expect("the new quest in the list");
+    assert_eq!(q["cadence"], "Weekly");
+    assert_eq!(q["weekdays"], serde_json::json!(["Mon", "Thu"]));
+    assert_eq!(q["assign_all"], false);
+    assert_eq!(q["squires"], serde_json::json!([SQUIRE_ID]));
+    assert_eq!(q["cash"], 2);
+    assert_eq!(q["auto_approve"], true);
+}
+
 #[tokio::test]
 async fn state_without_token_is_401() {
     let (state, _dir, _today) = test_state();

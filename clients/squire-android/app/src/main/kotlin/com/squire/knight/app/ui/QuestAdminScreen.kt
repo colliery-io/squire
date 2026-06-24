@@ -124,12 +124,38 @@ internal fun QuestAdminScreen(
     var dueLabel by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var formError by remember { mutableStateOf<String?>(null) }
+    var editingId by remember { mutableStateOf<Long?>(null) } // non-null = editing (upsert) — SQUIRE-T-0120
 
     fun resetForm() {
         title = ""; description = ""; reward = "5"; cash = "0"; category = ""; cadence = "Daily"
         weekdays.clear(); completion = "EachAssignee"; assignAll = true
         chosenSquires.clear(); repeatDay = false; autoApprove = false
         due = null; dueLabel = null; formError = null
+        editingId = null
+    }
+
+    // Prefill the form from an existing quest and enter edit mode (SQUIRE-T-0120/0126).
+    fun startEdit(q: QuestSummaryDto) {
+        title = q.title
+        description = q.description ?: ""
+        reward = q.reward.toString()
+        cash = (q.cash ?: 0).toString()
+        category = q.category ?: ""
+        cadence = when (q.cadence) {
+            CadenceKind.Weekly -> "Weekly"
+            CadenceKind.OneOff -> "OneOff"
+            else -> "Daily"
+        }
+        weekdays.clear(); weekdays.addAll(q.weekdays.orEmpty().map { it.name })
+        completion = if (q.completion == CompletionDto.Race) "Race" else "EachAssignee"
+        assignAll = q.assignAll ?: true
+        chosenSquires.clear(); chosenSquires.addAll(q.squires.orEmpty())
+        repeatDay = q.repeatableWithinDay
+        autoApprove = q.autoApprove
+        due = q.due
+        dueLabel = q.due?.let { "day $it" }
+        editingId = q.id
+        formError = null
     }
 
     fun create(req: CreateQuestReq, onDone: () -> Unit = {}) {
@@ -159,7 +185,7 @@ internal fun QuestAdminScreen(
                 description = description.trim().ifBlank { null },
                 category = category.trim().ifBlank { null },
                 due = if (cadence == "OneOff") due else null,
-                id = null,
+                id = editingId, // reuse id when editing (upsert) — SQUIRE-T-0120
                 squires = if (assignAll) null else chosenSquires.toList(),
                 weekdays = if (cadence == "Weekly") weekdays.map { WeekdayDto.valueOf(it) } else null,
             ),
@@ -251,10 +277,15 @@ internal fun QuestAdminScreen(
                         ToggleRow("Auto-approve (skip review)", autoApprove) { autoApprove = it }
 
                         formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                        Button(
-                            onClick = { submitForm() },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
-                        ) { Text("Add quest") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = { submitForm() },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
+                            ) { Text(if (editingId == null) "Add quest" else "Save changes") }
+                            if (editingId != null) {
+                                OutlinedButton(onClick = { resetForm() }) { Text("Cancel") }
+                            }
+                        }
                     }
                 }
             }
@@ -334,6 +365,7 @@ internal fun QuestAdminScreen(
                         }
                         GoldPill(q.reward.toInt())
                         if (q.active) {
+                            OutlinedButton(onClick = { startEdit(q) }) { Text("Edit") }
                             OutlinedButton(onClick = { scope.launch { runCatching { adapter.archiveQuest(q.id) }; tick++ } }) {
                                 Text("Archive")
                             }

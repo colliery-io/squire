@@ -23,7 +23,7 @@ use domain_core::contract::{
     RequestRedemptionResp, RewardCard, StateView, StreakView, SubmitClaimReq, SubmitClaimResp,
 };
 use domain_core::contract::{Clock, Engine, Projections, Repository};
-use domain_core::{quest_status, reward_view, streak_view, total_completions, Proj};
+use domain_core::{points_earned, quest_status, reward_view, streak_view, total_completions, Proj};
 
 use crate::auth::RequireSquire;
 use crate::state::AppState;
@@ -250,12 +250,13 @@ pub(crate) fn assemble_state(
     let balances = currency_balances(snap, squire);
     let streaks = streaks(snap, squire, today);
     let badges = badges(snap, squire);
-    let goals = goals(snap, squire);
+    let goals = goals(snap, squire, today);
     let rewards = rewards(snap, squire);
     let my_claims = my_claims(snap, squire);
     let my_requests = my_requests(snap, squire);
     let my_cashouts = my_cashouts(snap, squire);
     let adjustments = adjustments(snap, squire);
+    let recent_activity = recent_activity(snap, squire);
 
     StateView {
         squire,
@@ -271,7 +272,46 @@ pub(crate) fn assemble_state(
         my_requests,
         my_cashouts,
         adjustments,
+        recent_activity,
     }
+}
+
+/// The unified, newest-first **recent activity** feed (SQUIRE-T-0124): a single time-ordered list of
+/// the child's coin adjustments, quest claims, and redemption requests — interleaved by event time,
+/// not grouped by type. The event log is already in chronological order, so walking it newest-first
+/// (`.rev()`) and taking the first [`RECENT_LIMIT`] matching events yields exactly the globally most
+/// recent entries, in order — one unified cap across all types.
+fn recent_activity(snap: &Snapshot, squire: UserId) -> Vec<domain_core::contract::ActivityEntry> {
+    use domain_core::contract::ActivityEntry;
+    snap.events
+        .iter()
+        .rev()
+        .filter_map(|e| match e {
+            Event::Adjusted { squire: s, currency: Currency::Coins, amount, reason, at, .. } if *s == squire => {
+                Some(ActivityEntry::adjustment(*at, AdjustmentView { amount: *amount, reason: reason.clone(), at: *at }))
+            }
+            Event::CompletionClaimed { claim_id, squire: s, quest_id, on, at } if *s == squire => {
+                let quest_title = snap
+                    .quests
+                    .iter()
+                    .find(|q| q.id == *quest_id)
+                    .map(|q| q.title.clone())
+                    .unwrap_or_default();
+                Some(ActivityEntry::claim(*at, ClaimStatus { claim_id: *claim_id, quest_title, on: *on, state: claim_state(snap, *claim_id) }))
+            }
+            Event::RedemptionRequested { request_id, squire: s, item_id, at, .. } if *s == squire => {
+                let item = snap.items.iter().find(|i| i.id == *item_id);
+                Some(ActivityEntry::request(*at, RedemptionStatus {
+                    request_id: *request_id,
+                    item_name: item.map(|i| i.name.clone()).unwrap_or_default(),
+                    cost: item.map(|i| i.cost).unwrap_or(0),
+                    state: redemption_state(snap, *request_id),
+                }))
+            }
+            _ => None,
+        })
+        .take(RECENT_LIMIT)
+        .collect()
 }
 
 /// The Squire's recent point adjustments (newest first, capped) — grants and hazard penalties a
@@ -301,7 +341,7 @@ const RECENT_LIMIT: usize = 10;
 /// (SQUIRE-T-0094 #3). Streak achievements are shown live in the Streaks section, so they're excluded
 /// here to avoid duplication; this surfaces the rest (TotalCompletions / PointsEarned) that would
 /// otherwise be invisible until earned.
-fn goals(snap: &Snapshot, squire: UserId) -> Vec<GoalView> {
+fn goals(snap: &Snapshot, squire: UserId, today: Date) -> Vec<GoalView> {
     let earned = |aid| {
         snap.events.iter().any(|e| {
             matches!(e, Event::AchievementUnlocked { squire: s, id, .. } if *s == squire && *id == aid)
@@ -312,11 +352,25 @@ fn goals(snap: &Snapshot, squire: UserId) -> Vec<GoalView> {
         .filter(|a| a.active)
         .filter(|a| !matches!(a.criterion, Criterion::Streak { .. }))
         .filter(|a| !earned(a.id))
-        .map(|a| GoalView {
-            id: a.id,
-            name: a.name.clone(),
-            description: goal_description(snap, &a.criterion),
-            bonus: a.bonus_points,
+        .map(|a| {
+            // Progress toward the threshold, reusing the same helpers the unlock gate uses
+            // (criterion_met) so the displayed "x / y" can never disagree with when it unlocks.
+            // Streaks are filtered out above; the arm is defensive (0/0 → no progress shown).
+            let (current, target) = match &a.criterion {
+                Criterion::TotalCompletions { scope, count } => {
+                    (total_completions(snap, squire, scope, today), *count)
+                }
+                Criterion::PointsEarned { total } => (points_earned(snap, squire), *total),
+                Criterion::Streak { .. } => (0, 0),
+            };
+            GoalView {
+                id: a.id,
+                name: a.name.clone(),
+                description: goal_description(snap, &a.criterion),
+                bonus: a.bonus_points,
+                current,
+                target,
+            }
         })
         .collect()
 }

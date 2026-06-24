@@ -112,9 +112,23 @@ internal fun RewardAdminScreen(
     var gate by remember { mutableStateOf<Long?>(null) }          // null = None
     var icon by remember { mutableStateOf("") }
     var formError by remember { mutableStateOf<String?>(null) }
+    var editingId by remember { mutableStateOf<Long?>(null) }     // non-null = editing (upsert) — SQUIRE-T-0120
 
     fun resetForm() {
         name = ""; description = ""; cost = "10"; availability = "Repeatable"; gate = null; icon = ""; formError = null
+        editingId = null
+    }
+
+    // Prefill the form from an existing reward and enter edit mode (SQUIRE-T-0120/0126).
+    fun startEdit(r: ItemSummaryDto) {
+        name = r.name
+        description = r.description ?: ""
+        cost = r.cost.toString()
+        availability = if (r.availability == AvailabilityKind.Once) "Once" else "Repeatable"
+        gate = r.gate
+        icon = r.icon ?: ""
+        editingId = r.id
+        formError = null
     }
 
     fun create(req: CreateItemReq, onDone: () -> Unit = {}) {
@@ -138,7 +152,7 @@ internal fun RewardAdminScreen(
                 description = description.trim().ifBlank { null },
                 gate = gate,
                 icon = icon.trim().ifBlank { null },
-                id = null,
+                id = editingId, // reuse id when editing (upsert) — SQUIRE-T-0120
             ),
         ) { resetForm() }
     }
@@ -191,10 +205,15 @@ internal fun RewardAdminScreen(
                         OutlinedTextField(value = icon, onValueChange = { icon = it }, label = { Text("Icon (emoji, optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 
                         formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                        Button(
-                            onClick = { submitForm() },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
-                        ) { Text("Add reward") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = { submitForm() },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
+                            ) { Text(if (editingId == null) "Add reward" else "Save changes") }
+                            if (editingId != null) {
+                                OutlinedButton(onClick = { resetForm() }) { Text("Cancel") }
+                            }
+                        }
                     }
                 }
             }
@@ -247,6 +266,7 @@ internal fun RewardAdminScreen(
                         }
                         GoldPill(r.cost.toInt())
                         if (r.active) {
+                            OutlinedButton(onClick = { startEdit(r) }) { Text("Edit") }
                             OutlinedButton(onClick = { scope.launch { runCatching { adapter.archiveItem(r.id) }; tick++ } }) { Text("Archive") }
                         }
                     }

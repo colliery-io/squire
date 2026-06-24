@@ -40,6 +40,51 @@ pub struct StateView {
     /// (SQUIRE-T-0094 / SQUIRE-T-0096). `#[serde(default)]` for back-compat with older servers.
     #[cfg_attr(feature = "serde", serde(default))]
     pub adjustments: Vec<AdjustmentView>,
+    /// The unified, newest-first **recent activity** feed (SQUIRE-T-0124): adjustments, claims, and
+    /// redemption requests merged into one globally time-ordered list (capped), so the child's
+    /// Activity tab interleaves them by time instead of grouping by type. `#[serde(default)]` for
+    /// back-compat; the typed `adjustments`/`my_claims`/`my_requests` lists remain for older clients.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub recent_activity: Vec<ActivityEntry>,
+}
+
+/// One entry in the unified "recent activity" feed (SQUIRE-T-0124). A flat tagged object — a `kind`
+/// discriminator plus the variant's nested payload — so the Kotlin SDK gets a clean, decodable data
+/// class (A-0009 / SQUIRE-T-0033 flat-struct pattern): exactly one of `adjustment`/`claim`/`request`
+/// is set, matching `kind`.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct ActivityEntry {
+    /// Event time (unix millis) — the whole feed is ordered by this, newest first.
+    pub at: Timestamp,
+    pub kind: ActivityKind,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub adjustment: Option<AdjustmentView>,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub claim: Option<ClaimStatus>,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub request: Option<RedemptionStatus>,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ActivityKind { Adjustment, Claim, Request }
+
+impl ActivityEntry {
+    /// A grown-up's coin grant/penalty entry.
+    pub fn adjustment(at: Timestamp, v: AdjustmentView) -> Self {
+        Self { at, kind: ActivityKind::Adjustment, adjustment: Some(v), claim: None, request: None }
+    }
+    /// A quest-completion claim entry.
+    pub fn claim(at: Timestamp, v: ClaimStatus) -> Self {
+        Self { at, kind: ActivityKind::Claim, adjustment: None, claim: Some(v), request: None }
+    }
+    /// A reward redemption-request entry.
+    pub fn request(at: Timestamp, v: RedemptionStatus) -> Self {
+        Self { at, kind: ActivityKind::Request, adjustment: None, claim: None, request: Some(v) }
+    }
 }
 
 /// One currency's balance for a Squire (SQUIRE-A-0013), with its display policy so the UI can render
@@ -138,6 +183,14 @@ pub struct GoalView {
     pub description: String,
     /// The bonus coins awarded when it unlocks.
     pub bonus: Points,
+    /// Progress so far toward [`Self::target`] (e.g. chores completed, or coins earned) — lets the
+    /// child see how close they are, like a streak's progress. `serde(default)` for back-compat with
+    /// older servers / clients that predate the progress fields (SQUIRE-T-0122).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub current: u32,
+    /// The goal's threshold (e.g. 10 chores, 100 coins). `0` when an older server omitted it.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub target: u32,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -415,6 +415,7 @@ pub fn router(state: Arc<KeepState>) -> Router {
         // ── Member administration (SQUIRE-T-0028) ──────────────────────────────
         .route("/api/members", get(members::list_members).post(members::add_member))
         .route("/api/members/{id}/active", post(members::set_active))
+        .route("/api/members/{id}/name", post(members::rename))
         // Device pairing (ADR A-0010): mint a one-time code + QR for a chosen member.
         .route("/api/pair/codes", post(pair::mint_pair_code))
         // New-phone install QR — points at the LAN api's APK (SQUIRE-T-0088 / ADR A-0012).

@@ -41,6 +41,32 @@ test("create a weekly quest assigned to a specific squire", async ({ page }) => 
   await page.screenshot({ path: `${SCREENS}/03-quest-created.png`, fullPage: true });
 });
 
+test("edit a quest in place — upsert, not a duplicate (SQUIRE-T-0120)", async ({ page }) => {
+  await login(page);
+  // Create a daily quest.
+  await page.fill("#quest-form input[name=title]", "Sweep the porch");
+  await page.fill("#quest-form input[name=reward]", "4");
+  await page.click("#quest-form button[type=submit]");
+  await expect(page.locator("#quest-list li", { hasText: "Sweep the porch" })).toHaveCount(1);
+
+  // Edit it: the form prefills from the existing quest and the submit relabels.
+  const row = page.locator("#quest-list li", { hasText: "Sweep the porch" });
+  await row.getByRole("button", { name: "Edit" }).click();
+  await expect(page.locator("#quest-form button[type=submit]")).toHaveText("Save changes");
+  await expect(page.locator("#quest-form input[name=title]")).toHaveValue("Sweep the porch");
+  await expect(page.locator("#quest-form input[name=reward]")).toHaveValue("4");
+
+  await page.fill("#quest-form input[name=title]", "Sweep the deck");
+  await page.fill("#quest-form input[name=reward]", "9");
+  await page.click("#quest-form button[type=submit]");
+
+  // Edited in place: one renamed row, the old title gone, the new reward shown; back to create mode.
+  await expect(page.locator("#quest-list li", { hasText: "Sweep the deck" })).toHaveCount(1);
+  await expect(page.locator("#quest-list li", { hasText: "Sweep the porch" })).toHaveCount(0);
+  await expect(page.locator("#quest-list li", { hasText: "Sweep the deck" })).toContainText("9");
+  await expect(page.locator("#quest-form button[type=submit]")).toHaveText("Post to the board");
+});
+
 test("import a quest from the starter library", async ({ page }) => {
   await login(page);
   await page.locator("#library summary").click(); // expand the collapsible library
