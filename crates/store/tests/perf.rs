@@ -146,7 +146,7 @@ fn snapshot_and_projection_sweep_under_budget() {
         }
     }
     let elapsed = start.elapsed();
-    assert!(sink >= 0 || sink < 0, "observe sink");
+    std::hint::black_box(sink); // keep the work observable so the optimiser can't elide it
 
     assert!(n_events >= 4000, "expected a few thousand events, got {n_events}");
     println!(
