@@ -16,24 +16,42 @@ pub(crate) fn handle(
     clock: &dyn Clock,
 ) -> Result<Vec<Change>, DomainError> {
     match cmd {
-        Command::RequestRedemption { request_id, squire, item_id } => {
-            request(snap, request_id, squire, item_id, clock)
-        }
-        Command::ReviewRedemption { actor, request_id, decision } => {
-            review(snap, actor, request_id, decision, clock)
-        }
-        Command::RedeemItem { command_id, actor, squire, item_id } => {
-            redeem_direct(snap, command_id, actor, squire, item_id, clock)
-        }
-        Command::AdjustPoints { command_id, actor, squire, currency, amount, reason } => {
-            adjust(snap, command_id, actor, squire, currency, amount, reason, clock)
-        }
-        Command::RequestCashOut { request_id, squire, amount } => {
-            request_cashout(snap, request_id, squire, amount, clock)
-        }
-        Command::ReviewCashOut { actor, request_id, decision } => {
-            review_cashout(snap, actor, request_id, decision, clock)
-        }
+        Command::RequestRedemption {
+            request_id,
+            squire,
+            item_id,
+        } => request(snap, request_id, squire, item_id, clock),
+        Command::ReviewRedemption {
+            actor,
+            request_id,
+            decision,
+        } => review(snap, actor, request_id, decision, clock),
+        Command::RedeemItem {
+            command_id,
+            actor,
+            squire,
+            item_id,
+        } => redeem_direct(snap, command_id, actor, squire, item_id, clock),
+        Command::AdjustPoints {
+            command_id,
+            actor,
+            squire,
+            currency,
+            amount,
+            reason,
+        } => adjust(
+            snap, command_id, actor, squire, currency, amount, reason, clock,
+        ),
+        Command::RequestCashOut {
+            request_id,
+            squire,
+            amount,
+        } => request_cashout(snap, request_id, squire, amount, clock),
+        Command::ReviewCashOut {
+            actor,
+            request_id,
+            decision,
+        } => review_cashout(snap, actor, request_id, decision, clock),
         _ => unreachable!("redemption::handle only receives redemption/ledger commands"),
     }
 }
@@ -135,7 +153,11 @@ fn commit_redeem(
 
 /// A cash-out must be a positive whole-dollar amount no larger than the Squire's currently-owed
 /// Cash. Re-used at request and at commit (owed can change in between), mirroring `can_redeem`.
-fn check_cashout_affordable(snap: &Snapshot, squire: UserId, amount: i64) -> Result<(), DomainError> {
+fn check_cashout_affordable(
+    snap: &Snapshot,
+    squire: UserId,
+    amount: i64,
+) -> Result<(), DomainError> {
     let owed = Proj::balance_in(snap, squire, Currency::Cash);
     if amount <= 0 || owed < amount {
         return Err(DomainError::Redeem(Blocked::InsufficientPoints {

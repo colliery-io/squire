@@ -26,13 +26,26 @@ impl Projections for Proj {
         snap.events
             .iter()
             .map(|e| match e {
-                Event::CompletionApproved { squire: s, points, .. } if *s == squire && currency == Currency::Coins => *points as i64,
-                Event::ItemRedeemed { squire: s, cost, .. } if *s == squire && currency == Currency::Coins => -(*cost as i64),
-                Event::AchievementUnlocked { squire: s, bonus, .. } if *s == squire && currency == Currency::Coins => *bonus as i64,
-                Event::Adjusted { squire: s, currency: c, amount, .. } if *s == squire && *c == currency => *amount,
+                Event::CompletionApproved {
+                    squire: s, points, ..
+                } if *s == squire && currency == Currency::Coins => *points as i64,
+                Event::ItemRedeemed {
+                    squire: s, cost, ..
+                } if *s == squire && currency == Currency::Coins => -(*cost as i64),
+                Event::AchievementUnlocked {
+                    squire: s, bonus, ..
+                } if *s == squire && currency == Currency::Coins => *bonus as i64,
+                Event::Adjusted {
+                    squire: s,
+                    currency: c,
+                    amount,
+                    ..
+                } if *s == squire && *c == currency => *amount,
                 // An approved cash-out draws down owed Cash (SQUIRE-T-0118) — the Cash analogue of
                 // `ItemRedeemed` for coins.
-                Event::CashOutApproved { squire: s, amount, .. } if *s == squire && currency == Currency::Cash => -*amount,
+                Event::CashOutApproved {
+                    squire: s, amount, ..
+                } if *s == squire && currency == Currency::Cash => -*amount,
                 _ => 0,
             })
             .sum()
@@ -100,7 +113,10 @@ impl Projections for Proj {
         }
         let have = Self::balance(snap, squire);
         if have < item.cost as i64 {
-            return Err(Blocked::InsufficientPoints { needed: item.cost, have });
+            return Err(Blocked::InsufficientPoints {
+                needed: item.cost,
+                have,
+            });
         }
         Ok(())
     }
@@ -155,7 +171,9 @@ pub fn reward_view(
         .gate
         .and_then(|aid| {
             (!Proj::is_unlocked(snap, squire, aid)).then(|| {
-                let name = find_achievement(snap, aid).map(|a| a.name.clone()).unwrap_or_default();
+                let name = find_achievement(snap, aid)
+                    .map(|a| a.name.clone())
+                    .unwrap_or_default();
                 LockReason::needs_achievement(name)
             })
         })
@@ -171,7 +189,13 @@ pub fn reward_view(
 /// Consecutive *scheduled* occurrences of `qid` that `squire` has completed, counting back
 /// from `asof`. A non-scheduled gap (e.g. a weekend for a Mon/Wed/Fri quest) is skipped, not
 /// a break. A pending occurrence *today* (`asof` itself) doesn't break an otherwise-live run.
-fn scheduled_streak(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, qid: QuestId, asof: Date) -> u32 {
+fn scheduled_streak(
+    snap: &Snapshot,
+    idx: &ClaimIndex,
+    squire: UserId,
+    qid: QuestId,
+    asof: Date,
+) -> u32 {
     let quest = match find_quest(snap, qid) {
         Some(q) => q,
         None => return 0,
@@ -204,16 +228,25 @@ fn scheduled_streak(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, qid: Ques
 
 /// Consecutive calendar days (ending at `asof`) with ≥1 in-scope completion. A repeatable
 /// quest contributes once/day. A missing `asof` doesn't break a run that ends the day before.
-fn calendar_streak(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, scope: &Scope, asof: Date) -> u32 {
+fn calendar_streak(
+    snap: &Snapshot,
+    idx: &ClaimIndex,
+    squire: UserId,
+    scope: &Scope,
+    asof: Date,
+) -> u32 {
     let earliest = snap
         .events
         .iter()
         .filter_map(|e| match e {
-            Event::CompletionApproved { claim_id, squire: s, .. } if *s == squire => {
-                idx.meta(*claim_id)
-                    .filter(|(_, q, _)| quest_in_scope(snap, *q, scope))
-                    .map(|(_, _, d)| d.0)
-            }
+            Event::CompletionApproved {
+                claim_id,
+                squire: s,
+                ..
+            } if *s == squire => idx
+                .meta(*claim_id)
+                .filter(|(_, q, _)| quest_in_scope(snap, *q, scope))
+                .map(|(_, _, d)| d.0),
             _ => None,
         })
         .min();
@@ -269,7 +302,12 @@ pub fn streak_view(
     let mut days: std::collections::BTreeSet<i32> = std::collections::BTreeSet::new();
     let idx = ClaimIndex::build(snap);
     for e in &snap.events {
-        if let Event::CompletionApproved { claim_id, squire: s, .. } = e {
+        if let Event::CompletionApproved {
+            claim_id,
+            squire: s,
+            ..
+        } = e
+        {
             if *s == squire {
                 if let Some((_, q, d)) = idx.meta(*claim_id) {
                     if quest_in_scope(snap, q, scope) {
@@ -288,11 +326,9 @@ pub fn streak_view(
         .iter()
         .filter(|a| a.active)
         .filter_map(|a| match &a.criterion {
-            Criterion::Streak { scope: s2, length, .. }
-                if scopes_eq(s2, scope) && *length > current =>
-            {
-                Some(*length)
-            }
+            Criterion::Streak {
+                scope: s2, length, ..
+            } if scopes_eq(s2, scope) && *length > current => Some(*length),
             _ => None,
         })
         .min();

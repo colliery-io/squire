@@ -15,10 +15,20 @@ const N_QUESTS: u128 = 20;
 const N_DAYS: i32 = 40;
 
 fn squire(id: u128) -> User {
-    User { id: UserId(id), role: Role::Squire, display_name: format!("S{id}"), active: true }
+    User {
+        id: UserId(id),
+        role: Role::Squire,
+        display_name: format!("S{id}"),
+        active: true,
+    }
 }
 fn knight(id: u128) -> User {
-    User { id: UserId(id), role: Role::Knight, display_name: format!("K{id}"), active: true }
+    User {
+        id: UserId(id),
+        role: Role::Knight,
+        display_name: format!("K{id}"),
+        active: true,
+    }
 }
 
 fn daily_quest(id: u128, reward: Points, category: Option<&str>) -> Quest {
@@ -40,7 +50,16 @@ fn daily_quest(id: u128, reward: Points, category: Option<&str>) -> Quest {
 }
 
 fn item(id: u128, cost: Points) -> RedeemableItem {
-    RedeemableItem { id: ItemId(id), name: format!("I{id}"), description: None, cost, gate: None, availability: Availability::Repeatable, active: true, icon: None }
+    RedeemableItem {
+        id: ItemId(id),
+        name: format!("I{id}"),
+        description: None,
+        cost,
+        gate: None,
+        availability: Availability::Repeatable,
+        active: true,
+        icon: None,
+    }
 }
 
 /// Build the history: 3 squires × ~20 quests/day × ~40 days of approved completions.
@@ -53,7 +72,11 @@ fn build_history() -> InMemoryRepository {
         seed.push(Change::PutUser(squire(s)));
     }
     for q in 1..=N_QUESTS {
-        let cat = if q % 2 == 0 { Some("chores") } else { Some("school") };
+        let cat = if q % 2 == 0 {
+            Some("chores")
+        } else {
+            Some("school")
+        };
         seed.push(Change::PutQuest(daily_quest(q, 5, cat)));
     }
     for i in 1..=5u128 {
@@ -96,11 +119,18 @@ fn projection_sweep_under_budget() {
     let repo = build_history();
     let snap = repo.snapshot();
     let n_events = snap.events.len();
-    assert!(n_events >= 4000, "expected a few thousand events, got {n_events}");
+    assert!(
+        n_events >= 4000,
+        "expected a few thousand events, got {n_events}"
+    );
 
     let asof = Date(N_DAYS - 1);
     let scopes: Vec<(String, Scope, StreakBasis)> = vec![
-        ("chores".into(), Scope::Category(Category("chores".into())), StreakBasis::CalendarDays),
+        (
+            "chores".into(),
+            Scope::Category(Category("chores".into())),
+            StreakBasis::CalendarDays,
+        ),
         ("any".into(), Scope::Any, StreakBasis::CalendarDays),
     ];
 
@@ -113,7 +143,13 @@ fn projection_sweep_under_budget() {
         // Quests due today.
         sink += Proj::quests_due(&snap, sid, asof).len() as i64;
         // A couple of streak scopes (quest-scoped + the category/any scopes).
-        sink += Proj::current_streak(&snap, sid, &Scope::Quest(QuestId(1)), StreakBasis::ScheduledOccurrences, asof) as i64;
+        sink += Proj::current_streak(
+            &snap,
+            sid,
+            &Scope::Quest(QuestId(1)),
+            StreakBasis::ScheduledOccurrences,
+            asof,
+        ) as i64;
         for (_, scope, basis) in &scopes {
             sink += Proj::current_streak(&snap, sid, scope, *basis, asof) as i64;
         }

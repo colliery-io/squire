@@ -5,10 +5,20 @@ use domain_core::*;
 use std::collections::BTreeSet;
 
 fn squire(id: u128) -> User {
-    User { id: UserId(id), role: Role::Squire, display_name: format!("S{id}"), active: true }
+    User {
+        id: UserId(id),
+        role: Role::Squire,
+        display_name: format!("S{id}"),
+        active: true,
+    }
 }
 fn knight(id: u128) -> User {
-    User { id: UserId(id), role: Role::Knight, display_name: format!("K{id}"), active: true }
+    User {
+        id: UserId(id),
+        role: Role::Knight,
+        display_name: format!("K{id}"),
+        active: true,
+    }
 }
 fn base_repo() -> InMemoryRepository {
     let mut r = InMemoryRepository::new();
@@ -46,7 +56,11 @@ fn clk() -> FakeClock {
 fn define_quest_all_squires_emits_put() {
     let snap = base_repo().snapshot();
     let changes = eng()
-        .handle(&snap, Command::DefineQuest(daily_quest(10, Assignment::AllSquires)), &clk())
+        .handle(
+            &snap,
+            Command::DefineQuest(daily_quest(10, Assignment::AllSquires)),
+            &clk(),
+        )
         .unwrap();
     assert!(matches!(changes.as_slice(), [Change::PutQuest(q)] if q.id == QuestId(10)));
 }
@@ -85,13 +99,18 @@ fn define_quest_knight_assignee_is_not_a_squire() {
 fn define_quest_degenerate_schedules_rejected() {
     let snap = base_repo().snapshot();
     let mut weekly = daily_quest(10, Assignment::AllSquires);
-    weekly.cadence = Cadence::Recurring(Schedule::Weekly { days: BTreeSet::new() });
+    weekly.cadence = Cadence::Recurring(Schedule::Weekly {
+        days: BTreeSet::new(),
+    });
     assert!(matches!(
         eng().handle(&snap, Command::DefineQuest(weekly), &clk()),
         Err(DomainError::InvalidDefinition)
     ));
     let mut every0 = daily_quest(11, Assignment::AllSquires);
-    every0.cadence = Cadence::Recurring(Schedule::EveryNDays { n: 0, anchor: Date(0) });
+    every0.cadence = Cadence::Recurring(Schedule::EveryNDays {
+        n: 0,
+        anchor: Date(0),
+    });
     assert!(matches!(
         eng().handle(&snap, Command::DefineQuest(every0), &clk()),
         Err(DomainError::InvalidDefinition)
@@ -108,8 +127,13 @@ fn archive_quest_unknown_then_known() {
     ));
     repo.seed(&[Change::PutQuest(daily_quest(10, Assignment::AllSquires))]);
     let snap = repo.snapshot();
-    let changes = eng().handle(&snap, Command::ArchiveQuest(QuestId(10)), &clk()).unwrap();
-    assert!(matches!(changes.as_slice(), [Change::SetQuestActive(QuestId(10), false)]));
+    let changes = eng()
+        .handle(&snap, Command::ArchiveQuest(QuestId(10)), &clk())
+        .unwrap();
+    assert!(matches!(
+        changes.as_slice(),
+        [Change::SetQuestActive(QuestId(10), false)]
+    ));
 }
 
 #[test]
@@ -119,7 +143,9 @@ fn reward_edit_upserts_definition() {
     let snap = repo.snapshot();
     let mut edited = daily_quest(10, Assignment::AllSquires);
     edited.reward = 15;
-    let changes = eng().handle(&snap, Command::DefineQuest(edited), &clk()).unwrap();
+    let changes = eng()
+        .handle(&snap, Command::DefineQuest(edited), &clk())
+        .unwrap();
     repo.apply(Some(UserId(2)), &changes).unwrap();
     assert_eq!(repo.quests.len(), 1, "edit upserts, not appends");
     assert_eq!(repo.quests[0].reward, 15);
@@ -157,7 +183,9 @@ fn define_item_ungated_ok() {
         active: true,
         icon: None,
     };
-    let changes = eng().handle(&snap, Command::DefineItem(item), &clk()).unwrap();
+    let changes = eng()
+        .handle(&snap, Command::DefineItem(item), &clk())
+        .unwrap();
     assert!(matches!(changes.as_slice(), [Change::PutItem(i)] if i.id == ItemId(1)));
 }
 
@@ -206,7 +234,10 @@ fn define_achievement_scope_and_criterion_validation() {
         id: AchievementId(4),
         name: "A".into(),
         description: None,
-        criterion: Criterion::TotalCompletions { scope: Scope::Category(Category("  ".into())), count: 5 },
+        criterion: Criterion::TotalCompletions {
+            scope: Scope::Category(Category("  ".into())),
+            count: 5,
+        },
         bonus_points: 5,
         active: true,
     };
@@ -230,7 +261,9 @@ fn define_achievement_scope_and_criterion_validation() {
         bonus_points: 5,
         active: true,
     };
-    let changes = eng().handle(&snap, Command::DefineAchievement(ok), &clk()).unwrap();
+    let changes = eng()
+        .handle(&snap, Command::DefineAchievement(ok), &clk())
+        .unwrap();
     assert!(matches!(changes.as_slice(), [Change::PutAchievement(a)] if a.id == AchievementId(3)));
 }
 
@@ -242,7 +275,11 @@ fn archive_item_and_achievement_unknown() {
         Err(DomainError::ItemNotFound)
     ));
     assert!(matches!(
-        eng().handle(&snap, Command::ArchiveAchievement(AchievementId(404)), &clk()),
+        eng().handle(
+            &snap,
+            Command::ArchiveAchievement(AchievementId(404)),
+            &clk()
+        ),
         Err(DomainError::AchievementNotFound)
     ));
 }

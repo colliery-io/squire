@@ -23,8 +23,8 @@ use std::sync::{Arc, Mutex};
 
 use domain_core::contract::{
     AddMemberReq, AddMemberResp, AuthToken, Change, HouseholdHandle, LoginReq, LoginResp,
-    MintPairCodeResp, PairResp, RegisterHouseholdReq, RegisterHouseholdResp, Repository, Role, User,
-    UserId,
+    MintPairCodeResp, PairResp, RegisterHouseholdReq, RegisterHouseholdResp, Repository, Role,
+    User, UserId,
 };
 use store::{Store, SystemClock};
 
@@ -73,8 +73,11 @@ pub enum AuthError {
 /// land in T-0017; their signatures are fixed here so the seam is stable now.
 pub trait Identity: Send + Sync {
     /// Resolve `(household, token)` to a verified [`Principal`], or fail with an [`AuthError`].
-    fn verify(&self, household: &HouseholdHandle, token: &AuthToken)
-        -> Result<Principal, AuthError>;
+    fn verify(
+        &self,
+        household: &HouseholdHandle,
+        token: &AuthToken,
+    ) -> Result<Principal, AuthError>;
 
     /// Create a household (tenant) + seed its first Knight. Body lands in T-0017.
     fn register(&self, req: RegisterHouseholdReq) -> Result<RegisterHouseholdResp, AuthError>;
@@ -83,11 +86,8 @@ pub trait Identity: Send + Sync {
     fn login(&self, req: LoginReq) -> Result<LoginResp, AuthError>;
 
     /// Knight-only: add a member (Knight or Squire). Body lands in T-0017.
-    fn add_member(
-        &self,
-        caller: &Principal,
-        req: AddMemberReq,
-    ) -> Result<AddMemberResp, AuthError>;
+    fn add_member(&self, caller: &Principal, req: AddMemberReq)
+        -> Result<AddMemberResp, AuthError>;
 
     /// Knight-only: mint a one-time device-pairing code for member `target` (ADR SQUIRE-A-0010).
     /// Returns the plaintext code (shown once, in the Keep's QR) + its expiry. Default: unsupported.
@@ -207,7 +207,13 @@ impl Identity for DevIdentity {
         let slug: String = req
             .household_name
             .chars()
-            .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+            .map(|c| {
+                if c.is_ascii_alphanumeric() {
+                    c.to_ascii_lowercase()
+                } else {
+                    '-'
+                }
+            })
             .collect();
         let handle = HouseholdHandle(format!("{slug}-{n}"));
 
@@ -231,10 +237,18 @@ impl Identity for DevIdentity {
         let token = AuthToken(format!("dev-tok-{}", self.next()));
         self.seed(
             token.clone(),
-            Principal { household: handle.clone(), user: admin, role: Role::Knight },
+            Principal {
+                household: handle.clone(),
+                user: admin,
+                role: Role::Knight,
+            },
         );
 
-        Ok(RegisterHouseholdResp { household: handle, admin, token })
+        Ok(RegisterHouseholdResp {
+            household: handle,
+            admin,
+            token,
+        })
     }
 
     fn login(&self, req: LoginReq) -> Result<LoginResp, AuthError> {
@@ -253,7 +267,11 @@ impl Identity for DevIdentity {
         let token = AuthToken(format!("dev-tok-{}", self.next()));
         self.seed(
             token.clone(),
-            Principal { household: req.household, user: req.user, role },
+            Principal {
+                household: req.household,
+                user: req.user,
+                role,
+            },
         );
         Ok(LoginResp { token, role })
     }
@@ -301,8 +319,12 @@ mod tests {
     /// `TempDir` (kept alive for the duration of the test).
     fn dev_identity() -> (DevIdentity, tempfile::TempDir) {
         let dir = tempfile::tempdir().expect("tempdir");
-        let provisioner = Provisioner::new(Backend::Sqlite { dir: dir.path().to_path_buf() });
-        let store = provisioner.open("house1", SystemClock).expect("open tenant store");
+        let provisioner = Provisioner::new(Backend::Sqlite {
+            dir: dir.path().to_path_buf(),
+        });
+        let store = provisioner
+            .open("house1", SystemClock)
+            .expect("open tenant store");
         (DevIdentity::new(Arc::new(Mutex::new(store))), dir)
     }
 
@@ -354,7 +376,9 @@ mod tests {
             })
             .expect("register");
         // The minted admin token verifies as a Knight against the returned handle.
-        let p = id.verify(&resp.household, &resp.token).expect("admin token verifies");
+        let p = id
+            .verify(&resp.household, &resp.token)
+            .expect("admin token verifies");
         assert_eq!(p.user, resp.admin);
         assert_eq!(p.role, Role::Knight);
 
@@ -381,8 +405,12 @@ mod tests {
             })
             .expect("register");
         assert_eq!(
-            id.login(LoginReq { household: resp.household, user: resp.admin, secret: "wrong".into() })
-                .err(),
+            id.login(LoginReq {
+                household: resp.household,
+                user: resp.admin,
+                secret: "wrong".into()
+            })
+            .err(),
             Some(AuthError::BadToken)
         );
     }
@@ -398,7 +426,11 @@ mod tests {
         assert_eq!(
             id.add_member(
                 &squire_caller,
-                AddMemberReq { role: Role::Squire, display_name: "X".into(), initial_secret: "s".into() }
+                AddMemberReq {
+                    role: Role::Squire,
+                    display_name: "X".into(),
+                    initial_secret: "s".into()
+                }
             )
             .err(),
             Some(AuthError::Forbidden)

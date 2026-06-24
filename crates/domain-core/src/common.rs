@@ -28,7 +28,13 @@ impl ClaimIndex {
         let mut resolved = HashMap::new();
         for e in &snap.events {
             match e {
-                Event::CompletionClaimed { claim_id, squire, quest_id, on, .. } => {
+                Event::CompletionClaimed {
+                    claim_id,
+                    squire,
+                    quest_id,
+                    on,
+                    ..
+                } => {
                     meta.insert(claim_id.0, (*squire, *quest_id, *on));
                 }
                 Event::CompletionApproved { claim_id, .. } => {
@@ -52,7 +58,12 @@ impl ClaimIndex {
         if !self.meta.contains_key(&claim_id.0) {
             return None;
         }
-        Some(self.resolved.get(&claim_id.0).copied().unwrap_or(ClaimResolution::Pending))
+        Some(
+            self.resolved
+                .get(&claim_id.0)
+                .copied()
+                .unwrap_or(ClaimResolution::Pending),
+        )
     }
 }
 
@@ -110,9 +121,13 @@ pub enum ClaimResolution {
 /// `(squire, quest, on)` of a claim, from its `CompletionClaimed` — `None` if no such claim.
 pub fn claim_meta(snap: &Snapshot, claim_id: ClaimId) -> Option<(UserId, QuestId, Date)> {
     snap.events.iter().find_map(|e| match e {
-        Event::CompletionClaimed { claim_id: c, squire, quest_id, on, .. } if *c == claim_id => {
-            Some((*squire, *quest_id, *on))
-        }
+        Event::CompletionClaimed {
+            claim_id: c,
+            squire,
+            quest_id,
+            on,
+            ..
+        } if *c == claim_id => Some((*squire, *quest_id, *on)),
         _ => None,
     })
 }
@@ -145,22 +160,37 @@ pub fn occurrence_closed(snap: &Snapshot, quest_id: QuestId, on: Date) -> bool {
 }
 
 /// `occurrence_closed` over a prebuilt index (perf path; identical result).
-pub fn occurrence_closed_with(snap: &Snapshot, idx: &ClaimIndex, quest_id: QuestId, on: Date) -> bool {
+pub fn occurrence_closed_with(
+    snap: &Snapshot,
+    idx: &ClaimIndex,
+    quest_id: QuestId,
+    on: Date,
+) -> bool {
     snap.events.iter().any(|e| match e {
-        Event::CompletionApproved { claim_id, .. } => {
-            idx.meta(*claim_id).is_some_and(|(_, q, d)| q == quest_id && d == on)
-        }
+        Event::CompletionApproved { claim_id, .. } => idx
+            .meta(*claim_id)
+            .is_some_and(|(_, q, d)| q == quest_id && d == on),
         _ => false,
     })
 }
 
 /// EachAssignee: does `squire` already have an approved completion for `(quest, on)`?
 /// (Index variant `squire_satisfied_with` is the perf path used by the projections.)
-pub fn squire_satisfied_with(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, quest_id: QuestId, on: Date) -> bool {
+pub fn squire_satisfied_with(
+    snap: &Snapshot,
+    idx: &ClaimIndex,
+    squire: UserId,
+    quest_id: QuestId,
+    on: Date,
+) -> bool {
     snap.events.iter().any(|e| match e {
-        Event::CompletionApproved { claim_id, squire: s, .. } if *s == squire => {
-            idx.meta(*claim_id).is_some_and(|(_, q, d)| q == quest_id && d == on)
-        }
+        Event::CompletionApproved {
+            claim_id,
+            squire: s,
+            ..
+        } if *s == squire => idx
+            .meta(*claim_id)
+            .is_some_and(|(_, q, d)| q == quest_id && d == on),
         _ => false,
     })
 }
@@ -169,21 +199,36 @@ pub fn squire_satisfied_with(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, 
 /// claim is not live (the Squire may claim again).
 pub fn squire_has_live_claim(snap: &Snapshot, squire: UserId, quest_id: QuestId, on: Date) -> bool {
     snap.events.iter().any(|e| match e {
-        Event::CompletionClaimed { claim_id, squire: s, quest_id: q, on: d, .. }
-            if *s == squire && *q == quest_id && *d == on =>
-        {
-            !matches!(claim_resolution(snap, *claim_id), Some(ClaimResolution::Rejected))
-        }
+        Event::CompletionClaimed {
+            claim_id,
+            squire: s,
+            quest_id: q,
+            on: d,
+            ..
+        } if *s == squire && *q == quest_id && *d == on => !matches!(
+            claim_resolution(snap, *claim_id),
+            Some(ClaimResolution::Rejected)
+        ),
         _ => false,
     })
 }
 
 /// `squire_has_live_claim` over a prebuilt index (perf path; identical result).
-pub fn squire_has_live_claim_with(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, quest_id: QuestId, on: Date) -> bool {
+pub fn squire_has_live_claim_with(
+    snap: &Snapshot,
+    idx: &ClaimIndex,
+    squire: UserId,
+    quest_id: QuestId,
+    on: Date,
+) -> bool {
     snap.events.iter().any(|e| match e {
-        Event::CompletionClaimed { claim_id, squire: s, quest_id: q, on: d, .. }
-            if *s == squire && *q == quest_id && *d == on =>
-        {
+        Event::CompletionClaimed {
+            claim_id,
+            squire: s,
+            quest_id: q,
+            on: d,
+            ..
+        } if *s == squire && *q == quest_id && *d == on => {
             !matches!(idx.resolution(*claim_id), Some(ClaimResolution::Rejected))
         }
         _ => false,
@@ -232,11 +277,21 @@ pub fn cadence_matches(quest: &Quest, on: Date) -> bool {
 
 /// Does `squire` have a *pending* (un-reviewed) claim for `(quest, on)`?
 /// (Index variant `squire_pending_with` is the perf path used by the projections.)
-pub fn squire_pending_with(snap: &Snapshot, idx: &ClaimIndex, squire: UserId, quest_id: QuestId, on: Date) -> bool {
+pub fn squire_pending_with(
+    snap: &Snapshot,
+    idx: &ClaimIndex,
+    squire: UserId,
+    quest_id: QuestId,
+    on: Date,
+) -> bool {
     snap.events.iter().any(|e| match e {
-        Event::CompletionClaimed { claim_id, squire: s, quest_id: q, on: d, .. }
-            if *s == squire && *q == quest_id && *d == on =>
-        {
+        Event::CompletionClaimed {
+            claim_id,
+            squire: s,
+            quest_id: q,
+            on: d,
+            ..
+        } if *s == squire && *q == quest_id && *d == on => {
             matches!(idx.resolution(*claim_id), Some(ClaimResolution::Pending))
         }
         _ => false,
@@ -304,9 +359,7 @@ pub fn submit_rejection(
             }
         }
         Completion::EachAssignee => {
-            if !quest.repeatable_within_day
-                && squire_has_live_claim(snap, squire, quest.id, on)
-            {
+            if !quest.repeatable_within_day && squire_has_live_claim(snap, squire, quest.id, on) {
                 return Some(DomainError::AlreadyClaimedToday);
             }
         }
@@ -319,9 +372,12 @@ pub fn submit_rejection(
 /// `(squire, item)` of a redemption request, from its `RedemptionRequested` — `None` if none.
 pub fn request_meta(snap: &Snapshot, request_id: RequestId) -> Option<(UserId, ItemId)> {
     snap.events.iter().find_map(|e| match e {
-        Event::RedemptionRequested { request_id: r, squire, item_id, .. } if *r == request_id => {
-            Some((*squire, *item_id))
-        }
+        Event::RedemptionRequested {
+            request_id: r,
+            squire,
+            item_id,
+            ..
+        } if *r == request_id => Some((*squire, *item_id)),
         _ => None,
     })
 }
@@ -329,7 +385,10 @@ pub fn request_meta(snap: &Snapshot, request_id: RequestId) -> Option<(UserId, I
 /// Has a request been resolved (approved → `ItemRedeemed` with this `request_id`, or rejected)?
 pub fn request_resolved(snap: &Snapshot, request_id: RequestId) -> bool {
     snap.events.iter().any(|e| match e {
-        Event::ItemRedeemed { request_id: Some(r), .. } if *r == request_id => true,
+        Event::ItemRedeemed {
+            request_id: Some(r),
+            ..
+        } if *r == request_id => true,
         Event::RedemptionRejected { request_id: r, .. } if *r == request_id => true,
         _ => false,
     })
@@ -338,9 +397,12 @@ pub fn request_resolved(snap: &Snapshot, request_id: RequestId) -> bool {
 /// `(squire, amount)` of a cash-out request, from its `CashOutRequested` — `None` if none (T-0118).
 pub fn cashout_meta(snap: &Snapshot, request_id: RequestId) -> Option<(UserId, i64)> {
     snap.events.iter().find_map(|e| match e {
-        Event::CashOutRequested { request_id: r, squire, amount, .. } if *r == request_id => {
-            Some((*squire, *amount))
-        }
+        Event::CashOutRequested {
+            request_id: r,
+            squire,
+            amount,
+            ..
+        } if *r == request_id => Some((*squire, *amount)),
         _ => None,
     })
 }
@@ -359,7 +421,10 @@ pub fn cashout_resolved(snap: &Snapshot, request_id: RequestId) -> bool {
 /// derived from the log, not a side table.
 pub fn command_already_applied(snap: &Snapshot, command_id: CommandId) -> bool {
     snap.events.iter().any(|e| match e {
-        Event::ItemRedeemed { command_id: Some(c), .. } if *c == command_id => true,
+        Event::ItemRedeemed {
+            command_id: Some(c),
+            ..
+        } if *c == command_id => true,
         Event::Adjusted { command_id: c, .. } if *c == command_id => true,
         _ => false,
     })
@@ -407,7 +472,11 @@ pub fn squire_completed_in_scope_on_with(
     on: Date,
 ) -> bool {
     snap.events.iter().any(|e| match e {
-        Event::CompletionApproved { claim_id, squire: s, .. } if *s == squire => idx
+        Event::CompletionApproved {
+            claim_id,
+            squire: s,
+            ..
+        } if *s == squire => idx
             .meta(*claim_id)
             .is_some_and(|(_, q, d)| d == on && quest_in_scope(snap, q, scope)),
         _ => false,
@@ -419,7 +488,12 @@ pub fn squire_completed_in_scope_on_with(
 pub fn total_completions(snap: &Snapshot, squire: UserId, scope: &Scope, asof: Date) -> u32 {
     let mut seen: BTreeSet<(u128, i32)> = BTreeSet::new();
     for e in &snap.events {
-        if let Event::CompletionApproved { claim_id, squire: s, .. } = e {
+        if let Event::CompletionApproved {
+            claim_id,
+            squire: s,
+            ..
+        } = e
+        {
             if *s == squire {
                 if let Some((_, q, d)) = claim_meta(snap, *claim_id) {
                     if d.0 <= asof.0 && quest_in_scope(snap, q, scope) {
@@ -439,8 +513,12 @@ pub fn points_earned(snap: &Snapshot, squire: UserId) -> u32 {
     snap.events
         .iter()
         .map(|e| match e {
-            Event::CompletionApproved { squire: s, points, .. } if *s == squire => *points,
-            Event::AchievementUnlocked { squire: s, bonus, .. } if *s == squire => *bonus,
+            Event::CompletionApproved {
+                squire: s, points, ..
+            } if *s == squire => *points,
+            Event::AchievementUnlocked {
+                squire: s, bonus, ..
+            } if *s == squire => *bonus,
             _ => 0,
         })
         .sum()
@@ -452,9 +530,9 @@ pub fn latest_scheduled_on_or_before(quest: &Quest, day: Date) -> Option<Date> {
     match &quest.cadence {
         Cadence::OneOff { due } => due.filter(|d| d.0 <= day.0),
         Cadence::Recurring(Schedule::Daily) => Some(day),
-        Cadence::Recurring(Schedule::Weekly { days }) => {
-            (0..7).map(|k| Date(day.0 - k)).find(|d| days.contains(&weekday_of(*d)))
-        }
+        Cadence::Recurring(Schedule::Weekly { days }) => (0..7)
+            .map(|k| Date(day.0 - k))
+            .find(|d| days.contains(&weekday_of(*d))),
         Cadence::Recurring(Schedule::EveryNDays { n, anchor }) => {
             if *n == 0 || day.0 < anchor.0 {
                 None

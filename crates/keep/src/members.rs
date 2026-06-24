@@ -62,7 +62,10 @@ fn auth_status(err: AuthError) -> StatusCode {
 
 /// `GET /api/members` (Knight-only) — every household member with role, active flag, and the
 /// last-editor audit answering "who added / last changed this member".
-pub async fn list_members(State(state): State<Arc<KeepState>>, _op: Operator) -> Json<Vec<MemberRow>> {
+pub async fn list_members(
+    State(state): State<Arc<KeepState>>,
+    _op: Operator,
+) -> Json<Vec<MemberRow>> {
     let snap = state.snapshot();
     let mut guard = state.store.lock().expect("store mutex poisoned");
     let rows = snap
@@ -98,9 +101,16 @@ pub async fn add_member(
     // Mint the new member's token (login with the initial secret) so a phone can be paired now.
     let login = state
         .identity
-        .login(LoginReq { household: state.household.clone(), user: added.user, secret })
+        .login(LoginReq {
+            household: state.household.clone(),
+            user: added.user,
+            secret,
+        })
         .map_err(auth_status)?;
-    Ok(Json(AddedMember { user: added.user.0.to_string(), token: login.token.0 }))
+    Ok(Json(AddedMember {
+        user: added.user.0.to_string(),
+        token: login.token.0,
+    }))
 }
 
 /// `POST /api/members/{id}/active` (Knight-only) — de/reactivate a member via `SetUserActive`
@@ -142,7 +152,10 @@ pub async fn rename(
         .find(|u| u.id == uid)
         .cloned()
         .ok_or(StatusCode::NOT_FOUND)?;
-    let updated = User { display_name: name.to_string(), ..user };
+    let updated = User {
+        display_name: name.to_string(),
+        ..user
+    };
     state
         .apply_changes(Some(op.user), &[Change::PutUser(updated)])
         .map_err(|_| StatusCode::CONFLICT)?;

@@ -15,9 +15,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use domain_core::contract::{
-    Achievement, AchievementId, Assignment, Availability, Cadence, Category, Change, Clock, Command,
-    Completion, Criterion, Date, ItemId, Quest, QuestId, RedeemableItem, Repository, Role, Schedule,
-    Scope, Snapshot, StreakBasis, User, UserId, Weekday,
+    Achievement, AchievementId, Assignment, Availability, Cadence, Category, Change, Clock,
+    Command, Completion, Criterion, Date, ItemId, Quest, QuestId, RedeemableItem, Repository, Role,
+    Schedule, Scope, Snapshot, StreakBasis, User, UserId, Weekday,
 };
 
 use crate::auth::RequireKnight;
@@ -224,7 +224,10 @@ pub async fn create_quest(
         id,
         title: req.title,
         description: req.description.filter(|d| !d.trim().is_empty()),
-        category: req.category.filter(|c| !c.is_empty()).map(domain_core::contract::Category),
+        category: req
+            .category
+            .filter(|c| !c.is_empty())
+            .map(domain_core::contract::Category),
         reward: req.reward.max(0) as u32,
         cash: req.cash.max(0) as u32,
         cadence,
@@ -235,7 +238,8 @@ pub async fn create_quest(
         active: true,
         icon: None,
     };
-    handle_command(&state, Some(principal.user), Command::DefineQuest(quest)).map_err(domain_status)?;
+    handle_command(&state, Some(principal.user), Command::DefineQuest(quest))
+        .map_err(domain_status)?;
     Ok(Json(CreatedQuest { id }))
 }
 
@@ -313,7 +317,8 @@ pub async fn archive_quest(
     Path(id): Path<u64>,
 ) -> Result<StatusCode, StatusCode> {
     let qid = QuestId(u128::from(id));
-    handle_command(&state, Some(principal.user), Command::ArchiveQuest(qid)).map_err(domain_status)?;
+    handle_command(&state, Some(principal.user), Command::ArchiveQuest(qid))
+        .map_err(domain_status)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -321,11 +326,9 @@ pub async fn archive_quest(
 fn cadence_label(c: &Cadence) -> String {
     match c {
         Cadence::Recurring(Schedule::Daily) => "Daily".to_string(),
-        Cadence::Recurring(Schedule::Weekly { days }) => days
-            .iter()
-            .map(weekday_short)
-            .collect::<Vec<_>>()
-            .join("/"),
+        Cadence::Recurring(Schedule::Weekly { days }) => {
+            days.iter().map(weekday_short).collect::<Vec<_>>().join("/")
+        }
         Cadence::Recurring(Schedule::EveryNDays { n, .. }) => format!("Every {n} days"),
         Cadence::OneOff { .. } => "One-time".to_string(),
     }
@@ -476,13 +479,18 @@ pub async fn create_achievement(
     let scope = match req.scope {
         AchScopeKind::Any => Scope::Any,
         AchScopeKind::Quest => Scope::Quest(req.scope_quest.ok_or(StatusCode::BAD_REQUEST)?),
-        AchScopeKind::Category => Scope::Category(Category(req.scope_category.clone().unwrap_or_default())),
+        AchScopeKind::Category => {
+            Scope::Category(Category(req.scope_category.clone().unwrap_or_default()))
+        }
     };
     let criterion = match req.criterion {
-        AchCriterionKind::PointsEarned => Criterion::PointsEarned { total: req.total.unwrap_or(0).max(0) as u32 },
-        AchCriterionKind::TotalCompletions => {
-            Criterion::TotalCompletions { scope, count: req.count.unwrap_or(0).max(0) as u32 }
-        }
+        AchCriterionKind::PointsEarned => Criterion::PointsEarned {
+            total: req.total.unwrap_or(0).max(0) as u32,
+        },
+        AchCriterionKind::TotalCompletions => Criterion::TotalCompletions {
+            scope,
+            count: req.count.unwrap_or(0).max(0) as u32,
+        },
         AchCriterionKind::Streak => Criterion::Streak {
             scope,
             length: req.length.unwrap_or(0).max(0) as u32,
@@ -492,7 +500,9 @@ pub async fn create_achievement(
             },
         },
     };
-    let id = req.id.unwrap_or_else(|| AchievementId(state.clock.now().0 as u128));
+    let id = req
+        .id
+        .unwrap_or_else(|| AchievementId(state.clock.now().0 as u128));
     let achievement = Achievement {
         id,
         name: req.name,
@@ -501,7 +511,12 @@ pub async fn create_achievement(
         bonus_points: req.bonus.max(0) as u32,
         active: true,
     };
-    handle_command(&state, Some(principal.user), Command::DefineAchievement(achievement)).map_err(domain_status)?;
+    handle_command(
+        &state,
+        Some(principal.user),
+        Command::DefineAchievement(achievement),
+    )
+    .map_err(domain_status)?;
     Ok(Json(CreatedAchievement { id }))
 }
 
@@ -571,7 +586,12 @@ pub async fn archive_achievement(
     Path(id): Path<u64>,
 ) -> Result<StatusCode, StatusCode> {
     let aid = AchievementId(u128::from(id));
-    handle_command(&state, Some(principal.user), Command::ArchiveAchievement(aid)).map_err(domain_status)?;
+    handle_command(
+        &state,
+        Some(principal.user),
+        Command::ArchiveAchievement(aid),
+    )
+    .map_err(domain_status)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -591,8 +611,12 @@ fn achievement_summary(snap: &Snapshot, c: &Criterion) -> String {
     };
     match c {
         Criterion::PointsEarned { total } => format!("{total} points"),
-        Criterion::TotalCompletions { scope, count } => format!("{count} completions · {}", scope_label(scope)),
-        Criterion::Streak { scope, length, .. } => format!("{length}-day streak · {}", scope_label(scope)),
+        Criterion::TotalCompletions { scope, count } => {
+            format!("{count} completions · {}", scope_label(scope))
+        }
+        Criterion::Streak { scope, length, .. } => {
+            format!("{length}-day streak · {}", scope_label(scope))
+        }
     }
 }
 
@@ -695,7 +719,9 @@ pub async fn create_item(
     RequireKnight(principal): RequireKnight,
     Json(req): Json<CreateItemReq>,
 ) -> Result<Json<CreatedItem>, StatusCode> {
-    let id = req.id.unwrap_or_else(|| ItemId(state.clock.now().0 as u128));
+    let id = req
+        .id
+        .unwrap_or_else(|| ItemId(state.clock.now().0 as u128));
     let item = RedeemableItem {
         id,
         name: req.name,
@@ -706,7 +732,8 @@ pub async fn create_item(
         active: true,
         icon: req.icon.filter(|s| !s.is_empty()),
     };
-    handle_command(&state, Some(principal.user), Command::DefineItem(item)).map_err(domain_status)?;
+    handle_command(&state, Some(principal.user), Command::DefineItem(item))
+        .map_err(domain_status)?;
     Ok(Json(CreatedItem { id }))
 }
 
@@ -769,7 +796,8 @@ pub async fn archive_item(
     Path(id): Path<u64>,
 ) -> Result<StatusCode, StatusCode> {
     let iid = ItemId(u128::from(id));
-    handle_command(&state, Some(principal.user), Command::ArchiveItem(iid)).map_err(domain_status)?;
+    handle_command(&state, Some(principal.user), Command::ArchiveItem(iid))
+        .map_err(domain_status)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -802,9 +830,11 @@ fn item_summary(snap: &Snapshot, item: &RedeemableItem) -> String {
 fn quest_cadence_flat(c: &Cadence) -> (CadenceKind, Option<Vec<WeekdayDto>>, Option<Date>) {
     match c {
         Cadence::Recurring(Schedule::Daily) => (CadenceKind::Daily, None, None),
-        Cadence::Recurring(Schedule::Weekly { days }) => {
-            (CadenceKind::Weekly, Some(days.iter().map(|d| WeekdayDto::from(*d)).collect()), None)
-        }
+        Cadence::Recurring(Schedule::Weekly { days }) => (
+            CadenceKind::Weekly,
+            Some(days.iter().map(|d| WeekdayDto::from(*d)).collect()),
+            None,
+        ),
         Cadence::OneOff { due } => (CadenceKind::OneOff, None, *due),
         Cadence::Recurring(Schedule::EveryNDays { .. }) => (CadenceKind::Daily, None, None),
     }
@@ -863,7 +893,11 @@ fn ach_flat(c: &Criterion) -> AchFlat {
                 total: None,
             }
         }
-        Criterion::Streak { scope, length, basis } => {
+        Criterion::Streak {
+            scope,
+            length,
+            basis,
+        } => {
             let (sk, sq, sc) = scope_flat(scope);
             AchFlat {
                 criterion: AchCriterionKind::Streak,
@@ -972,7 +1006,10 @@ pub async fn set_member_active(
         return Err(StatusCode::NOT_FOUND);
     }
     store
-        .apply(Some(principal.user), &[Change::SetUserActive(uid, req.active)])
+        .apply(
+            Some(principal.user),
+            &[Change::SetUserActive(uid, req.active)],
+        )
         .expect("apply: single-writer store write failed");
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1023,7 +1060,10 @@ pub async fn rename_member(
         .find(|u| u.id == uid)
         .cloned()
         .ok_or(StatusCode::NOT_FOUND)?;
-    let updated = User { display_name: name.to_string(), ..user };
+    let updated = User {
+        display_name: name.to_string(),
+        ..user
+    };
     store
         .apply(Some(principal.user), &[Change::PutUser(updated)])
         .expect("apply: single-writer store write failed");

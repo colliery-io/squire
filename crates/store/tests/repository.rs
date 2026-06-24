@@ -9,8 +9,8 @@ use diesel::sqlite::SqliteConnection;
 
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, ClaimId, CommandId,
-    Completion, Criterion, Currency, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem, Repository,
-    Role, Schedule, Scope, Snapshot, StreakBasis, Timestamp, User, UserId,
+    Completion, Criterion, Currency, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem,
+    Repository, Role, Schedule, Scope, Snapshot, StreakBasis, Timestamp, User, UserId,
 };
 
 use store::{AnyConnection, FixedClock, Store, SystemClock};
@@ -73,8 +73,18 @@ fn fixed_store(conn: AnyConnection, now_millis: i64) -> Store<FixedClock> {
 
 fn sample_users() -> Vec<User> {
     vec![
-        User { id: UserId(1), role: Role::Knight, display_name: "Robb".into(), active: true },
-        User { id: UserId(2), role: Role::Squire, display_name: "Arya".into(), active: true },
+        User {
+            id: UserId(1),
+            role: Role::Knight,
+            display_name: "Robb".into(),
+            active: true,
+        },
+        User {
+            id: UserId(2),
+            role: Role::Squire,
+            display_name: "Arya".into(),
+            active: true,
+        },
     ]
 }
 
@@ -196,7 +206,9 @@ fn seed_batch() -> Vec<domain_core::contract::Change> {
 fn snapshot_round_trip() {
     each_backend(|conn| {
         let mut store = fixed_store(conn, 1_700_000_000_000);
-        store.apply(Some(UserId(1)), &seed_batch()).expect("apply seed");
+        store
+            .apply(Some(UserId(1)), &seed_batch())
+            .expect("apply seed");
 
         let snap = store.snapshot();
 
@@ -229,7 +241,9 @@ fn atomic_rollback_leaves_store_unchanged() {
     use domain_core::contract::Change;
     each_backend(|conn| {
         let mut store = fixed_store(conn, 1_700_000_000_000);
-        store.apply(Some(UserId(1)), &seed_batch()).expect("apply seed");
+        store
+            .apply(Some(UserId(1)), &seed_batch())
+            .expect("apply seed");
 
         let before = snap_dbg(&store.snapshot());
 
@@ -249,7 +263,9 @@ fn atomic_rollback_leaves_store_unchanged() {
             }),
             Change::SetQuestActive(QuestId(424242), false), // missing → RepoError
         ];
-        let err = store.apply(Some(UserId(1)), &bad).expect_err("batch must fail");
+        let err = store
+            .apply(Some(UserId(1)), &bad)
+            .expect_err("batch must fail");
         assert!(matches!(
             err,
             domain_core::contract::RepoError::Conflict | domain_core::contract::RepoError::Io(_)
@@ -257,7 +273,10 @@ fn atomic_rollback_leaves_store_unchanged() {
 
         // Byte-for-byte unchanged: the new event, the mutated quest, all rolled back.
         let after = snap_dbg(&store.snapshot());
-        assert_eq!(before, after, "rolled-back batch must leave the store unchanged");
+        assert_eq!(
+            before, after,
+            "rolled-back batch must leave the store unchanged"
+        );
     });
 }
 
@@ -282,25 +301,39 @@ fn audit_stamping_preserves_created_on_update() {
         // Second PutQuest (same id) by user v=2 at a later now.
         *store.clock_mut() = FixedClock::at(Timestamp(2_222));
         store
-            .apply(Some(UserId(2)), &[Change::PutQuest({
-                let mut q = sample_quest();
-                q.title = "Sweep harder".into();
-                q
-            })])
+            .apply(
+                Some(UserId(2)),
+                &[Change::PutQuest({
+                    let mut q = sample_quest();
+                    q.title = "Sweep harder".into();
+                    q
+                })],
+            )
             .expect("second put");
         let a2 = store::quest_audit(&mut store.connection(), QuestId(10))
             .expect("read audit")
             .expect("row exists");
         // created_* preserved; updated_* moved to v / later time.
-        assert_eq!(a2.created_by, Some(UserId(1)), "created_by must be preserved");
-        assert_eq!(a2.created_at, Timestamp(1_111), "created_at must be preserved");
+        assert_eq!(
+            a2.created_by,
+            Some(UserId(1)),
+            "created_by must be preserved"
+        );
+        assert_eq!(
+            a2.created_at,
+            Timestamp(1_111),
+            "created_at must be preserved"
+        );
         assert_eq!(a2.updated_by, Some(UserId(2)));
         assert_eq!(a2.updated_at, Timestamp(2_222));
 
         // SetQuestActive by w=3: updated_by=w, created_* still unchanged.
         *store.clock_mut() = FixedClock::at(Timestamp(3_333));
         store
-            .apply(Some(UserId(3)), &[Change::SetQuestActive(QuestId(10), false)])
+            .apply(
+                Some(UserId(3)),
+                &[Change::SetQuestActive(QuestId(10), false)],
+            )
             .expect("set active");
         let a3 = store::quest_audit(&mut store.connection(), QuestId(10))
             .expect("read audit")
@@ -313,12 +346,15 @@ fn audit_stamping_preserves_created_on_update() {
         // by = None → NULL audit user.
         *store.clock_mut() = FixedClock::at(Timestamp(4_444));
         store
-            .apply(None, &[Change::PutUser(User {
-                id: UserId(77),
-                role: Role::Squire,
-                display_name: "System".into(),
-                active: true,
-            })])
+            .apply(
+                None,
+                &[Change::PutUser(User {
+                    id: UserId(77),
+                    role: Role::Squire,
+                    display_name: "System".into(),
+                    active: true,
+                })],
+            )
             .expect("system put");
         let au = store::user_audit(&mut store.connection(), UserId(77))
             .expect("read audit")
@@ -341,8 +377,12 @@ fn append_only_seq_is_monotonic_and_immutable() {
             .map(Change::Append)
             .collect();
         store.apply(None, &first).expect("first append");
-        let after_first: Vec<String> =
-            store.snapshot().events.iter().map(|e| format!("{e:?}")).collect();
+        let after_first: Vec<String> = store
+            .snapshot()
+            .events
+            .iter()
+            .map(|e| format!("{e:?}"))
+            .collect();
         assert_eq!(after_first.len(), 3);
 
         // Second batch of 2 → seq 4,5; earlier events untouched.
@@ -415,17 +455,35 @@ fn credentials_set_and_read_back() {
         assert_eq!(store.credential(UserId(1)), None);
 
         // Set, then read back verbatim.
-        store.set_credential(UserId(1), "$argon2id$hash-one").expect("set credential");
-        assert_eq!(store.credential(UserId(1)).as_deref(), Some("$argon2id$hash-one"));
+        store
+            .set_credential(UserId(1), "$argon2id$hash-one")
+            .expect("set credential");
+        assert_eq!(
+            store.credential(UserId(1)).as_deref(),
+            Some("$argon2id$hash-one")
+        );
 
         // Upsert by user_id: a second set replaces the hash (no duplicate row).
-        store.set_credential(UserId(1), "$argon2id$hash-two").expect("replace credential");
-        assert_eq!(store.credential(UserId(1)).as_deref(), Some("$argon2id$hash-two"));
+        store
+            .set_credential(UserId(1), "$argon2id$hash-two")
+            .expect("replace credential");
+        assert_eq!(
+            store.credential(UserId(1)).as_deref(),
+            Some("$argon2id$hash-two")
+        );
 
         // A different user is independent.
-        store.set_credential(UserId(2), "$argon2id$other").expect("set other");
-        assert_eq!(store.credential(UserId(2)).as_deref(), Some("$argon2id$other"));
-        assert_eq!(store.credential(UserId(1)).as_deref(), Some("$argon2id$hash-two"));
+        store
+            .set_credential(UserId(2), "$argon2id$other")
+            .expect("set other");
+        assert_eq!(
+            store.credential(UserId(2)).as_deref(),
+            Some("$argon2id$other")
+        );
+        assert_eq!(
+            store.credential(UserId(1)).as_deref(),
+            Some("$argon2id$hash-two")
+        );
     });
 }
 

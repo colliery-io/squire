@@ -47,7 +47,11 @@ fn migrations_apply_clean_and_tables_exist() {
     run_migrations(&mut conn).expect("run_migrations");
 
     for table in ["users", "quests", "items", "achievements", "events"] {
-        assert_eq!(count(&mut conn, table), 0, "table {table} should exist and be empty");
+        assert_eq!(
+            count(&mut conn, table),
+            0,
+            "table {table} should exist and be empty"
+        );
     }
 }
 
@@ -87,18 +91,16 @@ fn events_table_is_append_only_ordered() {
     )
     .expect("insert events");
 
-    let row: Count = diesel::sql_query(
-        "SELECT MIN(seq) AS n FROM events WHERE kind = 'CompletionApproved'",
-    )
-    .get_result(&mut conn)
-    .expect("query seq");
+    let row: Count =
+        diesel::sql_query("SELECT MIN(seq) AS n FROM events WHERE kind = 'CompletionApproved'")
+            .get_result(&mut conn)
+            .expect("query seq");
     let approved_seq = row.n;
 
-    let row: Count = diesel::sql_query(
-        "SELECT MIN(seq) AS n FROM events WHERE kind = 'CompletionClaimed'",
-    )
-    .get_result(&mut conn)
-    .expect("query seq");
+    let row: Count =
+        diesel::sql_query("SELECT MIN(seq) AS n FROM events WHERE kind = 'CompletionClaimed'")
+            .get_result(&mut conn)
+            .expect("query seq");
     let claimed_seq = row.n;
 
     assert!(claimed_seq < approved_seq, "seq must order by insertion");

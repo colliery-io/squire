@@ -30,8 +30,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let handle = HouseholdHandle("demo".into());
 
     // One shared store + identity (a fixed demo signing key — fine for a throwaway tenant).
-    let (store, identity) =
-        open_household(Path::new(DIR), &handle, b"squire-home-signing-key", TOKEN_TTL_MS)?;
+    let (store, identity) = open_household(
+        Path::new(DIR),
+        &handle,
+        b"squire-home-signing-key",
+        TOKEN_TTL_MS,
+    )?;
 
     // ── Seed the demo household via the same public APIs the tests use ────────────────────────────
     identity
@@ -41,11 +45,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             admin_secret: "demo".into(),
         })
         .expect("register demo household + admin Knight (UserId 1)");
-    let knight = Principal { household: handle.clone(), user: UserId(1), role: Role::Knight };
+    let knight = Principal {
+        household: handle.clone(),
+        user: UserId(1),
+        role: Role::Knight,
+    };
     identity
         .add_member(
             &knight,
-            AddMemberReq { role: Role::Squire, display_name: "Gawain".into(), initial_secret: "demo".into() },
+            AddMemberReq {
+                role: Role::Squire,
+                display_name: "Gawain".into(),
+                initial_secret: "demo".into(),
+            },
         )
         .expect("add Squire (UserId 2)");
 

@@ -7,10 +7,20 @@ use domain_core::*;
 use std::collections::BTreeSet;
 
 fn squire(id: u128) -> User {
-    User { id: UserId(id), role: Role::Squire, display_name: format!("S{id}"), active: true }
+    User {
+        id: UserId(id),
+        role: Role::Squire,
+        display_name: format!("S{id}"),
+        active: true,
+    }
 }
 fn knight(id: u128) -> User {
-    User { id: UserId(id), role: Role::Knight, display_name: format!("K{id}"), active: true }
+    User {
+        id: UserId(id),
+        role: Role::Knight,
+        display_name: format!("K{id}"),
+        active: true,
+    }
 }
 
 /// A daily, EachAssignee quest assigned to all Squires, auto-approve toggleable.
@@ -56,15 +66,35 @@ fn mwf(id: u128, reward: Points, auto: bool) -> Quest {
 }
 
 fn achievement(id: u128, criterion: Criterion, bonus: Points) -> Achievement {
-    Achievement { id: AchievementId(id), name: "A".into(), description: None, criterion, bonus_points: bonus, active: true }
+    Achievement {
+        id: AchievementId(id),
+        name: "A".into(),
+        description: None,
+        criterion,
+        bonus_points: bonus,
+        active: true,
+    }
 }
 fn item(id: u128, cost: Points, gate: Option<AchievementId>) -> RedeemableItem {
-    RedeemableItem { id: ItemId(id), name: "I".into(), description: None, cost, gate, availability: Availability::Repeatable, active: true, icon: None }
+    RedeemableItem {
+        id: ItemId(id),
+        name: "I".into(),
+        description: None,
+        cost,
+        gate,
+        availability: Availability::Repeatable,
+        active: true,
+        icon: None,
+    }
 }
 
 fn repo() -> InMemoryRepository {
     let mut r = InMemoryRepository::new();
-    r.seed(&[Change::PutUser(squire(1)), Change::PutUser(squire(3)), Change::PutUser(knight(2))]);
+    r.seed(&[
+        Change::PutUser(squire(1)),
+        Change::PutUser(squire(3)),
+        Change::PutUser(knight(2)),
+    ]);
     r
 }
 
@@ -79,10 +109,19 @@ fn run(repo: &mut InMemoryRepository, cmd: Command) -> Result<Vec<Change>, Domai
 }
 
 fn submit(claim: u128, squire: u128, q: u128, day: i32) -> Command {
-    Command::SubmitClaim { claim_id: ClaimId(claim), squire: UserId(squire), quest_id: QuestId(q), on: Date(day) }
+    Command::SubmitClaim {
+        claim_id: ClaimId(claim),
+        squire: UserId(squire),
+        quest_id: QuestId(q),
+        on: Date(day),
+    }
 }
 fn approve(claim: u128) -> Command {
-    Command::ReviewClaim { actor: UserId(2), claim_id: ClaimId(claim), decision: Decision::Approve }
+    Command::ReviewClaim {
+        actor: UserId(2),
+        claim_id: ClaimId(claim),
+        decision: Decision::Approve,
+    }
 }
 
 /// Submit + approve one completion of quest `q` for `squire` on `day` (manual review).
@@ -112,7 +151,13 @@ fn scheduled_streak_skips_weekend_gaps_ac4() {
     complete(&mut r, 2, 1, 10, 2); // Wed
     complete(&mut r, 3, 1, 10, 4); // Fri
     let snap = r.snapshot();
-    let streak = Proj::current_streak(&snap, UserId(1), &Scope::Quest(QuestId(10)), StreakBasis::ScheduledOccurrences, Date(4));
+    let streak = Proj::current_streak(
+        &snap,
+        UserId(1),
+        &Scope::Quest(QuestId(10)),
+        StreakBasis::ScheduledOccurrences,
+        Date(4),
+    );
     assert_eq!(streak, 3, "AC-4: M/W/F done 3 scheduled days = 3");
 }
 
@@ -124,7 +169,13 @@ fn scheduled_streak_missed_day_resets() {
     complete(&mut r, 1, 1, 10, 0); // Mon
     complete(&mut r, 3, 1, 10, 4); // Fri (Wed skipped)
     let snap = r.snapshot();
-    let streak = Proj::current_streak(&snap, UserId(1), &Scope::Quest(QuestId(10)), StreakBasis::ScheduledOccurrences, Date(4));
+    let streak = Proj::current_streak(
+        &snap,
+        UserId(1),
+        &Scope::Quest(QuestId(10)),
+        StreakBasis::ScheduledOccurrences,
+        Date(4),
+    );
     assert_eq!(streak, 1, "a missed scheduled occurrence resets the run");
 }
 
@@ -136,8 +187,17 @@ fn scheduled_streak_pending_today_does_not_break() {
     complete(&mut r, 1, 1, 10, 0);
     complete(&mut r, 2, 1, 10, 2);
     let snap = r.snapshot();
-    let streak = Proj::current_streak(&snap, UserId(1), &Scope::Quest(QuestId(10)), StreakBasis::ScheduledOccurrences, Date(4));
-    assert_eq!(streak, 2, "a not-yet-done occurrence today is forgiven, not a break");
+    let streak = Proj::current_streak(
+        &snap,
+        UserId(1),
+        &Scope::Quest(QuestId(10)),
+        StreakBasis::ScheduledOccurrences,
+        Date(4),
+    );
+    assert_eq!(
+        streak, 2,
+        "a not-yet-done occurrence today is forgiven, not a break"
+    );
 }
 
 #[test]
@@ -149,7 +209,13 @@ fn scheduled_streak_dated_one_off_is_one_when_completed() {
     complete(&mut r, 1, 1, 10, 3);
     let snap = r.snapshot();
     assert_eq!(
-        Proj::current_streak(&snap, UserId(1), &Scope::Quest(QuestId(10)), StreakBasis::ScheduledOccurrences, Date(3)),
+        Proj::current_streak(
+            &snap,
+            UserId(1),
+            &Scope::Quest(QuestId(10)),
+            StreakBasis::ScheduledOccurrences,
+            Date(3)
+        ),
         1
     );
 }
@@ -163,12 +229,24 @@ fn calendar_streak_counts_consecutive_days() {
     complete(&mut r, 3, 1, 10, 2);
     let snap = r.snapshot();
     assert_eq!(
-        Proj::current_streak(&snap, UserId(1), &Scope::Category(Category("chores".into())), StreakBasis::CalendarDays, Date(2)),
+        Proj::current_streak(
+            &snap,
+            UserId(1),
+            &Scope::Category(Category("chores".into())),
+            StreakBasis::CalendarDays,
+            Date(2)
+        ),
         3
     );
     // A gap (day 3 missed) means as-of day 4 the run is 0 (nothing on day 4, nothing on 3).
     assert_eq!(
-        Proj::current_streak(&snap, UserId(1), &Scope::Category(Category("chores".into())), StreakBasis::CalendarDays, Date(4)),
+        Proj::current_streak(
+            &snap,
+            UserId(1),
+            &Scope::Category(Category("chores".into())),
+            StreakBasis::CalendarDays,
+            Date(4)
+        ),
         0
     );
 }
@@ -183,7 +261,13 @@ fn calendar_streak_repeatable_counts_once_per_day() {
     complete(&mut r, 3, 1, 10, 1);
     let snap = r.snapshot();
     assert_eq!(
-        Proj::current_streak(&snap, UserId(1), &Scope::Any, StreakBasis::CalendarDays, Date(1)),
+        Proj::current_streak(
+            &snap,
+            UserId(1),
+            &Scope::Any,
+            StreakBasis::CalendarDays,
+            Date(1)
+        ),
         2,
         "a repeatable quest contributes once/day"
     );
@@ -197,8 +281,26 @@ fn streaks_are_per_squire() {
     complete(&mut r, 2, 1, 10, 1);
     complete(&mut r, 3, 3, 10, 0); // Squire 3 only one day
     let snap = r.snapshot();
-    assert_eq!(Proj::current_streak(&snap, UserId(1), &Scope::Any, StreakBasis::CalendarDays, Date(1)), 2);
-    assert_eq!(Proj::current_streak(&snap, UserId(3), &Scope::Any, StreakBasis::CalendarDays, Date(1)), 1);
+    assert_eq!(
+        Proj::current_streak(
+            &snap,
+            UserId(1),
+            &Scope::Any,
+            StreakBasis::CalendarDays,
+            Date(1)
+        ),
+        2
+    );
+    assert_eq!(
+        Proj::current_streak(
+            &snap,
+            UserId(3),
+            &Scope::Any,
+            StreakBasis::CalendarDays,
+            Date(1)
+        ),
+        1
+    );
 }
 
 // ── achievement unlock emission ───────────────────────────────────────────────
@@ -210,7 +312,11 @@ fn streak_criterion_unlocks_once_and_is_sticky() {
         Change::PutQuest(daily(10, 5, false, false, None)),
         Change::PutAchievement(achievement(
             7,
-            Criterion::Streak { scope: Scope::Quest(QuestId(10)), length: 3, basis: StreakBasis::ScheduledOccurrences },
+            Criterion::Streak {
+                scope: Scope::Quest(QuestId(10)),
+                length: 3,
+                basis: StreakBasis::ScheduledOccurrences,
+            },
             50,
         )),
     ]);
@@ -218,11 +324,23 @@ fn streak_criterion_unlocks_once_and_is_sticky() {
     complete(&mut r, 2, 1, 10, 1);
     assert_eq!(unlock_count(&r, 1, 7), 0, "not yet at length 3");
     complete(&mut r, 3, 1, 10, 2); // third scheduled day → unlock
-    assert_eq!(unlock_count(&r, 1, 7), 1, "unlocked exactly once on first satisfaction");
-    assert!(Proj::is_unlocked(&r.snapshot(), UserId(1), AchievementId(7)));
+    assert_eq!(
+        unlock_count(&r, 1, 7),
+        1,
+        "unlocked exactly once on first satisfaction"
+    );
+    assert!(Proj::is_unlocked(
+        &r.snapshot(),
+        UserId(1),
+        AchievementId(7)
+    ));
     // Sticky: a fourth completion doesn't re-emit.
     complete(&mut r, 4, 1, 10, 3);
-    assert_eq!(unlock_count(&r, 1, 7), 1, "sticky — no re-emit on later completions");
+    assert_eq!(
+        unlock_count(&r, 1, 7),
+        1,
+        "sticky — no re-emit on later completions"
+    );
 }
 
 #[test]
@@ -232,7 +350,10 @@ fn unlock_awards_bonus_to_that_squire_only() {
         Change::PutQuest(daily(10, 5, false, false, None)),
         Change::PutAchievement(achievement(
             7,
-            Criterion::TotalCompletions { scope: Scope::Any, count: 2 },
+            Criterion::TotalCompletions {
+                scope: Scope::Any,
+                count: 2,
+            },
             40,
         )),
     ]);
@@ -256,7 +377,11 @@ fn points_earned_criterion_uses_earned_total_not_balance() {
     complete(&mut r, 1, 1, 10, 0); // earned 30
     assert_eq!(unlock_count(&r, 1, 7), 0);
     complete(&mut r, 2, 1, 10, 1); // earned 60 total → unlock (even though spends could lower balance)
-    assert_eq!(unlock_count(&r, 1, 7), 1, "PointsEarned tracks lifetime earnings");
+    assert_eq!(
+        unlock_count(&r, 1, 7),
+        1,
+        "PointsEarned tracks lifetime earnings"
+    );
 }
 
 #[test]
@@ -266,12 +391,23 @@ fn points_earned_unlock_cascades_via_bonus() {
     let mut r = repo();
     r.seed(&[
         Change::PutQuest(daily(10, 5, false, false, None)),
-        Change::PutAchievement(achievement(7, Criterion::TotalCompletions { scope: Scope::Any, count: 1 }, 100)),
+        Change::PutAchievement(achievement(
+            7,
+            Criterion::TotalCompletions {
+                scope: Scope::Any,
+                count: 1,
+            },
+            100,
+        )),
         Change::PutAchievement(achievement(8, Criterion::PointsEarned { total: 100 }, 0)),
     ]);
     complete(&mut r, 1, 1, 10, 0); // earns 5, then +100 bonus → earned 105 ≥ 100
     assert_eq!(unlock_count(&r, 1, 7), 1);
-    assert_eq!(unlock_count(&r, 1, 8), 1, "bonus cascade unlocks the PointsEarned achievement");
+    assert_eq!(
+        unlock_count(&r, 1, 8),
+        1,
+        "bonus cascade unlocks the PointsEarned achievement"
+    );
 }
 
 #[test]
@@ -279,16 +415,28 @@ fn unlock_flips_gated_item_to_redeemable_for_that_squire() {
     let mut r = repo();
     r.seed(&[
         Change::PutQuest(daily(10, 100, false, false, None)),
-        Change::PutAchievement(achievement(7, Criterion::TotalCompletions { scope: Scope::Any, count: 1 }, 0)),
+        Change::PutAchievement(achievement(
+            7,
+            Criterion::TotalCompletions {
+                scope: Scope::Any,
+                count: 1,
+            },
+            0,
+        )),
         Change::PutItem(item(1, 10, Some(AchievementId(7)))),
     ]);
     // Before: gated.
     assert!(matches!(
         Proj::can_redeem(&r.snapshot(), UserId(1), ItemId(1), Date(0)),
-        Err(Blocked::AchievementLocked { id: AchievementId(7) })
+        Err(Blocked::AchievementLocked {
+            id: AchievementId(7)
+        })
     ));
     complete(&mut r, 1, 1, 10, 0); // unlock achievement 7 for Squire 1
-    assert!(Proj::can_redeem(&r.snapshot(), UserId(1), ItemId(1), Date(0)).is_ok(), "gate lifted for Squire 1");
+    assert!(
+        Proj::can_redeem(&r.snapshot(), UserId(1), ItemId(1), Date(0)).is_ok(),
+        "gate lifted for Squire 1"
+    );
     // Per-Squire: Squire 3 still locked.
     assert!(matches!(
         Proj::can_redeem(&r.snapshot(), UserId(3), ItemId(1), Date(0)),
@@ -301,7 +449,14 @@ fn auto_approve_emits_unlock_in_one_command() {
     let mut r = repo();
     r.seed(&[
         Change::PutQuest(daily(10, 5, true, false, None)), // auto-approve
-        Change::PutAchievement(achievement(7, Criterion::TotalCompletions { scope: Scope::Any, count: 1 }, 25)),
+        Change::PutAchievement(achievement(
+            7,
+            Criterion::TotalCompletions {
+                scope: Scope::Any,
+                count: 1,
+            },
+            25,
+        )),
     ]);
     // A single submit auto-approves AND unlocks.
     run(&mut r, submit(1, 1, 10, 0)).unwrap();
@@ -316,7 +471,15 @@ fn streak_view_current_best_alive_next_milestone() {
     let mut r = repo();
     r.seed(&[
         Change::PutQuest(daily(10, 5, false, false, None)),
-        Change::PutAchievement(achievement(7, Criterion::Streak { scope: Scope::Any, length: 5, basis: StreakBasis::CalendarDays }, 0)),
+        Change::PutAchievement(achievement(
+            7,
+            Criterion::Streak {
+                scope: Scope::Any,
+                length: 5,
+                basis: StreakBasis::CalendarDays,
+            },
+            0,
+        )),
     ]);
     // Days 0,1,2 then a gap, then day 4 alone. Best run = 3 (days 0-2); current as-of day 4 = 1.
     complete(&mut r, 1, 1, 10, 0);
@@ -324,7 +487,13 @@ fn streak_view_current_best_alive_next_milestone() {
     complete(&mut r, 3, 1, 10, 2);
     complete(&mut r, 4, 1, 10, 4);
     let snap = r.snapshot();
-    let (current, best, alive, next) = streak_view(&snap, UserId(1), &Scope::Any, StreakBasis::CalendarDays, Date(4));
+    let (current, best, alive, next) = streak_view(
+        &snap,
+        UserId(1),
+        &Scope::Any,
+        StreakBasis::CalendarDays,
+        Date(4),
+    );
     assert_eq!(current, 1, "only day 4 in the current run");
     assert_eq!(best, 3, "high-water mark over days 0-2");
     assert!(alive, "current run is non-zero");
@@ -339,7 +508,13 @@ fn streak_view_dead_when_lapsed() {
     complete(&mut r, 2, 1, 10, 1);
     let snap = r.snapshot();
     // As of day 3, the last completion was day 1 → lapsed.
-    let (current, best, alive, next) = streak_view(&snap, UserId(1), &Scope::Any, StreakBasis::CalendarDays, Date(3));
+    let (current, best, alive, next) = streak_view(
+        &snap,
+        UserId(1),
+        &Scope::Any,
+        StreakBasis::CalendarDays,
+        Date(3),
+    );
     assert_eq!(current, 0);
     assert_eq!(best, 2);
     assert!(!alive, "alive=false once an occurrence has lapsed");

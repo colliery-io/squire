@@ -39,7 +39,12 @@ pub(crate) fn unlocks_after(
             break;
         }
         for (id, bonus) in newly {
-            let ev = Event::AchievementUnlocked { squire, id, bonus, at };
+            let ev = Event::AchievementUnlocked {
+                squire,
+                id,
+                bonus,
+                at,
+            };
             proj.events.push(ev.clone());
             out.push(Change::Append(ev));
         }
@@ -57,9 +62,11 @@ fn already_unlocked(proj: &Snapshot, squire: UserId, id: AchievementId) -> bool 
 /// Does `squire` satisfy `criterion` in `proj` as of `asof`?
 fn criterion_met(proj: &Snapshot, squire: UserId, criterion: &Criterion, asof: Date) -> bool {
     match criterion {
-        Criterion::Streak { scope, length, basis } => {
-            Proj::current_streak(proj, squire, scope, *basis, asof) >= *length
-        }
+        Criterion::Streak {
+            scope,
+            length,
+            basis,
+        } => Proj::current_streak(proj, squire, scope, *basis, asof) >= *length,
         Criterion::TotalCompletions { scope, count } => {
             total_completions(proj, squire, scope, asof) >= *count
         }

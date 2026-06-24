@@ -31,7 +31,12 @@ const N_DAYS: i32 = 40;
 const KNIGHT: u128 = 99;
 
 fn user(id: u128, role: Role) -> User {
-    User { id: UserId(id), role, display_name: format!("U{id}"), active: true }
+    User {
+        id: UserId(id),
+        role,
+        display_name: format!("U{id}"),
+        active: true,
+    }
 }
 
 fn daily_quest(id: u128, category: Option<&str>) -> Quest {
@@ -74,7 +79,11 @@ fn seed(store: &mut Store<FixedClock>) {
         defs.push(Change::PutUser(user(s, Role::Squire)));
     }
     for q in 1..=N_QUESTS {
-        let cat = if q % 2 == 0 { Some("chores") } else { Some("school") };
+        let cat = if q % 2 == 0 {
+            Some("chores")
+        } else {
+            Some("school")
+        };
         defs.push(Change::PutQuest(daily_quest(q, cat)));
     }
     for i in 1..=5u128 {
@@ -124,7 +133,10 @@ fn snapshot_and_projection_sweep_under_budget() {
 
     let asof = Date(N_DAYS - 1);
     let scopes: [(Scope, StreakBasis); 2] = [
-        (Scope::Category(Category("chores".into())), StreakBasis::CalendarDays),
+        (
+            Scope::Category(Category("chores".into())),
+            StreakBasis::CalendarDays,
+        ),
         (Scope::Any, StreakBasis::CalendarDays),
     ];
 
@@ -137,7 +149,13 @@ fn snapshot_and_projection_sweep_under_budget() {
         let sid = UserId(s);
         sink += Proj::balance(&snap, sid);
         sink += Proj::quests_due(&snap, sid, asof).len() as i64;
-        sink += Proj::current_streak(&snap, sid, &Scope::Quest(QuestId(1)), StreakBasis::ScheduledOccurrences, asof) as i64;
+        sink += Proj::current_streak(
+            &snap,
+            sid,
+            &Scope::Quest(QuestId(1)),
+            StreakBasis::ScheduledOccurrences,
+            asof,
+        ) as i64;
         for (scope, basis) in &scopes {
             sink += Proj::current_streak(&snap, sid, scope, *basis, asof) as i64;
         }
@@ -148,7 +166,10 @@ fn snapshot_and_projection_sweep_under_budget() {
     let elapsed = start.elapsed();
     std::hint::black_box(sink); // keep the work observable so the optimiser can't elide it
 
-    assert!(n_events >= 4000, "expected a few thousand events, got {n_events}");
+    assert!(
+        n_events >= 4000,
+        "expected a few thousand events, got {n_events}"
+    );
     println!(
         "store perf sweep: snapshot+projections over {n_events} events, {} squires, {} quests → {:?}",
         SQUIRES.len(),

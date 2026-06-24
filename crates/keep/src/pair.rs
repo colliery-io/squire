@@ -77,13 +77,23 @@ pub async fn mint_pair_code(
     Operator(op): Operator,
     Json(req): Json<MintReq>,
 ) -> Result<Json<PairCodeView>, StatusCode> {
-    let user = UserId(req.user.trim().parse().map_err(|_| StatusCode::BAD_REQUEST)?);
-    let minted = state.identity.mint_pairing_code(&op, user).map_err(auth_status)?;
+    let user = UserId(
+        req.user
+            .trim()
+            .parse()
+            .map_err(|_| StatusCode::BAD_REQUEST)?,
+    );
+    let minted = state
+        .identity
+        .mint_pairing_code(&op, user)
+        .map_err(auth_status)?;
 
     let household = state.household.0.clone();
     let (host, port) = advertised_addr();
-    let payload =
-        format!("squire://pair?host={host}&port={port}&household={household}&code={}", minted.code);
+    let payload = format!(
+        "squire://pair?host={host}&port={port}&household={household}&code={}",
+        minted.code
+    );
 
     let qr_svg = QrCode::new(payload.as_bytes())
         .map(|c| {

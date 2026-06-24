@@ -21,8 +21,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use identity::DevIdentity;
 use api::{router, AppState};
+use identity::DevIdentity;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -56,8 +56,12 @@ fn app() -> (
     Date,
 ) {
     let dir = tempfile::tempdir().expect("tempdir");
-    let provisioner = Provisioner::new(Backend::Sqlite { dir: dir.path().to_path_buf() });
-    let store = provisioner.open("seed", SystemClock).expect("open tenant store");
+    let provisioner = Provisioner::new(Backend::Sqlite {
+        dir: dir.path().to_path_buf(),
+    });
+    let store = provisioner
+        .open("seed", SystemClock)
+        .expect("open tenant store");
     let today = store.clock().today();
 
     let store = Arc::new(Mutex::new(store));
@@ -148,7 +152,12 @@ async fn post_json(
     body: Value,
 ) -> (StatusCode, Value) {
     let resp = router(state.clone())
-        .oneshot(build("POST", path, Some((token, handle)), Some(body.to_string())))
+        .oneshot(build(
+            "POST",
+            path,
+            Some((token, handle)),
+            Some(body.to_string()),
+        ))
         .await
         .unwrap();
     status_and_json(resp).await
@@ -172,7 +181,12 @@ async fn put_json(
     body: Value,
 ) -> (StatusCode, Value) {
     let resp = router(state.clone())
-        .oneshot(build("PUT", path, Some((token, handle)), Some(body.to_string())))
+        .oneshot(build(
+            "PUT",
+            path,
+            Some((token, handle)),
+            Some(body.to_string()),
+        ))
         .await
         .unwrap();
     status_and_json(resp).await
@@ -181,7 +195,12 @@ async fn put_json(
 // ─── over-the-wire register / login / add-member (how every token is obtained) ───────────────
 
 /// `POST /register` (unauthenticated) → the household handle + the first Knight's token.
-async fn register(state: &Arc<AppState>, name: &str, admin: &str, secret: &str) -> RegisterHouseholdResp {
+async fn register(
+    state: &Arc<AppState>,
+    name: &str,
+    admin: &str,
+    secret: &str,
+) -> RegisterHouseholdResp {
     let body = json!({ "household_name": name, "admin_name": admin, "admin_secret": secret });
     let resp = router(state.clone())
         .oneshot(build("POST", "/register", None, Some(body.to_string())))
@@ -231,7 +250,14 @@ async fn add_squire_and_login(
 }
 
 /// Give a squire a positive starting balance via a Knight `POST /admin/adjust`.
-async fn fund(state: &Arc<AppState>, knight: &str, handle: &str, squire: u128, amount: i64, cmd: u128) {
+async fn fund(
+    state: &Arc<AppState>,
+    knight: &str,
+    handle: &str,
+    squire: u128,
+    amount: i64,
+    cmd: u128,
+) {
     let (st, _) = post_json(
         state,
         "/admin/adjust",
@@ -258,7 +284,8 @@ async fn ac1_full_flow_over_http() {
     let knight = reg.token.0.clone();
 
     // 2. Knight adds a Squire, who then logs in (both over HTTP).
-    let (squire_id, squire) = add_squire_and_login(&state, &knight, &handle, "Lancelot", "lake").await;
+    let (squire_id, squire) =
+        add_squire_and_login(&state, &knight, &handle, "Lancelot", "lake").await;
 
     // 3. Squire submits a completion claim → Pending (auto_approve = false).
     let claim_id = 9001u128;
@@ -320,7 +347,8 @@ async fn authored_quest_description_reaches_the_card() {
     let reg = register(&state, "The Round Table", "Arthur", "excalibur").await;
     let handle = reg.household.0.clone();
     let knight = reg.token.0.clone();
-    let (_squire_id, squire) = add_squire_and_login(&state, &knight, &handle, "Lancelot", "lake").await;
+    let (_squire_id, squire) =
+        add_squire_and_login(&state, &knight, &handle, "Lancelot", "lake").await;
 
     let blurb = "Make your bed, put your clothes away, and clear the floor.";
     let (st, body) = post_json(
@@ -340,7 +368,11 @@ async fn authored_quest_description_reaches_the_card() {
         }),
     )
     .await;
-    assert_eq!(st, StatusCode::OK, "create quest should be 200, got {st}: {body}");
+    assert_eq!(
+        st,
+        StatusCode::OK,
+        "create quest should be 200, got {st}: {body}"
+    );
 
     let (st, view) = get(&state, "/state", &squire, &handle).await;
     assert_eq!(st, StatusCode::OK);
@@ -350,7 +382,10 @@ async fn authored_quest_description_reaches_the_card() {
         .iter()
         .find(|q| q["title"] == "Tidy your room")
         .expect("the authored quest is on today's list");
-    assert_eq!(card["description"], blurb, "the card carries the authored description");
+    assert_eq!(
+        card["description"], blurb,
+        "the card carries the authored description"
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -370,20 +405,43 @@ async fn squire_token_is_403_on_every_privileged_route() {
 
     // Each privileged POST with a *Squire* token → 403.
     let posts: Vec<(&str, Value)> = vec![
-        ("/admin/review-claim", json!({ "claim_id": 1u128, "decision": { "verdict": "approve" } })),
-        ("/admin/review-redemption", json!({ "request_id": 1u128, "decision": { "verdict": "approve" } })),
-        ("/admin/redeem", json!({ "command_id": 1u128, "squire": squire_id, "item_id": ITEM_ID })),
-        ("/admin/adjust", json!({ "command_id": 1u128, "squire": squire_id, "amount": 1, "reason": "x" })),
-        ("/admin/mark-done", json!({ "claim_id": 1u128, "squire": squire_id, "quest_id": DAILY_QUEST_ID, "on": today.0 })),
+        (
+            "/admin/review-claim",
+            json!({ "claim_id": 1u128, "decision": { "verdict": "approve" } }),
+        ),
+        (
+            "/admin/review-redemption",
+            json!({ "request_id": 1u128, "decision": { "verdict": "approve" } }),
+        ),
+        (
+            "/admin/redeem",
+            json!({ "command_id": 1u128, "squire": squire_id, "item_id": ITEM_ID }),
+        ),
+        (
+            "/admin/adjust",
+            json!({ "command_id": 1u128, "squire": squire_id, "amount": 1, "reason": "x" }),
+        ),
+        (
+            "/admin/mark-done",
+            json!({ "claim_id": 1u128, "squire": squire_id, "quest_id": DAILY_QUEST_ID, "on": today.0 }),
+        ),
     ];
     for (path, body) in posts {
         let (st, _) = post_json(&state, path, &squire, &handle, body).await;
-        assert_eq!(st, StatusCode::FORBIDDEN, "squire on POST {path} should be 403");
+        assert_eq!(
+            st,
+            StatusCode::FORBIDDEN,
+            "squire on POST {path} should be 403"
+        );
     }
 
     // The cross-Squire triage read is Knight-only too.
     let (st, _) = get(&state, "/household-review", &squire, &handle).await;
-    assert_eq!(st, StatusCode::FORBIDDEN, "squire on GET /household-review should be 403");
+    assert_eq!(
+        st,
+        StatusCode::FORBIDDEN,
+        "squire on GET /household-review should be 403"
+    );
 }
 
 /// A Squire cannot read another Squire's data: identity is taken from the token, never a query
@@ -441,9 +499,18 @@ async fn no_authoring_route_is_404() {
     let knight = reg.token.0.clone();
 
     // Even with a valid Knight token, there is simply no such route → 404 (not 401/403).
-    for path in ["/admin/define-quest", "/admin/archive-quest", "/quests", "/admin/define-item"] {
+    for path in [
+        "/admin/define-quest",
+        "/admin/archive-quest",
+        "/quests",
+        "/admin/define-item",
+    ] {
         let (st, _) = post_json(&state, path, &knight, &handle, json!({ "anything": true })).await;
-        assert_eq!(st, StatusCode::NOT_FOUND, "{path} must not exist on the wire");
+        assert_eq!(
+            st,
+            StatusCode::NOT_FOUND,
+            "{path} must not exist on the wire"
+        );
     }
 }
 
@@ -501,7 +568,11 @@ async fn claim_is_idempotent_over_http() {
 
     // Exactly ONE claim exists (verified via the Squire's own /state).
     let (_st, view) = get(&state, "/state", &squire, &handle).await;
-    assert_eq!(view["my_claims"].as_array().unwrap().len(), 1, "exactly one claim");
+    assert_eq!(
+        view["my_claims"].as_array().unwrap().len(),
+        1,
+        "exactly one claim"
+    );
 }
 
 #[tokio::test]
@@ -515,7 +586,14 @@ async fn redemption_request_is_idempotent_over_http() {
 
     let body = json!({ "request_id": 5678u128, "item_id": ITEM_ID });
 
-    let (st1, r1) = post_json(&state, "/redemption-requests", &squire, &handle, body.clone()).await;
+    let (st1, r1) = post_json(
+        &state,
+        "/redemption-requests",
+        &squire,
+        &handle,
+        body.clone(),
+    )
+    .await;
     let (st2, r2) = post_json(&state, "/redemption-requests", &squire, &handle, body).await;
     assert_eq!(st1, StatusCode::OK);
     assert_eq!(st2, StatusCode::OK);
@@ -524,7 +602,11 @@ async fn redemption_request_is_idempotent_over_http() {
 
     // Exactly ONE request exists (via the Squire's /state).
     let (_st, view) = get(&state, "/state", &squire, &handle).await;
-    assert_eq!(view["my_requests"].as_array().unwrap().len(), 1, "exactly one request");
+    assert_eq!(
+        view["my_requests"].as_array().unwrap().len(),
+        1,
+        "exactly one request"
+    );
 }
 
 #[tokio::test]
@@ -536,7 +618,8 @@ async fn adjust_is_idempotent_over_http_no_double_credit() {
     let knight = reg.token.0.clone();
     let (squire_id, squire) = add_squire_and_login(&state, &knight, &handle, "Sib", "s").await;
 
-    let body = json!({ "command_id": 7001u128, "squire": squire_id, "amount": 10, "reason": "bonus" });
+    let body =
+        json!({ "command_id": 7001u128, "squire": squire_id, "amount": 10, "reason": "bonus" });
 
     // Same command_id twice → 200 both times.
     let (st1, _) = post_json(&state, "/admin/adjust", &knight, &handle, body.clone()).await;
@@ -630,16 +713,28 @@ async fn config_timezone_get_put_over_http() {
     assert_eq!(cfg["timezone"], "UTC");
 
     // PUT a valid IANA zone → 200, echoes the new value; a re-read reflects it.
-    let (st, cfg) =
-        put_json(&state, "/admin/config", &knight, &handle, json!({ "timezone": "America/Detroit" })).await;
+    let (st, cfg) = put_json(
+        &state,
+        "/admin/config",
+        &knight,
+        &handle,
+        json!({ "timezone": "America/Detroit" }),
+    )
+    .await;
     assert_eq!(st, StatusCode::OK);
     assert_eq!(cfg["timezone"], "America/Detroit");
     let (_st, cfg) = get(&state, "/admin/config", &knight, &handle).await;
     assert_eq!(cfg["timezone"], "America/Detroit");
 
     // A garbage zone → 400 (validated before any write).
-    let (st, _) =
-        put_json(&state, "/admin/config", &knight, &handle, json!({ "timezone": "Mars/Phobos" })).await;
+    let (st, _) = put_json(
+        &state,
+        "/admin/config",
+        &knight,
+        &handle,
+        json!({ "timezone": "Mars/Phobos" }),
+    )
+    .await;
     assert_eq!(st, StatusCode::BAD_REQUEST);
 
     // A Squire token is 403 on the Knight-gated config surface.
@@ -657,7 +752,8 @@ async fn history_feed_is_knight_gated_newest_first_and_limited() {
     let reg = register(&state, "The Round Table", "Arthur", "excalibur").await;
     let handle = reg.household.0.clone();
     let knight = reg.token.0.clone();
-    let (squire_id, squire) = add_squire_and_login(&state, &knight, &handle, "Lancelot", "lake").await;
+    let (squire_id, squire) =
+        add_squire_and_login(&state, &knight, &handle, "Lancelot", "lake").await;
 
     // Two adjustments → two history entries, the later one newest.
     fund(&state, &knight, &handle, squire_id, 5, 7001).await;
