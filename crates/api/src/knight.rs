@@ -26,8 +26,8 @@ use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
     ClaimId, Clock, Command, CommandId, Currency, Date, Decision, Event, Hazard, HouseholdReview,
-    ItemId, ItemOption, PendingCashOut, PendingClaim, PendingRequest, Projections, QuestId, QuestOption, Repository,
-    RequestId, Role, Snapshot, SquireSummary, StateView, UserId,
+    ItemId, ItemOption, PendingCashOut, PendingClaim, PendingRequest, Projections, QuestId,
+    QuestOption, Repository, RequestId, Role, Snapshot, SquireSummary, StateView, UserId,
 };
 use domain_core::Proj;
 
@@ -61,12 +61,18 @@ pub struct DecisionDto {
 impl DecisionDto {
     /// `{"verdict":"approve"}` — accept the claim/request.
     pub fn approve() -> Self {
-        Self { verdict: DecisionKind::Approve, reason: None }
+        Self {
+            verdict: DecisionKind::Approve,
+            reason: None,
+        }
     }
 
     /// `{"verdict":"reject"}` (optionally with a `reason`) — decline it.
     pub fn reject(reason: Option<String>) -> Self {
-        Self { verdict: DecisionKind::Reject, reason }
+        Self {
+            verdict: DecisionKind::Reject,
+            reason,
+        }
     }
 }
 
@@ -349,7 +355,11 @@ pub async fn list_hazards(
     State(state): State<Arc<AppState>>,
     RequireKnight(_principal): RequireKnight,
 ) -> Json<Vec<Hazard>> {
-    let raw = state.store.lock().expect("store mutex poisoned").get_setting(HAZARDS_KEY);
+    let raw = state
+        .store
+        .lock()
+        .expect("store mutex poisoned")
+        .get_setting(HAZARDS_KEY);
     let hazards = raw
         .and_then(|s| serde_json::from_str::<Vec<Hazard>>(&s).ok())
         .unwrap_or_default();
@@ -377,8 +387,10 @@ pub async fn set_hazards(
     RequireKnight(principal): RequireKnight,
     Json(hazards): Json<Vec<Hazard>>,
 ) -> Result<Json<Ack>, StatusCode> {
-    let cleaned: Vec<Hazard> =
-        hazards.into_iter().filter(|h| !h.name.trim().is_empty()).collect();
+    let cleaned: Vec<Hazard> = hazards
+        .into_iter()
+        .filter(|h| !h.name.trim().is_empty())
+        .collect();
     let json = serde_json::to_string(&cleaned).map_err(|_| StatusCode::BAD_REQUEST)?;
     state
         .store
@@ -530,7 +542,11 @@ fn item_options(snap: &Snapshot) -> Vec<ItemOption> {
     snap.items
         .iter()
         .filter(|i| i.active)
-        .map(|i| ItemOption { item_id: i.id, name: i.name.clone(), cost: i.cost })
+        .map(|i| ItemOption {
+            item_id: i.id,
+            name: i.name.clone(),
+            cost: i.cost,
+        })
         .collect()
 }
 
@@ -539,7 +555,10 @@ fn quest_options(snap: &Snapshot) -> Vec<QuestOption> {
     snap.quests
         .iter()
         .filter(|q| q.active)
-        .map(|q| QuestOption { quest_id: q.id, title: q.title.clone() })
+        .map(|q| QuestOption {
+            quest_id: q.id,
+            title: q.title.clone(),
+        })
         .collect()
 }
 
@@ -552,7 +571,8 @@ fn squire_summaries(snap: &Snapshot) -> Vec<SquireSummary> {
             squire: u.id,
             display_name: u.display_name.clone(),
             balance: Proj::balance(snap, u.id).max(0) as domain_core::contract::Points,
-            cash_balance: Proj::balance_in(snap, u.id, Currency::Cash).max(0) as domain_core::contract::Points,
+            cash_balance: Proj::balance_in(snap, u.id, Currency::Cash).max(0)
+                as domain_core::contract::Points,
         })
         .collect()
 }
@@ -563,9 +583,13 @@ fn pending_claims(snap: &Snapshot) -> Vec<PendingClaim> {
     snap.events
         .iter()
         .filter_map(|e| match e {
-            Event::CompletionClaimed { claim_id, squire, quest_id, on, .. }
-                if !claim_resolved(snap, *claim_id) =>
-            {
+            Event::CompletionClaimed {
+                claim_id,
+                squire,
+                quest_id,
+                on,
+                ..
+            } if !claim_resolved(snap, *claim_id) => {
                 let quest_title = snap
                     .quests
                     .iter()
@@ -601,9 +625,12 @@ fn pending_requests(snap: &Snapshot) -> Vec<PendingRequest> {
     snap.events
         .iter()
         .filter_map(|e| match e {
-            Event::RedemptionRequested { request_id, squire, item_id, .. }
-                if !request_resolved(snap, *request_id) =>
-            {
+            Event::RedemptionRequested {
+                request_id,
+                squire,
+                item_id,
+                ..
+            } if !request_resolved(snap, *request_id) => {
                 let item = snap.items.iter().find(|i| i.id == *item_id);
                 Some(PendingRequest {
                     request_id: *request_id,
@@ -634,11 +661,16 @@ fn pending_cashouts(snap: &Snapshot) -> Vec<PendingCashOut> {
     snap.events
         .iter()
         .filter_map(|e| match e {
-            Event::CashOutRequested { request_id, squire, amount, .. }
-                if !cashout_resolved(snap, *request_id) =>
-            {
-                Some(PendingCashOut { request_id: *request_id, squire: *squire, amount: *amount })
-            }
+            Event::CashOutRequested {
+                request_id,
+                squire,
+                amount,
+                ..
+            } if !cashout_resolved(snap, *request_id) => Some(PendingCashOut {
+                request_id: *request_id,
+                squire: *squire,
+                amount: *amount,
+            }),
             _ => None,
         })
         .collect()

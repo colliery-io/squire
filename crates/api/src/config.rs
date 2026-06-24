@@ -30,7 +30,11 @@ pub async fn get_config(
     State(state): State<Arc<AppState>>,
     _knight: RequireKnight,
 ) -> Json<HouseholdConfig> {
-    let cfg = state.store.lock().expect("store mutex poisoned").load_config();
+    let cfg = state
+        .store
+        .lock()
+        .expect("store mutex poisoned")
+        .load_config();
     Json(cfg)
 }
 
@@ -70,7 +74,14 @@ pub async fn update_config(
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
     // Re-load the typed view and hot-swap the shared live cell (the clock reads it lock-free).
-    let cfg = state.store.lock().expect("store mutex poisoned").load_config();
-    state.clock.live().store(Arc::new(ConfigView::resolve(cfg.clone())));
+    let cfg = state
+        .store
+        .lock()
+        .expect("store mutex poisoned")
+        .load_config();
+    state
+        .clock
+        .live()
+        .store(Arc::new(ConfigView::resolve(cfg.clone())));
     Ok(Json(cfg))
 }

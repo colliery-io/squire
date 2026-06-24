@@ -17,12 +17,17 @@ pub(crate) fn handle(
     clock: &dyn Clock,
 ) -> Result<Vec<Change>, DomainError> {
     match cmd {
-        Command::SubmitClaim { claim_id, squire, quest_id, on } => {
-            submit(snap, claim_id, squire, quest_id, on, clock)
-        }
-        Command::ReviewClaim { actor, claim_id, decision } => {
-            review(snap, actor, claim_id, decision, clock)
-        }
+        Command::SubmitClaim {
+            claim_id,
+            squire,
+            quest_id,
+            on,
+        } => submit(snap, claim_id, squire, quest_id, on, clock),
+        Command::ReviewClaim {
+            actor,
+            claim_id,
+            decision,
+        } => review(snap, actor, claim_id, decision, clock),
         _ => unreachable!("claims::handle only receives claim/review commands"),
     }
 }
@@ -48,13 +53,30 @@ fn submit(
     }
 
     let at = clock.now();
-    let claimed = Event::CompletionClaimed { claim_id, squire, quest_id, on, at };
+    let claimed = Event::CompletionClaimed {
+        claim_id,
+        squire,
+        quest_id,
+        on,
+        at,
+    };
     let mut changes = vec![Change::Append(claimed.clone())];
     if quest.auto_approve {
         // Auto-approval is a system commit (actor = None), snapshotting the current reward.
         // The just-minted `CompletionClaimed` isn't in `snap` yet, so the unlock evaluation
         // (which joins approvals to their claim via `claim_meta`) gets it via `pending`.
-        changes.extend(approval_events(snap, &[claimed], claim_id, squire, on, quest.reward, quest.cash, &quest.title, None, at));
+        changes.extend(approval_events(
+            snap,
+            &[claimed],
+            claim_id,
+            squire,
+            on,
+            quest.reward,
+            quest.cash,
+            &quest.title,
+            None,
+            at,
+        ));
     }
     Ok(changes)
 }
@@ -84,7 +106,18 @@ fn review(
                 // Another assignee already won this occurrence.
                 return Err(DomainError::OccurrenceTaken);
             }
-            Ok(approval_events(snap, &[], claim_id, squire, on, quest.reward, quest.cash, &quest.title, Some(actor), at))
+            Ok(approval_events(
+                snap,
+                &[],
+                claim_id,
+                squire,
+                on,
+                quest.reward,
+                quest.cash,
+                &quest.title,
+                Some(actor),
+                at,
+            ))
         }
         Decision::Reject { reason } => Ok(vec![Change::Append(Event::CompletionRejected {
             claim_id,
@@ -113,7 +146,13 @@ fn approval_events(
     actor: Option<UserId>,
     at: Timestamp,
 ) -> Vec<Change> {
-    let approval = Event::CompletionApproved { claim_id, squire, actor, points, at };
+    let approval = Event::CompletionApproved {
+        claim_id,
+        squire,
+        actor,
+        points,
+        at,
+    };
     // `pending` carries events emitted earlier in *this* command but not yet in `snap`
     // (the auto-approve `CompletionClaimed`), so the join in `unlocks_after` can resolve.
     let mut projected = snap.events.clone();
@@ -135,6 +174,8 @@ fn approval_events(
             at,
         }));
     }
-    changes.extend(crate::achievements::unlocks_after(snap, squire, &projected, on, at));
+    changes.extend(crate::achievements::unlocks_after(
+        snap, squire, &projected, on, at,
+    ));
     changes
 }

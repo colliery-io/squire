@@ -40,6 +40,82 @@ pub struct StateView {
     /// (SQUIRE-T-0094 / SQUIRE-T-0096). `#[serde(default)]` for back-compat with older servers.
     #[cfg_attr(feature = "serde", serde(default))]
     pub adjustments: Vec<AdjustmentView>,
+    /// The unified, newest-first **recent activity** feed (SQUIRE-T-0124): adjustments, claims, and
+    /// redemption requests merged into one globally time-ordered list (capped), so the child's
+    /// Activity tab interleaves them by time instead of grouping by type. `#[serde(default)]` for
+    /// back-compat; the typed `adjustments`/`my_claims`/`my_requests` lists remain for older clients.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub recent_activity: Vec<ActivityEntry>,
+}
+
+/// One entry in the unified "recent activity" feed (SQUIRE-T-0124). A flat tagged object — a `kind`
+/// discriminator plus the variant's nested payload — so the Kotlin SDK gets a clean, decodable data
+/// class (A-0009 / SQUIRE-T-0033 flat-struct pattern): exactly one of `adjustment`/`claim`/`request`
+/// is set, matching `kind`.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug)]
+pub struct ActivityEntry {
+    /// Event time (unix millis) — the whole feed is ordered by this, newest first.
+    pub at: Timestamp,
+    pub kind: ActivityKind,
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub adjustment: Option<AdjustmentView>,
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub claim: Option<ClaimStatus>,
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub request: Option<RedemptionStatus>,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ActivityKind {
+    Adjustment,
+    Claim,
+    Request,
+}
+
+impl ActivityEntry {
+    /// A grown-up's coin grant/penalty entry.
+    pub fn adjustment(at: Timestamp, v: AdjustmentView) -> Self {
+        Self {
+            at,
+            kind: ActivityKind::Adjustment,
+            adjustment: Some(v),
+            claim: None,
+            request: None,
+        }
+    }
+    /// A quest-completion claim entry.
+    pub fn claim(at: Timestamp, v: ClaimStatus) -> Self {
+        Self {
+            at,
+            kind: ActivityKind::Claim,
+            adjustment: None,
+            claim: Some(v),
+            request: None,
+        }
+    }
+    /// A reward redemption-request entry.
+    pub fn request(at: Timestamp, v: RedemptionStatus) -> Self {
+        Self {
+            at,
+            kind: ActivityKind::Request,
+            adjustment: None,
+            claim: None,
+            request: Some(v),
+        }
+    }
 }
 
 /// One currency's balance for a Squire (SQUIRE-A-0013), with its display policy so the UI can render
@@ -88,7 +164,10 @@ pub struct QuestCard {
     pub title: String,
     /// The quest's authored blurb, shown in the tap-to-expand detail (SQUIRE-T-0094 #8). `serde(default)`
     /// for back-compat with older servers / clients.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub description: Option<String>,
     pub reward: Points,
     pub category: Option<Category>,
@@ -99,7 +178,12 @@ pub struct QuestCard {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Copy, Debug)]
-pub enum QuestStatus { Available, Pending, CompletedToday, TakenByOther } // TakenByOther: a Race quest claimed/won by a sibling
+pub enum QuestStatus {
+    Available,
+    Pending,
+    CompletedToday,
+    TakenByOther,
+} // TakenByOther: a Race quest claimed/won by a sibling
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -138,6 +222,14 @@ pub struct GoalView {
     pub description: String,
     /// The bonus coins awarded when it unlocks.
     pub bonus: Points,
+    /// Progress so far toward [`Self::target`] (e.g. chores completed, or coins earned) — lets the
+    /// child see how close they are, like a streak's progress. `serde(default)` for back-compat with
+    /// older servers / clients that predate the progress fields (SQUIRE-T-0122).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub current: u32,
+    /// The goal's threshold (e.g. 10 chores, 100 coins). `0` when an older server omitted it.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub target: u32,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -148,7 +240,10 @@ pub struct RewardCard {
     pub name: String,
     /// The reward's authored blurb, shown in the tap-to-expand detail (SQUIRE-T-0094 #8). `serde(default)`
     /// for back-compat with older servers / clients.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub description: Option<String>,
     pub cost: Points,
     pub icon: Option<String>,
@@ -168,22 +263,34 @@ pub struct RewardCard {
 pub struct LockReason {
     pub kind: LockReasonKind,
     /// Present for [`LockReasonKind::NeedsAchievement`]; the achievement's name.
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", default)
+    )]
     pub name: Option<String>,
 }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum LockReasonKind { NeedsAchievement, OutOfStock }
+pub enum LockReasonKind {
+    NeedsAchievement,
+    OutOfStock,
+}
 
 impl LockReason {
     /// `{"kind":"NeedsAchievement","name":…}` — the reward needs an as-yet-unearned achievement.
     pub fn needs_achievement(name: impl Into<String>) -> Self {
-        Self { kind: LockReasonKind::NeedsAchievement, name: Some(name.into()) }
+        Self {
+            kind: LockReasonKind::NeedsAchievement,
+            name: Some(name.into()),
+        }
     }
     /// `{"kind":"OutOfStock"}` — the reward is exhausted.
     pub fn out_of_stock() -> Self {
-        Self { kind: LockReasonKind::OutOfStock, name: None }
+        Self {
+            kind: LockReasonKind::OutOfStock,
+            name: None,
+        }
     }
 }
 
@@ -206,29 +313,51 @@ pub struct ClaimStatus {
 pub struct ClaimState {
     pub state: ClaimStateKind,
     /// Present (and required) for [`ClaimStateKind::Approved`]: the points awarded.
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", default)
+    )]
     pub points: Option<Points>,
     /// Optional rejection note for [`ClaimStateKind::Rejected`].
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", default)
+    )]
     pub reason: Option<String>,
 }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum ClaimStateKind { Pending, Approved, Rejected }
+pub enum ClaimStateKind {
+    Pending,
+    Approved,
+    Rejected,
+}
 
 impl ClaimState {
     /// `{"state":"Pending"}` — awaiting a Knight's review.
     pub fn pending() -> Self {
-        Self { state: ClaimStateKind::Pending, points: None, reason: None }
+        Self {
+            state: ClaimStateKind::Pending,
+            points: None,
+            reason: None,
+        }
     }
     /// `{"state":"Approved","points":…}` — awarded `points`.
     pub fn approved(points: Points) -> Self {
-        Self { state: ClaimStateKind::Approved, points: Some(points), reason: None }
+        Self {
+            state: ClaimStateKind::Approved,
+            points: Some(points),
+            reason: None,
+        }
     }
     /// `{"state":"Rejected"}` (or with a `reason`) — declined.
     pub fn rejected(reason: Option<String>) -> Self {
-        Self { state: ClaimStateKind::Rejected, points: None, reason }
+        Self {
+            state: ClaimStateKind::Rejected,
+            points: None,
+            reason,
+        }
     }
 }
 
@@ -249,26 +378,42 @@ pub struct RedemptionStatus {
 pub struct RedemptionState {
     pub state: RedemptionStateKind,
     /// Optional rejection note for [`RedemptionStateKind::Rejected`].
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", default)
+    )]
     pub reason: Option<String>,
 }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum RedemptionStateKind { Pending, Approved, Rejected }
+pub enum RedemptionStateKind {
+    Pending,
+    Approved,
+    Rejected,
+}
 
 impl RedemptionState {
     /// `{"state":"Pending"}` — awaiting a Knight's review.
     pub fn pending() -> Self {
-        Self { state: RedemptionStateKind::Pending, reason: None }
+        Self {
+            state: RedemptionStateKind::Pending,
+            reason: None,
+        }
     }
     /// `{"state":"Approved"}` — granted.
     pub fn approved() -> Self {
-        Self { state: RedemptionStateKind::Approved, reason: None }
+        Self {
+            state: RedemptionStateKind::Approved,
+            reason: None,
+        }
     }
     /// `{"state":"Rejected"}` (or with a `reason`) — declined.
     pub fn rejected(reason: Option<String>) -> Self {
-        Self { state: RedemptionStateKind::Rejected, reason }
+        Self {
+            state: RedemptionStateKind::Rejected,
+            reason,
+        }
     }
 }
 
@@ -277,11 +422,18 @@ impl RedemptionState {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct SubmitClaimReq { pub claim_id: ClaimId, pub quest_id: QuestId, pub on: Date }
+pub struct SubmitClaimReq {
+    pub claim_id: ClaimId,
+    pub quest_id: QuestId,
+    pub on: Date,
+}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct SubmitClaimResp { pub claim_id: ClaimId, pub state: ClaimState }
+pub struct SubmitClaimResp {
+    pub claim_id: ClaimId,
+    pub state: ClaimState,
+}
 
 /// POST /redemption-requests — idempotent on `request_id` (phone-minted), same as claims.
 /// Affordability is re-checked at approval time, so a request can be made even if the
@@ -289,11 +441,17 @@ pub struct SubmitClaimResp { pub claim_id: ClaimId, pub state: ClaimState }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct RequestRedemptionReq { pub request_id: RequestId, pub item_id: ItemId }
+pub struct RequestRedemptionReq {
+    pub request_id: RequestId,
+    pub item_id: ItemId,
+}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct RequestRedemptionResp { pub request_id: RequestId, pub state: RedemptionState }
+pub struct RequestRedemptionResp {
+    pub request_id: RequestId,
+    pub state: RedemptionState,
+}
 
 /// A Squire's cash-out request + its review state (SQUIRE-T-0118); `state` reuses [`RedemptionState`].
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -320,11 +478,17 @@ pub struct PendingCashOut {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct RequestCashOutReq { pub request_id: RequestId, pub amount: i64 }
+pub struct RequestCashOutReq {
+    pub request_id: RequestId,
+    pub amount: i64,
+}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct RequestCashOutResp { pub request_id: RequestId, pub state: RedemptionState }
+pub struct RequestCashOutResp {
+    pub request_id: RequestId,
+    pub state: RedemptionState,
+}
 
 /// Parent (Knight) review read — pending work across ALL Squires, each labeled with its
 /// Squire, plus per-Squire balances. The Knight renders/triages this; the exact shape is
@@ -351,26 +515,49 @@ pub struct HouseholdReview {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct SquireSummary { pub squire: UserId, pub display_name: String, pub balance: Points, #[cfg_attr(feature = "serde", serde(default))] pub cash_balance: Points }
+pub struct SquireSummary {
+    pub squire: UserId,
+    pub display_name: String,
+    pub balance: Points,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub cash_balance: Points,
+}
 /// A redeemable item the Knight can pick for a direct redeem (REQ-K5). Affordability/availability
 /// are re-checked by the Keep at commit, so this is just the catalog, not a per-Squire eligibility.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct ItemOption { pub item_id: ItemId, pub name: String, pub cost: Points }
+pub struct ItemOption {
+    pub item_id: ItemId,
+    pub name: String,
+    pub cost: Points,
+}
 /// An active quest the Knight can pick for a mark-done (REQ-K3).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct QuestOption { pub quest_id: QuestId, pub title: String }
+pub struct QuestOption {
+    pub quest_id: QuestId,
+    pub title: String,
+}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct PendingClaim { pub claim_id: ClaimId, pub squire: UserId, pub quest_title: String, pub on: Date }
+pub struct PendingClaim {
+    pub claim_id: ClaimId,
+    pub squire: UserId,
+    pub quest_title: String,
+    pub on: Date,
+}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct PendingRequest { pub request_id: RequestId, pub squire: UserId, pub item_name: String, pub cost: Points }
+pub struct PendingRequest {
+    pub request_id: RequestId,
+    pub squire: UserId,
+    pub item_name: String,
+    pub cost: Points,
+}
 
 // ─── IDENTITY, REGISTRATION & AUTH DTOs (control plane; ADR SQUIRE-A-0002 / A-0004) ──
 //
@@ -385,61 +572,92 @@ pub struct PendingRequest { pub request_id: RequestId, pub squire: UserId, pub i
 /// select the schema — ADR SQUIRE-A-0002). Established at registration/pairing.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Clone, PartialEq, Eq, Hash, Debug)] pub struct HouseholdHandle(pub String);
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct HouseholdHandle(pub String);
 /// A tenant-scoped bearer token proving (household, user, role). Presented on every call.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Clone, Debug)] pub struct AuthToken(pub String);
+#[derive(Clone, Debug)]
+pub struct AuthToken(pub String);
 
 /// POST /register — create a Household (tenant) + seed its first Knight (admin); provisions
 /// an isolated schema. Returns the handle and the admin's token.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct RegisterHouseholdReq { pub household_name: String, pub admin_name: String, pub admin_secret: String }
+pub struct RegisterHouseholdReq {
+    pub household_name: String,
+    pub admin_name: String,
+    pub admin_secret: String,
+}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct RegisterHouseholdResp { pub household: HouseholdHandle, pub admin: UserId, pub token: AuthToken }
+pub struct RegisterHouseholdResp {
+    pub household: HouseholdHandle,
+    pub admin: UserId,
+    pub token: AuthToken,
+}
 
 /// Knight-only — add a member (Knight or Squire). No assumed counts or family shape.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct AddMemberReq { pub role: Role, pub display_name: String, pub initial_secret: String }
+pub struct AddMemberReq {
+    pub role: Role,
+    pub display_name: String,
+    pub initial_secret: String,
+}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct AddMemberResp { pub user: UserId }
+pub struct AddMemberResp {
+    pub user: UserId,
+}
 
 /// POST /login (or device pair) — exchange a member secret for a tenant-scoped token.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct LoginReq { pub household: HouseholdHandle, pub user: UserId, pub secret: String }
+pub struct LoginReq {
+    pub household: HouseholdHandle,
+    pub user: UserId,
+    pub secret: String,
+}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct LoginResp { pub token: AuthToken, pub role: Role }
+pub struct LoginResp {
+    pub token: AuthToken,
+    pub role: Role,
+}
 
 /// POST /pair/codes (Knight-only) — mint a one-time device-pairing code for member `user`
 /// (ADR SQUIRE-A-0010). The plaintext `code` is returned once for the Keep to render as a QR.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct MintPairCodeReq { pub user: UserId }
+pub struct MintPairCodeReq {
+    pub user: UserId,
+}
 /// The minted pairing code and its expiry (unix millis). Single-use; ≥128-bit; 30-min TTL.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct MintPairCodeResp { pub code: String, pub expires_at: Timestamp }
+pub struct MintPairCodeResp {
+    pub code: String,
+    pub expires_at: Timestamp,
+}
 
 /// POST /pair (unauthenticated) — a phone exchanges a one-time pairing code for the member's
 /// tenant-scoped token (ADR SQUIRE-A-0010). `household` routes to the tenant (from the QR).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]
-pub struct PairReq { pub household: HouseholdHandle, pub code: String }
+pub struct PairReq {
+    pub household: HouseholdHandle,
+    pub code: String,
+}
 /// The paired member's tenant-scoped token + identity (same token shape as `/login`, A-0004).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

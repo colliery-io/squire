@@ -13,7 +13,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use domain_core::contract::{AddMemberReq, Change, LoginReq, Role, UserId};
+use domain_core::contract::{AddMemberReq, Change, LoginReq, Role, User, UserId};
 use identity::AuthError;
 
 use crate::quests::AuditView;
@@ -44,6 +44,12 @@ pub struct SetActiveReq {
     pub active: bool,
 }
 
+/// `POST /api/members/{id}/name` body — a member's new display name (SQUIRE-T-0120/0126).
+#[derive(Debug, Deserialize)]
+pub struct RenameReq {
+    pub display_name: String,
+}
+
 /// Map an [`AuthError`] from a member-admin call onto an HTTP status (Forbidden → 403, else 401).
 fn auth_status(err: AuthError) -> StatusCode {
     match err {
@@ -56,7 +62,10 @@ fn auth_status(err: AuthError) -> StatusCode {
 
 /// `GET /api/members` (Knight-only) — every household member with role, active flag, and the
 /// last-editor audit answering "who added / last changed this member".
-pub async fn list_members(State(state): State<Arc<KeepState>>, _op: Operator) -> Json<Vec<MemberRow>> {
+pub async fn list_members(
+    State(state): State<Arc<KeepState>>,
+    _op: Operator,
+) -> Json<Vec<MemberRow>> {
     let snap = state.snapshot();
     let mut guard = state.store.lock().expect("store mutex poisoned");
     let rows = snap
@@ -92,9 +101,16 @@ pub async fn add_member(
     // Mint the new member's token (login with the initial secret) so a phone can be paired now.
     let login = state
         .identity
-        .login(LoginReq { household: state.household.clone(), user: added.user, secret })
+        .login(LoginReq {
+            household: state.household.clone(),
+            user: added.user,
+            secret,
+        })
         .map_err(auth_status)?;
-    Ok(Json(AddedMember { user: added.user.0.to_string(), token: login.token.0 }))
+    Ok(Json(AddedMember {
+        user: added.user.0.to_string(),
+        token: login.token.0,
+    }))
 }
 
 /// `POST /api/members/{id}/active` (Knight-only) — de/reactivate a member via `SetUserActive`
@@ -111,6 +127,37 @@ pub async fn set_active(
     }
     state
         .apply_changes(Some(op.user), &[Change::SetUserActive(uid, req.active)])
+        .map_err(|_| StatusCode::CONFLICT)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `POST /api/members/{id}/name` (Knight-only) — rename a member in place. Reuses the `PutUser`
+/// upsert (keeps id, role, active, and `created_*` audit; moves `updated_*`), audited to the acting
+/// Knight. Blank name → 400; a missing member → 404.
+pub async fn rename(
+    State(state): State<Arc<KeepState>>,
+    Operator(op): Operator,
+    Path(id): Path<String>,
+    Json(req): Json<RenameReq>,
+) -> Result<StatusCode, StatusCode> {
+    let name = req.display_name.trim();
+    if name.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let uid = UserId(id.trim().parse().map_err(|_| StatusCode::BAD_REQUEST)?);
+    let user = state
+        .snapshot()
+        .users
+        .iter()
+        .find(|u| u.id == uid)
+        .cloned()
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let updated = User {
+        display_name: name.to_string(),
+        ..user
+    };
+    state
+        .apply_changes(Some(op.user), &[Change::PutUser(updated)])
         .map_err(|_| StatusCode::CONFLICT)?;
     Ok(StatusCode::NO_CONTENT)
 }

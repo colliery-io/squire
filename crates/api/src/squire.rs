@@ -14,8 +14,8 @@ use axum::http::StatusCode;
 use axum::Json;
 
 use domain_core::contract::{
-    Achievement, Cadence, Change, Command, Criterion, Currency, Date, DomainError, Event, Points, Quest,
-    QuestStatus, Scope, Snapshot, Timestamp, UserId,
+    Achievement, Cadence, Change, Command, Criterion, Currency, Date, DomainError, Event, Points,
+    Quest, QuestStatus, Scope, Snapshot, Timestamp, UserId,
 };
 use domain_core::contract::{
     AdjustmentView, CashOutStatus, ClaimState, ClaimStatus, GoalView, QuestCard, RedemptionState,
@@ -23,7 +23,7 @@ use domain_core::contract::{
     RequestRedemptionResp, RewardCard, StateView, StreakView, SubmitClaimReq, SubmitClaimResp,
 };
 use domain_core::contract::{Clock, Engine, Projections, Repository};
-use domain_core::{quest_status, reward_view, streak_view, total_completions, Proj};
+use domain_core::{points_earned, quest_status, reward_view, streak_view, total_completions, Proj};
 
 use crate::auth::RequireSquire;
 use crate::state::AppState;
@@ -101,7 +101,10 @@ pub async fn submit_claim(
         store.snapshot()
     };
     let state_ = claim_state(&snap, req.claim_id);
-    Ok(Json(SubmitClaimResp { claim_id: req.claim_id, state: state_ }))
+    Ok(Json(SubmitClaimResp {
+        claim_id: req.claim_id,
+        state: state_,
+    }))
 }
 
 /// `POST /redemption-requests` (RequireSquire) — record a redemption request for the
@@ -250,12 +253,13 @@ pub(crate) fn assemble_state(
     let balances = currency_balances(snap, squire);
     let streaks = streaks(snap, squire, today);
     let badges = badges(snap, squire);
-    let goals = goals(snap, squire);
+    let goals = goals(snap, squire, today);
     let rewards = rewards(snap, squire);
     let my_claims = my_claims(snap, squire);
     let my_requests = my_requests(snap, squire);
     let my_cashouts = my_cashouts(snap, squire);
     let adjustments = adjustments(snap, squire);
+    let recent_activity = recent_activity(snap, squire);
 
     StateView {
         squire,
@@ -271,7 +275,81 @@ pub(crate) fn assemble_state(
         my_requests,
         my_cashouts,
         adjustments,
+        recent_activity,
     }
+}
+
+/// The unified, newest-first **recent activity** feed (SQUIRE-T-0124): a single time-ordered list of
+/// the child's coin adjustments, quest claims, and redemption requests — interleaved by event time,
+/// not grouped by type. The event log is already in chronological order, so walking it newest-first
+/// (`.rev()`) and taking the first [`RECENT_LIMIT`] matching events yields exactly the globally most
+/// recent entries, in order — one unified cap across all types.
+fn recent_activity(snap: &Snapshot, squire: UserId) -> Vec<domain_core::contract::ActivityEntry> {
+    use domain_core::contract::ActivityEntry;
+    snap.events
+        .iter()
+        .rev()
+        .filter_map(|e| match e {
+            Event::Adjusted {
+                squire: s,
+                currency: Currency::Coins,
+                amount,
+                reason,
+                at,
+                ..
+            } if *s == squire => Some(ActivityEntry::adjustment(
+                *at,
+                AdjustmentView {
+                    amount: *amount,
+                    reason: reason.clone(),
+                    at: *at,
+                },
+            )),
+            Event::CompletionClaimed {
+                claim_id,
+                squire: s,
+                quest_id,
+                on,
+                at,
+            } if *s == squire => {
+                let quest_title = snap
+                    .quests
+                    .iter()
+                    .find(|q| q.id == *quest_id)
+                    .map(|q| q.title.clone())
+                    .unwrap_or_default();
+                Some(ActivityEntry::claim(
+                    *at,
+                    ClaimStatus {
+                        claim_id: *claim_id,
+                        quest_title,
+                        on: *on,
+                        state: claim_state(snap, *claim_id),
+                    },
+                ))
+            }
+            Event::RedemptionRequested {
+                request_id,
+                squire: s,
+                item_id,
+                at,
+                ..
+            } if *s == squire => {
+                let item = snap.items.iter().find(|i| i.id == *item_id);
+                Some(ActivityEntry::request(
+                    *at,
+                    RedemptionStatus {
+                        request_id: *request_id,
+                        item_name: item.map(|i| i.name.clone()).unwrap_or_default(),
+                        cost: item.map(|i| i.cost).unwrap_or(0),
+                        state: redemption_state(snap, *request_id),
+                    },
+                ))
+            }
+            _ => None,
+        })
+        .take(RECENT_LIMIT)
+        .collect()
 }
 
 /// The Squire's recent point adjustments (newest first, capped) — grants and hazard penalties a
@@ -284,9 +362,18 @@ fn adjustments(snap: &Snapshot, squire: UserId) -> Vec<AdjustmentView> {
         .filter_map(|e| match e {
             // Coin adjustments only, for now — the child's coin activity feed (T-0098/0099 will carry
             // the currency so dollar grants/payouts show too).
-            Event::Adjusted { squire: s, currency: Currency::Coins, amount, reason, at, .. } if *s == squire => {
-                Some(AdjustmentView { amount: *amount, reason: reason.clone(), at: *at })
-            }
+            Event::Adjusted {
+                squire: s,
+                currency: Currency::Coins,
+                amount,
+                reason,
+                at,
+                ..
+            } if *s == squire => Some(AdjustmentView {
+                amount: *amount,
+                reason: reason.clone(),
+                at: *at,
+            }),
             _ => None,
         })
         .take(RECENT_LIMIT)
@@ -301,7 +388,7 @@ const RECENT_LIMIT: usize = 10;
 /// (SQUIRE-T-0094 #3). Streak achievements are shown live in the Streaks section, so they're excluded
 /// here to avoid duplication; this surfaces the rest (TotalCompletions / PointsEarned) that would
 /// otherwise be invisible until earned.
-fn goals(snap: &Snapshot, squire: UserId) -> Vec<GoalView> {
+fn goals(snap: &Snapshot, squire: UserId, today: Date) -> Vec<GoalView> {
     let earned = |aid| {
         snap.events.iter().any(|e| {
             matches!(e, Event::AchievementUnlocked { squire: s, id, .. } if *s == squire && *id == aid)
@@ -312,11 +399,25 @@ fn goals(snap: &Snapshot, squire: UserId) -> Vec<GoalView> {
         .filter(|a| a.active)
         .filter(|a| !matches!(a.criterion, Criterion::Streak { .. }))
         .filter(|a| !earned(a.id))
-        .map(|a| GoalView {
-            id: a.id,
-            name: a.name.clone(),
-            description: goal_description(snap, &a.criterion),
-            bonus: a.bonus_points,
+        .map(|a| {
+            // Progress toward the threshold, reusing the same helpers the unlock gate uses
+            // (criterion_met) so the displayed "x / y" can never disagree with when it unlocks.
+            // Streaks are filtered out above; the arm is defensive (0/0 → no progress shown).
+            let (current, target) = match &a.criterion {
+                Criterion::TotalCompletions { scope, count } => {
+                    (total_completions(snap, squire, scope, today), *count)
+                }
+                Criterion::PointsEarned { total } => (points_earned(snap, squire), *total),
+                Criterion::Streak { .. } => (0, 0),
+            };
+            GoalView {
+                id: a.id,
+                name: a.name.clone(),
+                description: goal_description(snap, &a.criterion),
+                bonus: a.bonus_points,
+                current,
+                target,
+            }
         })
         .collect()
 }
@@ -356,7 +457,13 @@ fn badges(snap: &Snapshot, squire: UserId) -> Vec<domain_core::contract::BadgeVi
     let mut out: Vec<BadgeView> = Vec::new();
     // Walk newest → oldest so the first sighting of an id is the latest unlock.
     for e in snap.events.iter().rev() {
-        if let Event::AchievementUnlocked { squire: s, id, bonus, at } = e {
+        if let Event::AchievementUnlocked {
+            squire: s,
+            id,
+            bonus,
+            at,
+        } = e
+        {
             if *s == squire && seen.insert(id.0) {
                 let name = snap
                     .achievements
@@ -364,7 +471,12 @@ fn badges(snap: &Snapshot, squire: UserId) -> Vec<domain_core::contract::BadgeVi
                     .find(|a| a.id == *id)
                     .map(|a| a.name.clone())
                     .unwrap_or_else(|| format!("#{}", id.0));
-                out.push(BadgeView { id: *id, name, bonus: *bonus, at: *at });
+                out.push(BadgeView {
+                    id: *id,
+                    name,
+                    bonus: *bonus,
+                    at: *at,
+                });
             }
         }
     }
@@ -380,14 +492,21 @@ fn clamp_balance(raw: i64) -> Points {
 /// Every currency the household uses, with this Squire's balance (floored per the currency's policy)
 /// and its display strings (SQUIRE-A-0013). Coins is always present; a currency with a zero balance
 /// is still listed so the child can see "$ 0 owed" rather than the currency vanishing.
-fn currency_balances(snap: &Snapshot, squire: UserId) -> Vec<domain_core::contract::CurrencyBalance> {
+fn currency_balances(
+    snap: &Snapshot,
+    squire: UserId,
+) -> Vec<domain_core::contract::CurrencyBalance> {
     use domain_core::contract::CurrencyBalance;
     Currency::all()
         .iter()
         .map(|&currency| {
             let policy = currency.policy();
             let raw = Proj::balance_in(snap, squire, currency);
-            let balance = if policy.floors_at_zero { raw.max(0) } else { raw };
+            let balance = if policy.floors_at_zero {
+                raw.max(0)
+            } else {
+                raw
+            };
             CurrencyBalance {
                 currency,
                 balance,
@@ -415,7 +534,10 @@ fn quests_today(snap: &Snapshot, squire: UserId, today: Date) -> Vec<QuestCard> 
             // Usage feedback: the active quest log shows only *actionable* quests. A quest that's
             // been completed (approved) or taken by a sibling drops off here — it lives in the
             // recent-activity feed instead — so the list shrinks as quests get done.
-            if matches!(status, QuestStatus::CompletedToday | QuestStatus::TakenByOther) {
+            if matches!(
+                status,
+                QuestStatus::CompletedToday | QuestStatus::TakenByOther
+            ) {
                 return None;
             }
             Some(QuestCard {
@@ -470,7 +592,12 @@ fn is_assignee(snap: &Snapshot, squire: UserId, quest: &Quest) -> bool {
 /// Whether `squire` has already claimed (or had completed/taken) `quest` on `on` — i.e. there is
 /// a claim of theirs for this occurrence, or (for a Race) the occurrence is closed. Used to keep
 /// a scheduled-today quest on the list even after it leaves the `quests_due` set.
-fn squire_acted_today(snap: &Snapshot, squire: UserId, quest_id: domain_core::contract::QuestId, on: Date) -> bool {
+fn squire_acted_today(
+    snap: &Snapshot,
+    squire: UserId,
+    quest_id: domain_core::contract::QuestId,
+    on: Date,
+) -> bool {
     // The Squire's own claim for this occurrence …
     let own_claim = snap.events.iter().any(|e| {
         matches!(
@@ -483,18 +610,25 @@ fn squire_acted_today(snap: &Snapshot, squire: UserId, quest_id: domain_core::co
     let race_taken = snap.quests.iter().any(|q| {
         q.id == quest_id
             && q.completion == domain_core::contract::Completion::Race
-            && snap.events.iter().any(|e| matches!(
-                e,
-                Event::CompletionApproved { claim_id, .. }
-                    if claim_targets(snap, *claim_id, quest_id, on)
-            ))
+            && snap.events.iter().any(|e| {
+                matches!(
+                    e,
+                    Event::CompletionApproved { claim_id, .. }
+                        if claim_targets(snap, *claim_id, quest_id, on)
+                )
+            })
     });
     own_claim || race_taken
 }
 
 /// Whether `claim_id` is a claim for `(quest_id, on)` (any Squire) — resolves an approval back
 /// to its quest/occurrence via the originating `CompletionClaimed`.
-fn claim_targets(snap: &Snapshot, claim_id: domain_core::contract::ClaimId, quest_id: domain_core::contract::QuestId, on: Date) -> bool {
+fn claim_targets(
+    snap: &Snapshot,
+    claim_id: domain_core::contract::ClaimId,
+    quest_id: domain_core::contract::QuestId,
+    on: Date,
+) -> bool {
     snap.events.iter().any(|e| {
         matches!(
             e,
@@ -515,7 +649,12 @@ fn streaks(snap: &Snapshot, squire: UserId, today: Date) -> Vec<StreakView> {
 }
 
 /// Build a [`StreakView`] for one achievement iff its criterion is a `Streak`.
-fn streak_view_for(snap: &Snapshot, squire: UserId, ach: &Achievement, today: Date) -> Option<StreakView> {
+fn streak_view_for(
+    snap: &Snapshot,
+    squire: UserId,
+    ach: &Achievement,
+    today: Date,
+) -> Option<StreakView> {
     match &ach.criterion {
         Criterion::Streak { scope, basis, .. } => {
             let (current, best, alive, next_milestone) =
@@ -561,7 +700,13 @@ fn my_claims(snap: &Snapshot, squire: UserId) -> Vec<ClaimStatus> {
         .iter()
         .rev() // newest-first, so the recent ones survive the RECENT_LIMIT cap
         .filter_map(|e| match e {
-            Event::CompletionClaimed { claim_id, squire: s, quest_id, on, .. } if *s == squire => {
+            Event::CompletionClaimed {
+                claim_id,
+                squire: s,
+                quest_id,
+                on,
+                ..
+            } if *s == squire => {
                 let quest_title = snap
                     .quests
                     .iter()
@@ -586,10 +731,18 @@ fn my_claims(snap: &Snapshot, squire: UserId) -> Vec<ClaimStatus> {
 fn claim_state(snap: &Snapshot, claim_id: domain_core::contract::ClaimId) -> ClaimState {
     for e in &snap.events {
         match e {
-            Event::CompletionApproved { claim_id: c, points, .. } if *c == claim_id => {
+            Event::CompletionApproved {
+                claim_id: c,
+                points,
+                ..
+            } if *c == claim_id => {
                 return ClaimState::approved(*points);
             }
-            Event::CompletionRejected { claim_id: c, reason, .. } if *c == claim_id => {
+            Event::CompletionRejected {
+                claim_id: c,
+                reason,
+                ..
+            } if *c == claim_id => {
                 return ClaimState::rejected(reason.clone());
             }
             _ => {}
@@ -604,7 +757,12 @@ fn my_requests(snap: &Snapshot, squire: UserId) -> Vec<RedemptionStatus> {
         .iter()
         .rev() // newest-first, so the recent ones survive the RECENT_LIMIT cap
         .filter_map(|e| match e {
-            Event::RedemptionRequested { request_id, squire: s, item_id, .. } if *s == squire => {
+            Event::RedemptionRequested {
+                request_id,
+                squire: s,
+                item_id,
+                ..
+            } if *s == squire => {
                 let item = snap.items.iter().find(|i| i.id == *item_id);
                 Some(RedemptionStatus {
                     request_id: *request_id,
@@ -621,13 +779,23 @@ fn my_requests(snap: &Snapshot, squire: UserId) -> Vec<RedemptionStatus> {
 
 /// The resolution of one redemption request: `Approved` (an `ItemRedeemed` carries the
 /// `request_id`), `Rejected { reason }`, or `Pending`.
-fn redemption_state(snap: &Snapshot, request_id: domain_core::contract::RequestId) -> RedemptionState {
+fn redemption_state(
+    snap: &Snapshot,
+    request_id: domain_core::contract::RequestId,
+) -> RedemptionState {
     for e in &snap.events {
         match e {
-            Event::ItemRedeemed { request_id: Some(r), .. } if *r == request_id => {
+            Event::ItemRedeemed {
+                request_id: Some(r),
+                ..
+            } if *r == request_id => {
                 return RedemptionState::approved();
             }
-            Event::RedemptionRejected { request_id: r, reason, .. } if *r == request_id => {
+            Event::RedemptionRejected {
+                request_id: r,
+                reason,
+                ..
+            } if *r == request_id => {
                 return RedemptionState::rejected(reason.clone());
             }
             _ => {}
@@ -642,13 +810,16 @@ fn my_cashouts(snap: &Snapshot, squire: UserId) -> Vec<CashOutStatus> {
         .iter()
         .rev()
         .filter_map(|e| match e {
-            Event::CashOutRequested { request_id, squire: s, amount, .. } if *s == squire => {
-                Some(CashOutStatus {
-                    request_id: *request_id,
-                    amount: *amount,
-                    state: cashout_state(snap, *request_id),
-                })
-            }
+            Event::CashOutRequested {
+                request_id,
+                squire: s,
+                amount,
+                ..
+            } if *s == squire => Some(CashOutStatus {
+                request_id: *request_id,
+                amount: *amount,
+                state: cashout_state(snap, *request_id),
+            }),
             _ => None,
         })
         .take(RECENT_LIMIT)
@@ -663,7 +834,11 @@ fn cashout_state(snap: &Snapshot, request_id: domain_core::contract::RequestId) 
             Event::CashOutApproved { request_id: r, .. } if *r == request_id => {
                 return RedemptionState::approved();
             }
-            Event::CashOutRejected { request_id: r, reason, .. } if *r == request_id => {
+            Event::CashOutRejected {
+                request_id: r,
+                reason,
+                ..
+            } if *r == request_id => {
                 return RedemptionState::rejected(reason.clone());
             }
             _ => {}

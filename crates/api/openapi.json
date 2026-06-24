@@ -778,6 +778,68 @@
         ]
       }
     },
+    "/admin/members/{id}/name": {
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/members/{id}/name` (RequireKnight) — rename a member in place. Reuses the\n`PutUser` upsert (keeps the id, role, active flag, and `created_*` audit; moves `updated_*`),\naudited to the acting Knight. Blank name → 400; a missing member → 404.",
+        "operationId": "rename_member",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Member user id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameMemberReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Renamed"
+          },
+          "400": {
+            "description": "Blank display name"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "Member not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/admin/quests": {
       "get": {
         "tags": [
@@ -1728,19 +1790,72 @@
           "active": {
             "type": "boolean"
           },
+          "basis": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AchBasisKind"
+              }
+            ]
+          },
           "bonus": {
             "type": "integer",
             "format": "int64"
           },
+          "count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "criterion": {
+            "$ref": "#/components/schemas/AchCriterionKind"
+          },
           "id": {
             "$ref": "#/components/schemas/AchievementId"
+          },
+          "length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
           },
           "name": {
             "type": "string"
           },
+          "scope": {
+            "$ref": "#/components/schemas/AchScopeKind"
+          },
+          "scope_category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scope_quest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuestId"
+              }
+            ]
+          },
           "summary": {
             "type": "string",
             "description": "e.g. \"7-day streak · Bedroom\", \"20 completions · Kitchen\", \"100 points\"."
+          },
+          "total": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
           }
         }
       },
@@ -1755,6 +1870,61 @@
             "type": "boolean"
           }
         }
+      },
+      "ActivityEntry": {
+        "type": "object",
+        "description": "One entry in the unified \"recent activity\" feed (SQUIRE-T-0124). A flat tagged object — a `kind`\ndiscriminator plus the variant's nested payload — so the Kotlin SDK gets a clean, decodable data\nclass (A-0009 / SQUIRE-T-0033 flat-struct pattern): exactly one of `adjustment`/`claim`/`request`\nis set, matching `kind`.",
+        "required": [
+          "at",
+          "kind"
+        ],
+        "properties": {
+          "adjustment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AdjustmentView"
+              }
+            ]
+          },
+          "at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "Event time (unix millis) — the whole feed is ordered by this, newest first."
+          },
+          "claim": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ClaimStatus"
+              }
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ActivityKind"
+          },
+          "request": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RedemptionStatus"
+              }
+            ]
+          }
+        }
+      },
+      "ActivityKind": {
+        "type": "string",
+        "enum": [
+          "Adjustment",
+          "Claim",
+          "Request"
+        ]
       },
       "AddMemberReq": {
         "type": "object",
@@ -2359,6 +2529,12 @@
             "$ref": "#/components/schemas/u32",
             "description": "The bonus coins awarded when it unlocks."
           },
+          "current": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Progress so far toward [`Self::target`] (e.g. chores completed, or coins earned) — lets the\nchild see how close they are, like a streak's progress. `serde(default)` for back-compat with\nolder servers / clients that predate the progress fields (SQUIRE-T-0122).",
+            "minimum": 0
+          },
           "description": {
             "type": "string",
             "description": "How to earn it, in kid-friendly words — e.g. \"Complete 10 chores\" or \"Earn 100 coins\"."
@@ -2368,6 +2544,12 @@
           },
           "name": {
             "type": "string"
+          },
+          "target": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The goal's threshold (e.g. 10 chores, 100 coins). `0` when an older server omitted it.",
+            "minimum": 0
           }
         }
       },
@@ -2409,6 +2591,13 @@
             ],
             "format": "int64"
           },
+          "achievement_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The achievement's name, resolved from `achievement_id` (SQUIRE-T-0121) — present for unlock rows."
+          },
           "actor": {
             "type": [
               "integer",
@@ -2416,6 +2605,13 @@
             ],
             "format": "int64",
             "description": "The acting Knight, if any (`None` = auto-approve / system / squire-initiated)."
+          },
+          "actor_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The acting Knight's display name, resolved from `actor` (SQUIRE-T-0121) — so the feed can say\n\"approved by Dad\" instead of leaking a raw id. `None` when there's no actor."
           },
           "amount": {
             "type": [
@@ -2448,6 +2644,13 @@
             ],
             "format": "int64"
           },
+          "item_title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reward's name, resolved from `item_id` (SQUIRE-T-0121) — present for redemption rows."
+          },
           "kind": {
             "type": "string",
             "description": "Variant tag: `Claimed | Approved | Rejected | Redeemed | Requested | RedemptionRejected | Unlocked | Adjusted`."
@@ -2459,6 +2662,13 @@
             ],
             "format": "int64"
           },
+          "quest_title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The quest's title, resolved from `quest_id` (SQUIRE-T-0121) — present for claim/approval rows."
+          },
           "reason": {
             "type": [
               "string",
@@ -2469,6 +2679,13 @@
             "type": "integer",
             "format": "int64",
             "description": "The Squire the event is scoped to."
+          },
+          "squire_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Squire's display name, resolved server-side from `squire` (SQUIRE-T-0121). `None` only if\nthe id no longer maps to any household member."
           }
         }
       },
@@ -2588,9 +2805,34 @@
           "active": {
             "type": "boolean"
           },
+          "availability": {
+            "$ref": "#/components/schemas/AvailabilityKind"
+          },
           "cost": {
             "type": "integer",
             "format": "int64"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AchievementId"
+              }
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "id": {
             "$ref": "#/components/schemas/ItemId"
@@ -2948,6 +3190,10 @@
           "active": {
             "type": "boolean"
           },
+          "assign_all": {
+            "type": "boolean",
+            "description": "True = all squires; false = the explicit `squires` list."
+          },
           "assignment_label": {
             "type": "string",
             "description": "e.g. \"All squires\", \"Gawain, Percival\"."
@@ -2955,9 +3201,17 @@
           "auto_approve": {
             "type": "boolean"
           },
+          "cadence": {
+            "$ref": "#/components/schemas/CadenceKind",
+            "description": "`Daily | Weekly | OneOff` (an `EveryNDays` quest reports `Daily` — not phone-authorable)."
+          },
           "cadence_label": {
             "type": "string",
             "description": "e.g. \"Daily\", \"Mon/Wed/Fri\", \"One-time\"."
+          },
+          "cash": {
+            "type": "integer",
+            "format": "int64"
           },
           "category": {
             "type": [
@@ -2975,6 +3229,22 @@
             ],
             "description": "The authored blurb (so the editor can pre-fill it on edit). `serde(default)` for back-compat."
           },
+          "due": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Date"
+              }
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "$ref": "#/components/schemas/QuestId"
           },
@@ -2985,8 +3255,28 @@
             "type": "integer",
             "format": "int64"
           },
+          "squires": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
           "title": {
             "type": "string"
+          },
+          "weekdays": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/WeekdayDto"
+            }
           }
         }
       },
@@ -3095,6 +3385,18 @@
           },
           "token": {
             "$ref": "#/components/schemas/AuthToken"
+          }
+        }
+      },
+      "RenameMemberReq": {
+        "type": "object",
+        "description": "`POST /admin/members/{id}/name` body — a member's new display name (SQUIRE-T-0120/0126).",
+        "required": [
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
           }
         }
       },
@@ -3383,6 +3685,13 @@
             "items": {
               "$ref": "#/components/schemas/QuestCard"
             }
+          },
+          "recent_activity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityEntry"
+            },
+            "description": "The unified, newest-first **recent activity** feed (SQUIRE-T-0124): adjustments, claims, and\nredemption requests merged into one globally time-ordered list (capped), so the child's\nActivity tab interleaves them by time instead of grouping by type. `#[serde(default)]` for\nback-compat; the typed `adjustments`/`my_claims`/`my_requests` lists remain for older clients."
           },
           "rewards": {
             "type": "array",

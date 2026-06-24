@@ -28,7 +28,9 @@ const HANDLE: &str = "keep";
 /// with `Authorization: Bearer <token>`.
 fn keep() -> (Arc<KeepState>, u128, String, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("tempdir");
-    let backend = Backend::Sqlite { dir: dir.path().to_path_buf() };
+    let backend = Backend::Sqlite {
+        dir: dir.path().to_path_buf(),
+    };
     let state = KeepState::local(
         backend,
         domain_core::contract::HouseholdHandle(HANDLE.into()),
@@ -58,7 +60,11 @@ fn add_squire(state: &Arc<KeepState>, admin: u128) -> UserId {
         .identity
         .add_member(
             &caller,
-            AddMemberReq { role: Role::Squire, display_name: "Gareth".into(), initial_secret: "g".into() },
+            AddMemberReq {
+                role: Role::Squire,
+                display_name: "Gareth".into(),
+                initial_secret: "g".into(),
+            },
         )
         .expect("add squire")
         .user
@@ -104,18 +110,44 @@ async fn send(
     let resp = router(state.clone()).oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    let value = if bytes.is_empty() { Value::Null } else { serde_json::from_slice(&bytes).unwrap_or(Value::Null) };
+    let value = if bytes.is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
+    };
     (status, value)
 }
 
 /// Approve a fresh claim for `squire` on `quest`/`on` via the engine-direct seam (used to exercise
 /// reward snapshotting). The acting Knight is `admin`.
-fn claim_and_approve(state: &Arc<KeepState>, admin: u128, squire: UserId, quest: u128, on: domain_core::contract::Date, claim: u128) {
+fn claim_and_approve(
+    state: &Arc<KeepState>,
+    admin: u128,
+    squire: UserId,
+    quest: u128,
+    on: domain_core::contract::Date,
+    claim: u128,
+) {
     state
-        .commit(None, Command::SubmitClaim { claim_id: ClaimId(claim), squire, quest_id: QuestId(quest), on })
+        .commit(
+            None,
+            Command::SubmitClaim {
+                claim_id: ClaimId(claim),
+                squire,
+                quest_id: QuestId(quest),
+                on,
+            },
+        )
         .expect("submit");
     state
-        .commit(Some(UserId(admin)), Command::ReviewClaim { actor: UserId(admin), claim_id: ClaimId(claim), decision: Decision::Approve })
+        .commit(
+            Some(UserId(admin)),
+            Command::ReviewClaim {
+                actor: UserId(admin),
+                claim_id: ClaimId(claim),
+                decision: Decision::Approve,
+            },
+        )
         .expect("approve");
 }
 
@@ -129,22 +161,45 @@ fn balance(state: &Arc<KeepState>, squire: UserId) -> i64 {
 async fn create_lists_and_audits_to_the_knight() {
     let (state, admin, token, _dir) = keep();
 
-    let (st, body) = send(&state, "POST", "/api/quests", Some(&token), Some(to_value(daily_quest(100, 5)).unwrap())).await;
+    let (st, body) = send(
+        &state,
+        "POST",
+        "/api/quests",
+        Some(&token),
+        Some(to_value(daily_quest(100, 5)).unwrap()),
+    )
+    .await;
     assert_eq!(st, StatusCode::OK);
     assert_eq!(body["id"], "100");
 
     let (st, list) = send(&state, "GET", "/api/quests", Some(&token), None).await;
     assert_eq!(st, StatusCode::OK);
-    let row = list.as_array().unwrap().iter().find(|r| r["quest"]["id"] == 100).expect("quest in list");
+    let row = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["quest"]["id"] == 100)
+        .expect("quest in list");
     assert_eq!(row["quest"]["active"], true);
     assert_eq!(row["quest"]["reward"], 5);
-    assert_eq!(row["audit"]["created_by"], admin.to_string(), "authoring audited to the Knight");
+    assert_eq!(
+        row["audit"]["created_by"],
+        admin.to_string(),
+        "authoring audited to the Knight"
+    );
 }
 
 #[tokio::test]
 async fn unauthenticated_create_is_401() {
     let (state, _admin, _token, _dir) = keep();
-    let (st, _) = send(&state, "POST", "/api/quests", None, Some(to_value(daily_quest(1, 5)).unwrap())).await;
+    let (st, _) = send(
+        &state,
+        "POST",
+        "/api/quests",
+        None,
+        Some(to_value(daily_quest(1, 5)).unwrap()),
+    )
+    .await;
     assert_eq!(st, StatusCode::UNAUTHORIZED);
 }
 
@@ -154,7 +209,14 @@ async fn invalid_definition_is_400() {
     // Assignment::Squires(empty) is an invalid definition → 400 (not a 500).
     let mut q = daily_quest(7, 5);
     q.assignment = Assignment::Squires(BTreeSet::new());
-    let (st, _) = send(&state, "POST", "/api/quests", Some(&token), Some(to_value(q).unwrap())).await;
+    let (st, _) = send(
+        &state,
+        "POST",
+        "/api/quests",
+        Some(&token),
+        Some(to_value(q).unwrap()),
+    )
+    .await;
     assert_eq!(st, StatusCode::BAD_REQUEST);
 }
 
@@ -167,19 +229,48 @@ async fn reward_edits_are_forward_only() {
     let today = state.clock.today();
 
     // Define reward 5, approve a claim → +5.
-    let (st, _) = send(&state, "POST", "/api/quests", Some(&token), Some(to_value(daily_quest(100, 5)).unwrap())).await;
+    let (st, _) = send(
+        &state,
+        "POST",
+        "/api/quests",
+        Some(&token),
+        Some(to_value(daily_quest(100, 5)).unwrap()),
+    )
+    .await;
     assert_eq!(st, StatusCode::OK);
     claim_and_approve(&state, admin, squire, 100, today, 9001);
     assert_eq!(balance(&state, squire), 5);
 
     // Edit the reward to 10 (same id → upsert). The PAST payout is untouched (still 5).
-    let (st, _) = send(&state, "POST", "/api/quests", Some(&token), Some(to_value(daily_quest(100, 10)).unwrap())).await;
+    let (st, _) = send(
+        &state,
+        "POST",
+        "/api/quests",
+        Some(&token),
+        Some(to_value(daily_quest(100, 10)).unwrap()),
+    )
+    .await;
     assert_eq!(st, StatusCode::OK);
-    assert_eq!(balance(&state, squire), 5, "editing reward must not rewrite a past approval");
+    assert_eq!(
+        balance(&state, squire),
+        5,
+        "editing reward must not rewrite a past approval"
+    );
 
     // A NEW approval (next day) snapshots the new reward → +10 → 15 total.
-    claim_and_approve(&state, admin, squire, 100, domain_core::contract::Date(today.0 + 1), 9002);
-    assert_eq!(balance(&state, squire), 15, "future approvals use the new reward");
+    claim_and_approve(
+        &state,
+        admin,
+        squire,
+        100,
+        domain_core::contract::Date(today.0 + 1),
+        9002,
+    );
+    assert_eq!(
+        balance(&state, squire),
+        15,
+        "future approvals use the new reward"
+    );
 }
 
 // ─── archive (never delete) ──────────────────────────────────────────────────────────────────
@@ -189,15 +280,34 @@ async fn archive_deactivates_but_keeps_history() {
     let (state, admin, token, _dir) = keep();
     let squire = add_squire(&state, admin);
     let today = state.clock.today();
-    send(&state, "POST", "/api/quests", Some(&token), Some(to_value(daily_quest(100, 5)).unwrap())).await;
+    send(
+        &state,
+        "POST",
+        "/api/quests",
+        Some(&token),
+        Some(to_value(daily_quest(100, 5)).unwrap()),
+    )
+    .await;
     claim_and_approve(&state, admin, squire, 100, today, 9001);
     assert_eq!(balance(&state, squire), 5);
 
     // Archive → 204; the quest is now inactive but the historical credit stands.
-    let (st, _) = send(&state, "POST", "/api/quests/100/archive", Some(&token), None).await;
+    let (st, _) = send(
+        &state,
+        "POST",
+        "/api/quests/100/archive",
+        Some(&token),
+        None,
+    )
+    .await;
     assert_eq!(st, StatusCode::NO_CONTENT);
     let (_st, list) = send(&state, "GET", "/api/quests", Some(&token), None).await;
-    let row = list.as_array().unwrap().iter().find(|r| r["quest"]["id"] == 100).unwrap();
+    let row = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["quest"]["id"] == 100)
+        .unwrap();
     assert_eq!(row["quest"]["active"], false, "archived, not deleted");
     assert_eq!(balance(&state, squire), 5, "history survives archive");
 }
@@ -205,7 +315,14 @@ async fn archive_deactivates_but_keeps_history() {
 #[tokio::test]
 async fn archive_missing_quest_is_404() {
     let (state, _admin, token, _dir) = keep();
-    let (st, _) = send(&state, "POST", "/api/quests/424242/archive", Some(&token), None).await;
+    let (st, _) = send(
+        &state,
+        "POST",
+        "/api/quests/424242/archive",
+        Some(&token),
+        None,
+    )
+    .await;
     assert_eq!(st, StatusCode::NOT_FOUND);
 }
 
@@ -219,12 +336,26 @@ async fn race_quest_assignment_and_completion_round_trip() {
     let mut q = daily_quest(200, 8);
     q.completion = Completion::Race;
     q.assignment = Assignment::Squires(BTreeSet::from([squire]));
-    let (st, _) = send(&state, "POST", "/api/quests", Some(&token), Some(to_value(q).unwrap())).await;
+    let (st, _) = send(
+        &state,
+        "POST",
+        "/api/quests",
+        Some(&token),
+        Some(to_value(q).unwrap()),
+    )
+    .await;
     assert_eq!(st, StatusCode::OK);
 
     let (_st, list) = send(&state, "GET", "/api/quests", Some(&token), None).await;
-    let row = list.as_array().unwrap().iter().find(|r| r["quest"]["id"] == 200).unwrap();
+    let row = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["quest"]["id"] == 200)
+        .unwrap();
     assert_eq!(row["quest"]["completion"], "Race");
-    let assigned = row["quest"]["assignment"]["Squires"].as_array().expect("explicit squire subset");
+    let assigned = row["quest"]["assignment"]["Squires"]
+        .as_array()
+        .expect("explicit squire subset");
     assert_eq!(assigned.len(), 1, "the one assigned squire round-trips");
 }

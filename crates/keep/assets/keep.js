@@ -292,6 +292,26 @@
         info.append(inactive);
       }
 
+      // Rename in place (SQUIRE-T-0120/0126) — keeps the member's id, role, and pairing.
+      const renameBtn = document.createElement("button");
+      renameBtn.className = "btn-sm btn-ghost";
+      renameBtn.textContent = "Rename";
+      renameBtn.addEventListener("click", async () => {
+        const next = prompt(`New name for ${m.display_name}:`, m.display_name);
+        if (next == null) return;
+        const name = next.trim();
+        if (!name || name === m.display_name) return;
+        const r = await fetch(`/api/members/${m.user}/name`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ display_name: name }),
+        });
+        if (r.ok) {
+          loadMembers();
+          loadPairMembers();
+        }
+      });
+
       const btn = document.createElement("button");
       btn.className = "btn-sm btn-ghost";
       btn.textContent = m.active ? "Deactivate" : "Reactivate";
@@ -305,7 +325,7 @@
         loadPairMembers();
       });
 
-      li.append(info, btn);
+      li.append(info, renameBtn, btn);
       ul.appendChild(li);
     }
   }
@@ -420,6 +440,10 @@
         li.appendChild(c);
       }
       if (obj.active) {
+        // Edit-in-place for rewards + achievements (SQUIRE-T-0120/0126).
+        const editBtn = el("button", "edit-row", "Edit");
+        editBtn.addEventListener("click", () => (row.item ? fillItemForm(obj) : fillAchForm(obj)));
+        li.appendChild(editBtn);
         const btn = el("button", "archive", "Archive");
         btn.addEventListener("click", async () => {
           await fetch(`/api/${kind}/${obj.id}/archive`, { method: "POST" });
@@ -544,8 +568,75 @@
   // ── Quests (T-0026 / rich authoring T-0062) ──────────────────────────────────
   // The session cookie is HttpOnly; same-origin fetch sends it automatically, so the Operator
   // extractor authenticates these calls without the page handling the token.
+  // ── Edit-in-place (SQUIRE-T-0120) ────────────────────────────────────────────
+  // Authoring is an upsert: re-POSTing a definition with an EXISTING id edits it in place (the engine
+  // replaces the row, keeping its id + created audit). Each catalog form can enter "edit mode" —
+  // prefilled, submit relabelled "Save changes", with a Cancel — and reuses the stashed id on submit
+  // instead of minting a fresh one. `null` id ⇒ a normal create.
+  let questEdit = null;
+  let itemEdit = null;
+  let achEdit = null;
+  function makeEditable(form) {
+    const submit = form.querySelector('button[type="submit"]');
+    const createLabel = submit ? submit.textContent : "Save";
+    const cancel = el("button", "cancel-edit", "Cancel");
+    cancel.type = "button";
+    cancel.hidden = true;
+    if (submit) submit.after(cancel);
+    cancel.addEventListener("click", () => form.reset());
+    const state = { id: null };
+    form.addEventListener("reset", () => {
+      state.id = null;
+      cancel.hidden = true;
+      if (submit) submit.textContent = createLabel;
+    });
+    state.enter = (id) => {
+      state.id = id;
+      cancel.hidden = false;
+      if (submit) submit.textContent = "Save changes";
+      form.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    return state;
+  }
+
   const questForm = document.getElementById("quest-form");
   const questErr = document.getElementById("quest-error");
+
+  // Prefill the quest form from a raw quest object and enter edit mode (SQUIRE-T-0120). The Keep's
+  // GET /api/quests returns the full domain quest, so every field round-trips.
+  function fillQuestForm(q) {
+    if (!questForm) return;
+    const set = (name, val) => { const e = questForm.querySelector(`[name="${name}"]`); if (e) e.value = val; };
+    set("title", q.title || "");
+    set("reward", q.reward);
+    set("cash", Number(q.cash) || 0);
+    set("category", q.category || "");
+    set("completion", q.completion || "EachAssignee");
+    const cad = q.cadence || {};
+    const cadSel = document.getElementById("quest-cadence");
+    if (cad.Recurring === "Daily") {
+      cadSel.value = "Daily";
+    } else if (cad.Recurring && cad.Recurring.Weekly) {
+      cadSel.value = "Weekly";
+      const days = cad.Recurring.Weekly.days || [];
+      for (const cb of questForm.querySelectorAll('input[name="wd"]')) cb.checked = days.includes(cb.value);
+    } else if (cad.OneOff) {
+      cadSel.value = "OneOff";
+      set("due", cad.OneOff.due != null ? fromDomainDate(cad.OneOff.due) : "");
+    }
+    const some = !!(q.assignment && q.assignment.Squires);
+    for (const r of questForm.querySelectorAll('input[name="assign"]')) r.checked = r.value === (some ? "some" : "all");
+    const ids = some ? q.assignment.Squires.map(String) : [];
+    for (const cb of questForm.querySelectorAll('input[name="squire"]')) cb.checked = ids.includes(cb.value);
+    const auto = questForm.querySelector('[name="auto_approve"]'); if (auto) auto.checked = !!q.auto_approve;
+    const rep = questForm.querySelector('[name="repeat_day"]'); if (rep) rep.checked = !!q.repeatable_within_day;
+    syncQuestFields();
+    questEdit.enter(q.id);
+  }
+  // Inverse of toDomainDate: domain day-count → yyyy-mm-dd (UTC).
+  function fromDomainDate(d) {
+    return new Date((d - 3) * 86400000).toISOString().slice(0, 10);
+  }
 
   // Active squires, for the assignment picker + list labels.
   let squiresById = {};
@@ -620,6 +711,9 @@
       if (Number(q.cash) > 0) li.appendChild(el("span", "chip", `$${Number(q.cash)}`));
       li.appendChild(coinPill(q.reward));
       if (q.active) {
+        const editBtn = el("button", "edit-row", "Edit");
+        editBtn.addEventListener("click", () => fillQuestForm(q));
+        li.appendChild(editBtn);
         const btn = el("button", "archive", "Archive");
         btn.addEventListener("click", async () => {
           await fetch(`/api/quests/${q.id}/archive`, { method: "POST" });
@@ -633,6 +727,7 @@
   }
 
   if (questForm) {
+    questEdit = makeEditable(questForm);
     document.getElementById("quest-cadence").addEventListener("change", syncQuestFields);
     for (const r of questForm.querySelectorAll('input[name="assign"]')) {
       r.addEventListener("change", syncQuestFields);
@@ -668,8 +763,9 @@
 
       const category = (fd.get("category") || "").trim();
       const quest = {
-        // QuestId is a u128 deserialized from a JSON number; Date.now() is well under 2^53.
-        id: Date.now(),
+        // Reuse the existing id when editing (upsert); otherwise mint a fresh one. QuestId is a u128
+        // deserialized from a JSON number; Date.now() is well under 2^53 (SQUIRE-T-0120).
+        id: questEdit.id ?? Date.now(),
         title: fd.get("title"),
         description: null,
         category: category || null,
@@ -787,7 +883,22 @@
   // ── Item create (T-0027) ─────────────────────────────────────────────────────
   const itemForm = document.getElementById("item-form");
   const itemErr = document.getElementById("item-error");
+
+  // Prefill the reward form from a raw item and enter edit mode (SQUIRE-T-0120).
+  function fillItemForm(it) {
+    if (!itemForm) return;
+    const set = (name, val) => { const e = itemForm.querySelector(`[name="${name}"]`); if (e) e.value = val; };
+    set("name", it.name || "");
+    set("description", it.description || "");
+    set("cost", it.cost);
+    set("availability", it.availability || "Repeatable");
+    const gate = document.getElementById("item-gate");
+    if (gate) gate.value = it.gate != null ? String(it.gate) : "";
+    itemEdit.enter(it.id);
+  }
+
   if (itemForm) {
+    itemEdit = makeEditable(itemForm);
     itemForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       itemErr.hidden = true;
@@ -800,7 +911,7 @@
       const desc = (fd.get("description") || "").trim();
       const gateRaw = fd.get("gate");
       const item = {
-        id: Date.now(),
+        id: itemEdit.id ?? Date.now(), // reuse id when editing (upsert) — SQUIRE-T-0120
         name,
         description: desc || null,
         cost,
@@ -936,7 +1047,40 @@
     return "Any";
   }
 
+  // Prefill the achievement form from a raw achievement and enter edit mode (SQUIRE-T-0120/0126),
+  // round-tripping the criterion (PointsEarned | TotalCompletions | Streak) and its scope.
+  function fillAchForm(a) {
+    if (!achForm) return;
+    const set = (name, val) => { const e = achForm.querySelector(`[name="${name}"]`); if (e != null) e.value = val; };
+    set("name", a.name || "");
+    set("bonus", a.bonus_points);
+    const critSel = document.getElementById("ach-criterion");
+    const scopeSel = document.getElementById("ach-scope");
+    const setScope = (scope) => {
+      if (scope && scope.Quest != null) { scopeSel.value = "Quest"; set("scope_quest", String(scope.Quest)); }
+      else if (scope && scope.Category != null) { scopeSel.value = "Category"; set("scope_category", scope.Category); }
+      else { scopeSel.value = "Any"; }
+    };
+    const c = a.criterion || {};
+    if (c.PointsEarned) {
+      critSel.value = "PointsEarned";
+      set("total", c.PointsEarned.total);
+    } else if (c.TotalCompletions) {
+      critSel.value = "TotalCompletions";
+      set("count", c.TotalCompletions.count);
+      setScope(c.TotalCompletions.scope);
+    } else if (c.Streak) {
+      critSel.value = "Streak";
+      set("length", c.Streak.length);
+      set("basis", c.Streak.basis);
+      setScope(c.Streak.scope);
+    }
+    syncAchFields();
+    achEdit.enter(a.id);
+  }
+
   if (achForm) {
+    achEdit = makeEditable(achForm);
     document.getElementById("ach-criterion").addEventListener("change", syncAchFields);
     document.getElementById("ach-scope").addEventListener("change", syncAchFields);
     syncAchFields();
@@ -961,7 +1105,7 @@
         criterion = { Streak: { scope: buildScope(fd), length: Number(fd.get("length")), basis: fd.get("basis") } };
       }
       const achievement = {
-        id: Date.now(),
+        id: achEdit.id ?? Date.now(), // reuse id when editing (upsert) — SQUIRE-T-0120/0126
         name: fd.get("name"),
         description: null,
         criterion,

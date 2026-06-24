@@ -6,17 +6,17 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use identity::{DevIdentity, Principal};
 use api::{router, AppState};
+use identity::{DevIdentity, Principal};
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 
 use domain_core::contract::{
-    Achievement, AchievementId, Assignment, AuthToken, Cadence, Change, Completion, Criterion, Date,
-    Event, HouseholdHandle, ItemId, Quest, QuestId, RedeemableItem, Availability, Role, Schedule,
-    Scope, StateView, SubmitClaimResp, RequestRedemptionResp, ClaimStateKind, RedemptionStateKind,
-    Timestamp, User, UserId,
+    Achievement, AchievementId, Assignment, AuthToken, Availability, Cadence, Change,
+    ClaimStateKind, Completion, Criterion, Date, Event, HouseholdHandle, ItemId, Quest, QuestId,
+    RedeemableItem, RedemptionStateKind, RequestRedemptionResp, Role, Schedule, Scope, StateView,
+    SubmitClaimResp, Timestamp, User, UserId,
 };
 use domain_core::contract::{Clock, Repository};
 use store::tenant::{Backend, Provisioner};
@@ -46,7 +46,9 @@ fn test_state() -> (Arc<AppState>, tempfile::TempDir, Date) {
 /// achievement + an unlock for the badge test).
 fn test_state_with(extra: &[Change]) -> (Arc<AppState>, tempfile::TempDir, Date) {
     let dir = tempfile::tempdir().expect("tempdir");
-    let provisioner = Provisioner::new(Backend::Sqlite { dir: dir.path().to_path_buf() });
+    let provisioner = Provisioner::new(Backend::Sqlite {
+        dir: dir.path().to_path_buf(),
+    });
     let mut store = provisioner
         .open(HANDLE, SystemClock)
         .expect("open tenant store");
@@ -54,8 +56,18 @@ fn test_state_with(extra: &[Change]) -> (Arc<AppState>, tempfile::TempDir, Date)
     let today = store.clock().today();
 
     // Seed identity + definitions directly via Put* changes (by = None: a system seed).
-    let knight = User { id: UserId(KNIGHT_ID), role: Role::Knight, display_name: "Knight".into(), active: true };
-    let squire = User { id: UserId(SQUIRE_ID), role: Role::Squire, display_name: "Squire".into(), active: true };
+    let knight = User {
+        id: UserId(KNIGHT_ID),
+        role: Role::Knight,
+        display_name: "Knight".into(),
+        active: true,
+    };
+    let squire = User {
+        id: UserId(SQUIRE_ID),
+        role: Role::Squire,
+        display_name: "Squire".into(),
+        active: true,
+    };
 
     let mut assignees = BTreeSet::new();
     assignees.insert(UserId(SQUIRE_ID));
@@ -99,11 +111,19 @@ fn test_state_with(extra: &[Change]) -> (Arc<AppState>, tempfile::TempDir, Date)
     let identity = DevIdentity::new(store.clone());
     identity.seed(
         AuthToken(KNIGHT_TOKEN.into()),
-        Principal { household: HouseholdHandle(HANDLE.into()), user: UserId(KNIGHT_ID), role: Role::Knight },
+        Principal {
+            household: HouseholdHandle(HANDLE.into()),
+            user: UserId(KNIGHT_ID),
+            role: Role::Knight,
+        },
     );
     identity.seed(
         AuthToken(SQUIRE_TOKEN.into()),
-        Principal { household: HouseholdHandle(HANDLE.into()), user: UserId(SQUIRE_ID), role: Role::Squire },
+        Principal {
+            household: HouseholdHandle(HANDLE.into()),
+            user: UserId(SQUIRE_ID),
+            role: Role::Squire,
+        },
     );
 
     let state = AppState::new(store, Arc::new(identity));
@@ -148,7 +168,10 @@ async fn get_state_returns_squires_view() {
     assert_eq!(view.quests_today.len(), 1);
     let card = &view.quests_today[0];
     assert_eq!(card.quest_id, QuestId(QUEST_ID));
-    assert!(matches!(card.status, domain_core::contract::QuestStatus::Available));
+    assert!(matches!(
+        card.status,
+        domain_core::contract::QuestStatus::Available
+    ));
     // The reward card is present.
     assert_eq!(view.rewards.len(), 1);
     assert_eq!(view.rewards[0].item_id, ItemId(ITEM_ID));
@@ -168,7 +191,12 @@ async fn submit_claim_is_pending_and_idempotent() {
     .to_string();
 
     let resp = router(state.clone())
-        .oneshot(req("POST", "/claims", Some(SQUIRE_TOKEN), Some(body.clone())))
+        .oneshot(req(
+            "POST",
+            "/claims",
+            Some(SQUIRE_TOKEN),
+            Some(body.clone()),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -193,7 +221,10 @@ async fn submit_claim_is_pending_and_idempotent() {
     )
     .await;
     assert_eq!(view.my_claims.len(), 1);
-    assert!(matches!(view.my_claims[0].state.state, ClaimStateKind::Pending));
+    assert!(matches!(
+        view.my_claims[0].state.state,
+        ClaimStateKind::Pending
+    ));
 }
 
 #[tokio::test]
@@ -202,7 +233,12 @@ async fn redemption_request_is_pending_and_shows_in_state() {
     let body = serde_json::json!({ "request_id": 8000u128, "item_id": ITEM_ID }).to_string();
 
     let resp = router(state.clone())
-        .oneshot(req("POST", "/redemption-requests", Some(SQUIRE_TOKEN), Some(body)))
+        .oneshot(req(
+            "POST",
+            "/redemption-requests",
+            Some(SQUIRE_TOKEN),
+            Some(body),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -217,7 +253,10 @@ async fn redemption_request_is_pending_and_shows_in_state() {
     )
     .await;
     assert_eq!(view.my_requests.len(), 1);
-    assert!(matches!(view.my_requests[0].state.state, RedemptionStateKind::Pending));
+    assert!(matches!(
+        view.my_requests[0].state.state,
+        RedemptionStateKind::Pending
+    ));
     assert_eq!(view.my_requests[0].cost, 3);
 }
 
@@ -229,31 +268,79 @@ async fn knight_reject_with_reason_surfaces_to_child_then_reclaim_approves() {
     let (state, _dir, today) = test_state();
 
     // Child claims.
-    let claim = serde_json::json!({ "claim_id": 9100u128, "quest_id": QUEST_ID, "on": today.0 }).to_string();
-    let resp = router(state.clone()).oneshot(req("POST", "/claims", Some(SQUIRE_TOKEN), Some(claim))).await.unwrap();
+    let claim = serde_json::json!({ "claim_id": 9100u128, "quest_id": QUEST_ID, "on": today.0 })
+        .to_string();
+    let resp = router(state.clone())
+        .oneshot(req("POST", "/claims", Some(SQUIRE_TOKEN), Some(claim)))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
     // Knight rejects with a reason.
     let reject = serde_json::json!({ "claim_id": 9100u128, "decision": { "verdict": "reject", "reason": "Make the bed first" } }).to_string();
-    let resp = router(state.clone()).oneshot(req("POST", "/admin/review-claim", Some(KNIGHT_TOKEN), Some(reject))).await.unwrap();
+    let resp = router(state.clone())
+        .oneshot(req(
+            "POST",
+            "/admin/review-claim",
+            Some(KNIGHT_TOKEN),
+            Some(reject),
+        ))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
     // The child sees the rejection AND the reason; nothing credited.
-    let view: StateView = json_body(router(state.clone()).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap()).await;
-    let rejected = view.my_claims.iter().find(|c| matches!(c.state.state, ClaimStateKind::Rejected)).expect("a rejected claim");
+    let view: StateView = json_body(
+        router(state.clone())
+            .oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let rejected = view
+        .my_claims
+        .iter()
+        .find(|c| matches!(c.state.state, ClaimStateKind::Rejected))
+        .expect("a rejected claim");
     assert_eq!(rejected.state.reason.as_deref(), Some("Make the bed first"));
     assert_eq!(view.balance, 0, "a rejected claim credits nothing");
 
     // The slot re-opened: a fresh claim, approved, credits the reward and shows Approved {points}.
-    let reclaim = serde_json::json!({ "claim_id": 9101u128, "quest_id": QUEST_ID, "on": today.0 }).to_string();
-    router(state.clone()).oneshot(req("POST", "/claims", Some(SQUIRE_TOKEN), Some(reclaim))).await.unwrap();
-    let approve = serde_json::json!({ "claim_id": 9101u128, "decision": { "verdict": "approve" } }).to_string();
-    let resp = router(state.clone()).oneshot(req("POST", "/admin/review-claim", Some(KNIGHT_TOKEN), Some(approve))).await.unwrap();
+    let reclaim = serde_json::json!({ "claim_id": 9101u128, "quest_id": QUEST_ID, "on": today.0 })
+        .to_string();
+    router(state.clone())
+        .oneshot(req("POST", "/claims", Some(SQUIRE_TOKEN), Some(reclaim)))
+        .await
+        .unwrap();
+    let approve = serde_json::json!({ "claim_id": 9101u128, "decision": { "verdict": "approve" } })
+        .to_string();
+    let resp = router(state.clone())
+        .oneshot(req(
+            "POST",
+            "/admin/review-claim",
+            Some(KNIGHT_TOKEN),
+            Some(approve),
+        ))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    let view: StateView = json_body(router(state).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap()).await;
-    assert_eq!(view.balance, 5, "the approved re-claim credits the quest reward");
-    let approved = view.my_claims.iter().find(|c| matches!(c.state.state, ClaimStateKind::Approved)).expect("an approved claim");
+    let view: StateView = json_body(
+        router(state)
+            .oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        view.balance, 5,
+        "the approved re-claim credits the quest reward"
+    );
+    let approved = view
+        .my_claims
+        .iter()
+        .find(|c| matches!(c.state.state, ClaimStateKind::Approved))
+        .expect("an approved claim");
     assert_eq!(approved.state.points, Some(5));
 }
 
@@ -263,7 +350,13 @@ async fn knight_reject_with_reason_surfaces_to_child_then_reclaim_approves() {
 async fn earned_achievements_surface_as_badges() {
     // No badges by default.
     let (fresh, _dir, _t) = test_state();
-    let view: StateView = json_body(router(fresh).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap()).await;
+    let view: StateView = json_body(
+        router(fresh)
+            .oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None))
+            .await
+            .unwrap(),
+    )
+    .await;
     assert!(view.badges.is_empty(), "a fresh squire has no badges");
 
     // Seed an achievement definition + an unlock for the squire.
@@ -277,14 +370,252 @@ async fn earned_achievements_surface_as_badges() {
     };
     let (state, _dir, _t) = test_state_with(&[
         Change::PutAchievement(ach),
-        Change::Append(Event::AchievementUnlocked { squire: UserId(SQUIRE_ID), id: AchievementId(900), bonus: 25, at: Timestamp(123) }),
+        Change::Append(Event::AchievementUnlocked {
+            squire: UserId(SQUIRE_ID),
+            id: AchievementId(900),
+            bonus: 25,
+            at: Timestamp(123),
+        }),
     ]);
-    let view: StateView = json_body(router(state).oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None)).await.unwrap()).await;
-    assert_eq!(view.badges.len(), 1, "the earned achievement shows as a badge");
+    let view: StateView = json_body(
+        router(state)
+            .oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        view.badges.len(),
+        1,
+        "the earned achievement shows as a badge"
+    );
     let b = &view.badges[0];
     assert_eq!(b.id, AchievementId(900));
     assert_eq!(b.name, "Century Club");
     assert_eq!(b.bonus, 25);
+}
+
+/// Non-streak goals carry live progress toward their threshold (SQUIRE-T-0122): a `TotalCompletions`
+/// goal counts approved completions and a `PointsEarned` goal counts earned points — using the same
+/// helpers the unlock gate uses, so the displayed "x / y" can't disagree with when it unlocks.
+#[tokio::test]
+async fn goals_show_progress_toward_threshold() {
+    let completions = Achievement {
+        id: AchievementId(901),
+        name: "Triple Play".into(),
+        description: None,
+        criterion: Criterion::TotalCompletions {
+            scope: Scope::Any,
+            count: 3,
+        },
+        bonus_points: 10,
+        active: true,
+    };
+    let points = Achievement {
+        id: AchievementId(902),
+        name: "Century Club".into(),
+        description: None,
+        criterion: Criterion::PointsEarned { total: 100 },
+        bonus_points: 25,
+        active: true,
+    };
+    let (state, _dir, today) = test_state_with(&[
+        Change::PutAchievement(completions),
+        Change::PutAchievement(points),
+    ]);
+
+    // Before any activity: both goals present at 0 / target.
+    let view: StateView = json_body(
+        router(state.clone())
+            .oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let g = view
+        .goals
+        .iter()
+        .find(|g| g.id == AchievementId(901))
+        .expect("completions goal");
+    assert_eq!((g.current, g.target), (0, 3));
+    let g = view
+        .goals
+        .iter()
+        .find(|g| g.id == AchievementId(902))
+        .expect("points goal");
+    assert_eq!((g.current, g.target), (0, 100));
+
+    // Claim + approve the seeded daily quest (reward 5).
+    let claim = serde_json::json!({ "claim_id": 9200u128, "quest_id": QUEST_ID, "on": today.0 })
+        .to_string();
+    router(state.clone())
+        .oneshot(req("POST", "/claims", Some(SQUIRE_TOKEN), Some(claim)))
+        .await
+        .unwrap();
+    let approve = serde_json::json!({ "claim_id": 9200u128, "decision": { "verdict": "approve" } })
+        .to_string();
+    let resp = router(state.clone())
+        .oneshot(req(
+            "POST",
+            "/admin/review-claim",
+            Some(KNIGHT_TOKEN),
+            Some(approve),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Now: one completion → 1/3; 5 points earned → 5/100. Neither threshold met, so both stay goals.
+    let view: StateView = json_body(
+        router(state)
+            .oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let g = view
+        .goals
+        .iter()
+        .find(|g| g.id == AchievementId(901))
+        .expect("completions goal");
+    assert_eq!((g.current, g.target), (1, 3), "one approved completion");
+    let g = view
+        .goals
+        .iter()
+        .find(|g| g.id == AchievementId(902))
+        .expect("points goal");
+    assert_eq!(
+        (g.current, g.target),
+        (5, 100),
+        "5 points earned toward 100"
+    );
+}
+
+/// The `recent_activity` feed is ONE list, strictly newest-first across all entry types — an
+/// adjustment, a claim, and a request interleaved by event time, not grouped by type (SQUIRE-T-0124).
+#[tokio::test]
+async fn recent_activity_is_one_globally_time_ordered_feed() {
+    use domain_core::contract::{ActivityKind, ClaimId, CommandId, Currency, RequestId};
+    let t = Timestamp;
+    let extra = [
+        Change::Append(Event::Adjusted {
+            command_id: CommandId(1),
+            squire: UserId(SQUIRE_ID),
+            actor: Some(UserId(KNIGHT_ID)),
+            currency: Currency::Coins,
+            amount: 5,
+            reason: "gofur".into(),
+            at: t(100),
+        }),
+        Change::Append(Event::CompletionClaimed {
+            claim_id: ClaimId(2),
+            squire: UserId(SQUIRE_ID),
+            quest_id: QuestId(QUEST_ID),
+            on: Date(1),
+            at: t(200),
+        }),
+        Change::Append(Event::RedemptionRequested {
+            request_id: RequestId(3),
+            squire: UserId(SQUIRE_ID),
+            item_id: ItemId(ITEM_ID),
+            at: t(300),
+        }),
+        Change::Append(Event::Adjusted {
+            command_id: CommandId(4),
+            squire: UserId(SQUIRE_ID),
+            actor: Some(UserId(KNIGHT_ID)),
+            currency: Currency::Coins,
+            amount: -2,
+            reason: "hazard".into(),
+            at: t(400),
+        }),
+    ];
+    let (state, _dir, _today) = test_state_with(&extra);
+    let view: StateView = json_body(
+        router(state)
+            .oneshot(req("GET", "/state", Some(SQUIRE_TOKEN), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+
+    let feed = &view.recent_activity;
+    assert_eq!(
+        feed.len(),
+        4,
+        "all four activity events surface in one feed"
+    );
+    // Strictly descending by time, with an adjustment correctly sandwiched between a request and a
+    // claim — impossible under the old type-grouped rendering.
+    assert_eq!(
+        feed.iter().map(|a| a.at.0).collect::<Vec<_>>(),
+        vec![400, 300, 200, 100]
+    );
+    assert_eq!(
+        feed.iter().map(|a| a.kind).collect::<Vec<_>>(),
+        vec![
+            ActivityKind::Adjustment,
+            ActivityKind::Request,
+            ActivityKind::Claim,
+            ActivityKind::Adjustment
+        ],
+    );
+    // The tagged payload matches the kind.
+    assert!(
+        feed[1].request.is_some(),
+        "the request entry carries its payload"
+    );
+    assert!(
+        feed[2].claim.is_some(),
+        "the claim entry carries its payload"
+    );
+}
+
+/// The authoring **summary** DTOs carry the raw fields the phone edit form pre-fills from
+/// (SQUIRE-T-0120/0126) — not just the display labels. Create a Weekly, specific-squire, cash +
+/// auto-approve quest via the flat endpoint, then assert `GET /admin/quests` round-trips it.
+#[tokio::test]
+async fn quest_summary_carries_raw_round_trip_fields() {
+    let (state, _dir, _today) = test_state();
+    let body = serde_json::json!({
+        "title": "Vacuum",
+        "reward": 7,
+        "cash": 2,
+        "category": "Chores",
+        "cadence": "Weekly",
+        "weekdays": ["Mon", "Thu"],
+        "completion": "EachAssignee",
+        "assign_all": false,
+        "squires": [SQUIRE_ID],
+        "repeatable_within_day": false,
+        "auto_approve": true,
+    })
+    .to_string();
+    let resp = router(state.clone())
+        .oneshot(req("POST", "/admin/quests", Some(KNIGHT_TOKEN), Some(body)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let list: serde_json::Value = json_body(
+        router(state)
+            .oneshot(req("GET", "/admin/quests", Some(KNIGHT_TOKEN), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let q = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|q| q["title"] == "Vacuum")
+        .expect("the new quest in the list");
+    assert_eq!(q["cadence"], "Weekly");
+    assert_eq!(q["weekdays"], serde_json::json!(["Mon", "Thu"]));
+    assert_eq!(q["assign_all"], false);
+    assert_eq!(q["squires"], serde_json::json!([SQUIRE_ID]));
+    assert_eq!(q["cash"], 2);
+    assert_eq!(q["auto_approve"], true);
 }
 
 #[tokio::test]
@@ -309,7 +640,8 @@ async fn knight_on_squire_routes_is_403() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 
     // POST /claims
-    let claim_body = serde_json::json!({ "claim_id": 1u128, "quest_id": QUEST_ID, "on": today.0 }).to_string();
+    let claim_body =
+        serde_json::json!({ "claim_id": 1u128, "quest_id": QUEST_ID, "on": today.0 }).to_string();
     let resp = router(state.clone())
         .oneshot(req("POST", "/claims", Some(KNIGHT_TOKEN), Some(claim_body)))
         .await
@@ -319,7 +651,12 @@ async fn knight_on_squire_routes_is_403() {
     // POST /redemption-requests
     let red_body = serde_json::json!({ "request_id": 1u128, "item_id": ITEM_ID }).to_string();
     let resp = router(state)
-        .oneshot(req("POST", "/redemption-requests", Some(KNIGHT_TOKEN), Some(red_body)))
+        .oneshot(req(
+            "POST",
+            "/redemption-requests",
+            Some(KNIGHT_TOKEN),
+            Some(red_body),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);

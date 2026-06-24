@@ -34,7 +34,9 @@ pub async fn app_install(Operator(_op): Operator) -> Json<AppInstallView> {
 }
 
 fn install_view() -> Option<AppInstallView> {
-    let dir = std::env::var_os("SQUIRE_APK_DIR").map(PathBuf::from).filter(|p| p.is_dir())?;
+    let dir = std::env::var_os("SQUIRE_APK_DIR")
+        .map(PathBuf::from)
+        .filter(|p| p.is_dir())?;
     let raw = std::fs::read_to_string(dir.join("manifest.json")).ok()?;
     let manifest: serde_json::Value = serde_json::from_str(&raw).ok()?;
     let sq = manifest.get("squire")?;
@@ -58,7 +60,10 @@ fn install_view() -> Option<AppInstallView> {
 
     Some(AppInstallView {
         available: true,
-        version_name: sq.get("versionName").and_then(|v| v.as_str()).map(String::from),
+        version_name: sq
+            .get("versionName")
+            .and_then(|v| v.as_str())
+            .map(String::from),
         version_code: sq.get("versionCode").and_then(|v| v.as_u64()),
         file: Some(file),
         url: Some(url),

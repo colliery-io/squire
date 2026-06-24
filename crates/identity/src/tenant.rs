@@ -63,7 +63,11 @@ impl std::fmt::Display for TenantError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TenantError::UnknownTenant(h) => {
-                write!(f, "unknown tenant {:?}: not provisioned / not registered", h.0)
+                write!(
+                    f,
+                    "unknown tenant {:?}: not provisioned / not registered",
+                    h.0
+                )
             }
             TenantError::WrongTenant { expected, got } => write!(
                 f,
@@ -95,7 +99,9 @@ enum Mode {
     /// Local single-tenant: exactly one bound handle, no registry set.
     Local { handle: HouseholdHandle },
     /// Hosted multi-tenant: an in-memory set of known (routing-only) handles.
-    Hosted { known: Mutex<HashSet<HouseholdHandle>> },
+    Hosted {
+        known: Mutex<HashSet<HouseholdHandle>>,
+    },
 }
 
 /// Maps a [`HouseholdHandle`] to a tenant-scoped [`Store`], over a [`store::tenant::Backend`].
@@ -114,7 +120,10 @@ impl TenantRegistry {
     /// The bound tenant is provisioned lazily on first [`resolve`](Self::resolve)/[`provision`]
     /// (the [`Provisioner`] runs migrations on open), so a fresh deployment is usable immediately.
     pub fn local(backend: Backend, handle: HouseholdHandle) -> Self {
-        Self { provisioner: Provisioner::new(backend), mode: Mode::Local { handle } }
+        Self {
+            provisioner: Provisioner::new(backend),
+            mode: Mode::Local { handle },
+        }
     }
 
     /// A **hosted multi-tenant** registry over `backend`, starting with an empty known-set.
@@ -123,7 +132,9 @@ impl TenantRegistry {
     pub fn hosted(backend: Backend) -> Self {
         Self {
             provisioner: Provisioner::new(backend),
-            mode: Mode::Hosted { known: Mutex::new(HashSet::new()) },
+            mode: Mode::Hosted {
+                known: Mutex::new(HashSet::new()),
+            },
         }
     }
 
@@ -144,11 +155,17 @@ impl TenantRegistry {
                 if bound == handle {
                     Ok(())
                 } else {
-                    Err(TenantError::WrongTenant { expected: bound.clone(), got: handle.clone() })
+                    Err(TenantError::WrongTenant {
+                        expected: bound.clone(),
+                        got: handle.clone(),
+                    })
                 }
             }
             Mode::Hosted { known } => {
-                known.lock().expect("tenant registry poisoned").insert(handle.clone());
+                known
+                    .lock()
+                    .expect("tenant registry poisoned")
+                    .insert(handle.clone());
                 Ok(())
             }
         }
@@ -190,7 +207,10 @@ impl TenantRegistry {
             }
             Mode::Hosted { known } => {
                 self.provisioner.deprovision(&handle.0)?;
-                known.lock().expect("tenant registry poisoned").remove(handle);
+                known
+                    .lock()
+                    .expect("tenant registry poisoned")
+                    .remove(handle);
             }
         }
         Ok(())

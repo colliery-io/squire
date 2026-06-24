@@ -17,8 +17,8 @@ use diesel::sqlite::SqliteConnection;
 
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, ClaimId, CommandId,
-    Completion, Criterion, Currency, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem, Repository,
-    Role, Schedule, Scope, Snapshot, StreakBasis, Timestamp, User, UserId,
+    Completion, Criterion, Currency, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem,
+    Repository, Role, Schedule, Scope, Snapshot, StreakBasis, Timestamp, User, UserId,
 };
 
 use store::{AnyConnection, FixedClock, Store};
@@ -36,8 +36,18 @@ fn snap_dbg(s: &Snapshot) -> String {
 
 fn sample_users() -> Vec<User> {
     vec![
-        User { id: UserId(1), role: Role::Knight, display_name: "Robb".into(), active: true },
-        User { id: UserId(2), role: Role::Squire, display_name: "Arya".into(), active: true },
+        User {
+            id: UserId(1),
+            role: Role::Knight,
+            display_name: "Robb".into(),
+            active: true,
+        },
+        User {
+            id: UserId(2),
+            role: Role::Squire,
+            display_name: "Arya".into(),
+            active: true,
+        },
     ]
 }
 
@@ -176,7 +186,9 @@ fn durability_sqlite_reopen_same_file() {
     // Open at a FILE path (not :memory:), apply a batch, then DROP the store (close conn).
     let before = {
         let mut store = store::SqliteStore::open(&url).expect("open A");
-        store.apply(Some(UserId(1)), &seed_batch()).expect("apply seed");
+        store
+            .apply(Some(UserId(1)), &seed_batch())
+            .expect("apply seed");
         snap_dbg(&store.snapshot())
         // `store` dropped here → connection closed.
     };
@@ -184,7 +196,10 @@ fn durability_sqlite_reopen_same_file() {
     // Reopen the SAME file: data must be intact.
     let store = store::SqliteStore::open(&url).expect("reopen");
     let after = snap_dbg(&store.snapshot());
-    assert_eq!(before, after, "data must survive close + reopen of the same SQLite file");
+    assert_eq!(
+        before, after,
+        "data must survive close + reopen of the same SQLite file"
+    );
     assert!(!store.snapshot().events.is_empty(), "events must persist");
 }
 
@@ -201,18 +216,21 @@ fn durability_postgres_reconnect_same_schema() {
 
     let before = {
         let mut store = Store::new(fresh_pg(&url), FixedClock::at(Timestamp(1_700_000_000_000)));
-        store.apply(Some(UserId(1)), &seed_batch()).expect("apply seed");
+        store
+            .apply(Some(UserId(1)), &seed_batch())
+            .expect("apply seed");
         snap_dbg(&store.snapshot())
         // store dropped → connection closed; data committed to the schema.
     };
 
     // Reconnect WITHOUT resetting the schema.
-    let conn = AnyConnection::Pg(
-        diesel::pg::PgConnection::establish(&url).expect("pg reconnect"),
-    );
+    let conn = AnyConnection::Pg(diesel::pg::PgConnection::establish(&url).expect("pg reconnect"));
     let store = Store::new(conn, FixedClock::at(Timestamp(0)));
     let after = snap_dbg(&store.snapshot());
-    assert_eq!(before, after, "data must survive reconnect to the same Postgres schema");
+    assert_eq!(
+        before, after,
+        "data must survive reconnect to the same Postgres schema"
+    );
 }
 
 // ─── test 2 + 3: export → import round-trip, one-file ─────────────────────────
@@ -225,7 +243,9 @@ fn round_trip(conn_a: AnyConnection, mut conn_b: AnyConnection) {
 
     // Populate store A with non-trivial audit (apply with Some(uid)).
     let mut store_a = Store::new(conn_a, FixedClock::at(Timestamp(1_700_000_000_000)));
-    store_a.apply(Some(UserId(1)), &seed_batch()).expect("apply seed into A");
+    store_a
+        .apply(Some(UserId(1)), &seed_batch())
+        .expect("apply seed into A");
 
     // Export A to ONE file.
     store_a.export(&dump_path).expect("export A");
@@ -242,7 +262,10 @@ fn round_trip(conn_a: AnyConnection, mut conn_b: AnyConnection) {
     // Whole-snapshot equality (debug-string compare).
     let snap_a = snap_dbg(&store_a.snapshot());
     let snap_b = snap_dbg(&store_b.snapshot());
-    assert_eq!(snap_a, snap_b, "snapshot(A) must equal snapshot(B) after round-trip");
+    assert_eq!(
+        snap_a, snap_b,
+        "snapshot(A) must equal snapshot(B) after round-trip"
+    );
 
     // Spot-check: audit columns survived (created_by / updated_by) for the quest.
     let qa = store::quest_audit(&mut store_a.connection(), QuestId(10))
@@ -251,17 +274,40 @@ fn round_trip(conn_a: AnyConnection, mut conn_b: AnyConnection) {
     let qb = store::quest_audit(&mut store_b.connection(), QuestId(10))
         .expect("read B quest audit")
         .expect("quest exists in B");
-    assert_eq!(qa.created_by, qb.created_by, "created_by must survive round-trip");
-    assert_eq!(qa.updated_by, qb.updated_by, "updated_by must survive round-trip");
-    assert_eq!(qa.created_at, qb.created_at, "created_at must survive round-trip");
-    assert_eq!(qa.updated_at, qb.updated_at, "updated_at must survive round-trip");
-    assert_eq!(qa.created_by, Some(UserId(1)), "non-trivial audit was captured");
+    assert_eq!(
+        qa.created_by, qb.created_by,
+        "created_by must survive round-trip"
+    );
+    assert_eq!(
+        qa.updated_by, qb.updated_by,
+        "updated_by must survive round-trip"
+    );
+    assert_eq!(
+        qa.created_at, qb.created_at,
+        "created_at must survive round-trip"
+    );
+    assert_eq!(
+        qa.updated_at, qb.updated_at,
+        "updated_at must survive round-trip"
+    );
+    assert_eq!(
+        qa.created_by,
+        Some(UserId(1)),
+        "non-trivial audit was captured"
+    );
 
     // Spot-check: `seq` survived verbatim (events ordered, seq preserved).
     let seqs_a = raw_event_seqs(&mut store_a.connection());
     let seqs_b = raw_event_seqs(&mut store_b.connection());
-    assert_eq!(seqs_a, seqs_b, "event `seq` must survive round-trip verbatim");
-    assert_eq!(seqs_a, vec![1, 2, 3, 4, 5], "five events with their original seq");
+    assert_eq!(
+        seqs_a, seqs_b,
+        "event `seq` must survive round-trip verbatim"
+    );
+    assert_eq!(
+        seqs_a,
+        vec![1, 2, 3, 4, 5],
+        "five events with their original seq"
+    );
 }
 
 #[test]
@@ -288,7 +334,9 @@ fn export_import_round_trip_postgres() {
     // Populate + export A.
     let snap_a = {
         let mut store_a = Store::new(fresh_pg(&url), FixedClock::at(Timestamp(1_700_000_000_000)));
-        store_a.apply(Some(UserId(1)), &seed_batch()).expect("apply seed into A (pg)");
+        store_a
+            .apply(Some(UserId(1)), &seed_batch())
+            .expect("apply seed into A (pg)");
         store_a.export(&dump_path).expect("export A (pg)");
         let s = snap_dbg(&store_a.snapshot());
         let qa = store::quest_audit(&mut store_a.connection(), QuestId(10))
@@ -300,7 +348,10 @@ fn export_import_round_trip_postgres() {
 
     // One-file check.
     let meta = std::fs::metadata(&dump_path).expect("dump exists");
-    assert!(meta.is_file() && meta.len() > 0, "export must be one non-empty file");
+    assert!(
+        meta.is_file() && meta.len() > 0,
+        "export must be one non-empty file"
+    );
 
     // Fresh B (resets the shared schema), import.
     let mut store_b = {
@@ -310,7 +361,11 @@ fn export_import_round_trip_postgres() {
     };
 
     let (snap_a_str, qa, seqs_a) = snap_a;
-    assert_eq!(snap_a_str, snap_dbg(&store_b.snapshot()), "snapshot(A)==snapshot(B) on pg");
+    assert_eq!(
+        snap_a_str,
+        snap_dbg(&store_b.snapshot()),
+        "snapshot(A)==snapshot(B) on pg"
+    );
 
     let qb = store::quest_audit(&mut store_b.connection(), QuestId(10))
         .expect("audit B")

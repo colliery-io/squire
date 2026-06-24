@@ -39,6 +39,34 @@ test("create a Streak achievement scoped to a category (F3 + F4)", async ({ page
   await page.screenshot({ path: `${SCREENS}/ach-03-streak-created.png`, fullPage: true });
 });
 
+test("edit an achievement in place — upsert + criterion round-trip (SQUIRE-T-0120)", async ({ page }) => {
+  await login(page);
+  // Create a Points-earned achievement.
+  await page.fill("#achievement-form input[name=name]", "Saver");
+  await page.selectOption("#ach-criterion", "PointsEarned");
+  await page.fill("#ach-points-fields input[name=total]", "50");
+  await page.fill("#achievement-form input[name=bonus]", "5");
+  await page.click("#achievement-form button[type=submit]");
+  await expect(page.locator("#achievement-list li", { hasText: "Saver" })).toHaveCount(1);
+
+  // Edit: the form round-trips the criterion (PointsEarned + total) and relabels.
+  const row = page.locator("#achievement-list li", { hasText: "Saver" });
+  await row.getByRole("button", { name: "Edit" }).click();
+  await expect(page.locator("#achievement-form button[type=submit]")).toHaveText("Save changes");
+  await expect(page.locator("#ach-criterion")).toHaveValue("PointsEarned");
+  await expect(page.locator("#ach-points-fields input[name=total]")).toHaveValue("50");
+  await expect(page.locator("#achievement-form input[name=bonus]")).toHaveValue("5");
+
+  await page.fill("#achievement-form input[name=name]", "Penny Pincher");
+  await page.fill("#ach-points-fields input[name=total]", "200");
+  await page.click("#achievement-form button[type=submit]");
+
+  // Renamed + retuned in place: one row, old name gone (no duplicate), back to create mode.
+  await expect(page.locator("#achievement-list li", { hasText: "Penny Pincher" })).toHaveCount(1);
+  await expect(page.locator("#achievement-list li", { hasText: "Saver" })).toHaveCount(0);
+  await expect(page.locator("#achievement-form button[type=submit]")).toHaveText("Add achievement");
+});
+
 test("an empty category scope is rejected with an inline error", async ({ page }) => {
   await login(page);
   await page.fill("#achievement-form input[name=name]", "Bad Achievement");

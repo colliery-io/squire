@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -70,6 +71,7 @@ import com.squire.core.PlayerUiState
 import com.squire.sdk.model.BadgeView
 import com.squire.sdk.model.AdjustmentView
 import com.squire.sdk.model.ClaimStateKind
+import com.squire.sdk.model.ActivityKind
 import com.squire.sdk.model.GoalView
 import com.squire.sdk.model.ClaimStatus
 import com.squire.sdk.model.LockReasonKind
@@ -348,13 +350,27 @@ private fun ReadyContent(
                 }
                 SquireTab.Activity -> {
                     item { SectionTitle("Recent activity") }
-                    val adjustments = view.adjustments.orEmpty()
-                    if (view.myClaims.isEmpty() && view.myRequests.isEmpty() && adjustments.isEmpty()) {
-                        item { EmptyHint("Nothing yet — go finish a quest! 💪") }
+                    // One feed, already merged + newest-first by the server (SQUIRE-T-0124).
+                    val activity = view.recentActivity.orEmpty()
+                    if (activity.isNotEmpty()) {
+                        itemsIndexed(activity, key = { i, _ -> "act$i" }) { _, entry ->
+                            when (entry.kind) {
+                                ActivityKind.Adjustment -> entry.adjustment?.let { AdjustmentRow(it) }
+                                ActivityKind.Claim -> entry.claim?.let { ClaimRow(it) }
+                                ActivityKind.Request -> entry.request?.let { RequestRow(it) }
+                            }
+                        }
                     } else {
-                        items(adjustments, key = { "adj${it.at}_${it.amount}" }) { AdjustmentRow(it) }
-                        items(view.myClaims, key = { "c" + it.claimId }) { ClaimRow(it) }
-                        items(view.myRequests, key = { "r" + it.requestId }) { RequestRow(it) }
+                        // Fallback for an older server that doesn't send the merged feed: the legacy
+                        // type-grouped lists.
+                        val adjustments = view.adjustments.orEmpty()
+                        if (view.myClaims.isEmpty() && view.myRequests.isEmpty() && adjustments.isEmpty()) {
+                            item { EmptyHint("Nothing yet — go finish a quest! 💪") }
+                        } else {
+                            items(adjustments, key = { "adj${it.at}_${it.amount}" }) { AdjustmentRow(it) }
+                            items(view.myClaims, key = { "c" + it.claimId }) { ClaimRow(it) }
+                            items(view.myRequests, key = { "r" + it.requestId }) { RequestRow(it) }
+                        }
                     }
                 }
             }
@@ -500,6 +516,20 @@ private fun GoalCardRow(goal: GoalView, onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // Progress toward the goal, like a streak's dots — "2 / 5" (SQUIRE-T-0122).
+                val target = goal.target ?: 0
+                if (target > 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ProgressDots(current = goal.current ?: 0, target = target)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "${goal.current ?: 0} / $target",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
             if (goal.bonus > 0) {
                 Spacer(Modifier.width(8.dp))
@@ -755,8 +785,13 @@ internal fun badgeDetail(b: BadgeView) = DetailContent(
 internal fun goalDetail(g: GoalView) = DetailContent(
     icon = "🎯",
     title = g.name,
+    // "How to earn it" reads as a sentence, so render it as a stacked, full-width block (the
+    // description slot) instead of a cramped label↔value row, matching quest/reward detail
+    // (SQUIRE-T-0122).
+    description = g.description,
     lines = buildList {
-        add("How to earn it" to g.description)
+        val target = g.target ?: 0
+        if (target > 0) add("Progress" to "${g.current ?: 0} / $target")
         if (g.bonus > 0) add("Reward" to "+${g.bonus} coins")
     },
     note = "Not unlocked yet — keep going!",

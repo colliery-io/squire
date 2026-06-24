@@ -64,7 +64,10 @@ where
     // SQLite — always. Base dir is a TempDir that drops (and deletes) at scope end.
     {
         let dir = tempfile::tempdir().expect("tempdir");
-        f(Backend::Sqlite { dir: dir.path().to_path_buf() }).await;
+        f(Backend::Sqlite {
+            dir: dir.path().to_path_buf(),
+        })
+        .await;
     }
 
     // Postgres — opt-in, serialized behind a Mutex (the tests share one database).
@@ -74,11 +77,16 @@ where
 
         if let Ok(url) = std::env::var("DATABASE_URL") {
             let _guard = PG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-            let cleaner = store::tenant::Provisioner::new(Backend::Postgres { base_url: url.clone() });
+            let cleaner = store::tenant::Provisioner::new(Backend::Postgres {
+                base_url: url.clone(),
+            });
             for h in handles {
                 cleaner.deprovision(h).expect("pre-clean schema");
             }
-            f(Backend::Postgres { base_url: url.clone() }).await;
+            f(Backend::Postgres {
+                base_url: url.clone(),
+            })
+            .await;
             for h in handles {
                 cleaner.deprovision(h).expect("post-clean schema");
             }
@@ -99,7 +107,12 @@ fn prod_app(backend: Backend, handle: &str) -> (Arc<AppState>, Date) {
         TTL_MS,
     )
     .expect("provision + wire prod AppState");
-    let today = state.store.lock().expect("store mutex poisoned").clock().today();
+    let today = state
+        .store
+        .lock()
+        .expect("store mutex poisoned")
+        .clock()
+        .today();
     (state, today)
 }
 
@@ -141,7 +154,12 @@ fn seed_quest_and_item(state: &Arc<AppState>) {
 
 // ─── tiny wire helpers ─────────────────────────────────────────────────────────────────────────
 
-fn build(method: &str, path: &str, auth: Option<(&str, &str)>, body: Option<String>) -> Request<Body> {
+fn build(
+    method: &str,
+    path: &str,
+    auth: Option<(&str, &str)>,
+    body: Option<String>,
+) -> Request<Body> {
     let mut b = Request::builder().method(method).uri(path);
     if let Some((token, handle)) = auth {
         b = b
@@ -169,9 +187,20 @@ async fn status_and_json(resp: axum::response::Response) -> (StatusCode, Value) 
     (status, value)
 }
 
-async fn post_json(state: &Arc<AppState>, path: &str, token: &str, handle: &str, body: Value) -> (StatusCode, Value) {
+async fn post_json(
+    state: &Arc<AppState>,
+    path: &str,
+    token: &str,
+    handle: &str,
+    body: Value,
+) -> (StatusCode, Value) {
     let resp = router(state.clone())
-        .oneshot(build("POST", path, Some((token, handle)), Some(body.to_string())))
+        .oneshot(build(
+            "POST",
+            path,
+            Some((token, handle)),
+            Some(body.to_string()),
+        ))
         .await
         .unwrap();
     status_and_json(resp).await
@@ -188,7 +217,12 @@ async fn get(state: &Arc<AppState>, path: &str, token: &str, handle: &str) -> (S
 // ─── over-the-wire register / login / add-member ─────────────────────────────────────────────
 
 /// `POST /register` (unauthenticated) → the household handle + the first Knight's token.
-async fn register(state: &Arc<AppState>, name: &str, admin: &str, secret: &str) -> RegisterHouseholdResp {
+async fn register(
+    state: &Arc<AppState>,
+    name: &str,
+    admin: &str,
+    secret: &str,
+) -> RegisterHouseholdResp {
     let body = json!({ "household_name": name, "admin_name": admin, "admin_secret": secret });
     let resp = router(state.clone())
         .oneshot(build("POST", "/register", None, Some(body.to_string())))
@@ -200,7 +234,14 @@ async fn register(state: &Arc<AppState>, name: &str, admin: &str, secret: &str) 
 }
 
 /// `POST /members` (Knight-only) → the new member's user id.
-async fn add_member(state: &Arc<AppState>, knight: &str, handle: &str, role: &str, name: &str, secret: &str) -> u128 {
+async fn add_member(
+    state: &Arc<AppState>,
+    knight: &str,
+    handle: &str,
+    role: &str,
+    name: &str,
+    secret: &str,
+) -> u128 {
     let (st, add) = post_json(
         state,
         "/members",
@@ -214,7 +255,13 @@ async fn add_member(state: &Arc<AppState>, knight: &str, handle: &str, role: &st
 }
 
 /// `POST /login` (unauthenticated) → a fresh token for `(handle, user, secret)`, asserting `role`.
-async fn login(state: &Arc<AppState>, handle: &str, user: u128, secret: &str, role: &str) -> String {
+async fn login(
+    state: &Arc<AppState>,
+    handle: &str,
+    user: u128,
+    secret: &str,
+    role: &str,
+) -> String {
     let resp = router(state.clone())
         .oneshot(build(
             "POST",
@@ -311,7 +358,8 @@ async fn mvp_seed_two_knights_one_squire_through_real_flow() {
         let knight1_id = reg.admin.0;
 
         // Knight #1 adds a SECOND Knight and a Squire — through the real Knight-only endpoint.
-        let knight2_id = add_member(&state, &knight1, &handle, "Knight", "Lancelot", "k2secret").await;
+        let knight2_id =
+            add_member(&state, &knight1, &handle, "Knight", "Lancelot", "k2secret").await;
         let squire_id = add_member(&state, &knight1, &handle, "Squire", "Gareth", "sqsecret").await;
 
         // Every member can log in and is the role they were created as.
@@ -322,8 +370,16 @@ async fn mvp_seed_two_knights_one_squire_through_real_flow() {
         {
             let snap = state.store.lock().expect("store mutex poisoned").snapshot();
             assert_eq!(snap.users.len(), 3, "exactly the 3 seeded members");
-            let knights = snap.users.iter().filter(|u| u.role == domain_core::contract::Role::Knight).count();
-            let squires = snap.users.iter().filter(|u| u.role == domain_core::contract::Role::Squire).count();
+            let knights = snap
+                .users
+                .iter()
+                .filter(|u| u.role == domain_core::contract::Role::Knight)
+                .count();
+            let squires = snap
+                .users
+                .iter()
+                .filter(|u| u.role == domain_core::contract::Role::Squire)
+                .count();
             assert_eq!((knights, squires), (2, 1), "2 Knights + 1 Squire");
         }
 
@@ -350,9 +406,21 @@ async fn mvp_seed_two_knights_one_squire_through_real_flow() {
 
         // Audit (REQ-1.12): who added member X? The admin Knight was a system seed; the two added
         // members both record Knight #1 as `created_by`.
-        assert_eq!(created_by(&state, knight1_id), None, "the admin Knight is a system seed");
-        assert_eq!(created_by(&state, knight2_id), Some(UserId(knight1_id)), "Knight #1 added Knight #2");
-        assert_eq!(created_by(&state, squire_id), Some(UserId(knight1_id)), "Knight #1 added the Squire");
+        assert_eq!(
+            created_by(&state, knight1_id),
+            None,
+            "the admin Knight is a system seed"
+        );
+        assert_eq!(
+            created_by(&state, knight2_id),
+            Some(UserId(knight1_id)),
+            "Knight #1 added Knight #2"
+        );
+        assert_eq!(
+            created_by(&state, squire_id),
+            Some(UserId(knight1_id)),
+            "Knight #1 added the Squire"
+        );
     })
     .await;
 }
@@ -385,7 +453,11 @@ async fn no_account_bypass_on_prod() {
 
         // A signature-valid token but presented with a foreign household handle → 401.
         let (st, _) = get(&state, "/state", &squire, "some-other-household").await;
-        assert_eq!(st, StatusCode::UNAUTHORIZED, "valid token + wrong household → 401");
+        assert_eq!(
+            st,
+            StatusCode::UNAUTHORIZED,
+            "valid token + wrong household → 401"
+        );
     })
     .await;
 }
@@ -416,10 +488,18 @@ async fn two_households_are_fully_isolated() {
 
         // A's token reaches NOTHING on B — with B's handle (token/handle mismatch) ...
         let (st, _) = get(&app_b, "/household-review", &a_token, &b_handle).await;
-        assert_eq!(st, StatusCode::UNAUTHORIZED, "A's token + B handle on B → 401");
+        assert_eq!(
+            st,
+            StatusCode::UNAUTHORIZED,
+            "A's token + B handle on B → 401"
+        );
         // ... and with A's own handle (B serves only B; a foreign-tenant handle is refused).
         let (st, _) = get(&app_b, "/household-review", &a_token, &a_handle).await;
-        assert_eq!(st, StatusCode::UNAUTHORIZED, "A's token + A handle on B → 401");
+        assert_eq!(
+            st,
+            StatusCode::UNAUTHORIZED,
+            "A's token + A handle on B → 401"
+        );
 
         // No global directory: A's admin cannot log into B (B holds no credential for that id), and
         // B's user list contains none of A's members.
@@ -428,18 +508,33 @@ async fn two_households_are_fully_isolated() {
                 "POST",
                 "/login",
                 None,
-                Some(json!({ "household": b_handle, "user": a_admin, "secret": "asecret" }).to_string()),
+                Some(
+                    json!({ "household": b_handle, "user": a_admin, "secret": "asecret" })
+                        .to_string(),
+                ),
             ))
             .await
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "A's admin cannot log into B");
+        assert_eq!(
+            resp.status(),
+            StatusCode::UNAUTHORIZED,
+            "A's admin cannot log into B"
+        );
 
         // B's directory holds ONLY its own admin (Bob) — none of A's members. (Ids are minted
         // per-tenant, so both admins happen to be `UserId(1)` in their *separate* tenants; identity
         // here is the member data, which is wholly B's.)
-        let b_users = app_b.store.lock().expect("store mutex poisoned").snapshot().users;
+        let b_users = app_b
+            .store
+            .lock()
+            .expect("store mutex poisoned")
+            .snapshot()
+            .users;
         assert_eq!(b_users.len(), 1, "B has only its own admin");
-        assert_eq!(b_users[0].display_name, "Bob", "B's sole member is Bob, not anyone from A");
+        assert_eq!(
+            b_users[0].display_name, "Bob",
+            "B's sole member is Bob, not anyone from A"
+        );
     })
     .await;
 }
@@ -456,7 +551,12 @@ async fn two_households_are_fully_isolated() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn concurrent_control_plane_and_feature_writes_serialize() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let (state, _today) = prod_app(Backend::Sqlite { dir: dir.path().to_path_buf() }, "concurrent");
+    let (state, _today) = prod_app(
+        Backend::Sqlite {
+            dir: dir.path().to_path_buf(),
+        },
+        "concurrent",
+    );
     seed_quest_and_item(&state);
     let reg = register(&state, "Concurrent", "Admin", "secret").await;
     let handle = reg.household.0.clone();
@@ -503,12 +603,19 @@ async fn concurrent_control_plane_and_feature_writes_serialize() {
     let (st, review) = get(&state, "/household-review", &knight, &handle).await;
     assert_eq!(st, StatusCode::OK);
     let squires = review["squires"].as_array().unwrap();
-    assert_eq!(squires.len(), 1 + ADDS, "every concurrent add_member created exactly one squire");
+    assert_eq!(
+        squires.len(),
+        1 + ADDS,
+        "every concurrent add_member created exactly one squire"
+    );
     let balance = squires
         .iter()
         .find(|s| s["squire"] == squire_id as u64)
         .expect("the funded squire")["balance"]
         .as_i64()
         .unwrap();
-    assert_eq!(balance, ADJUSTS as i64, "every concurrent adjust applied exactly once");
+    assert_eq!(
+        balance, ADJUSTS as i64,
+        "every concurrent adjust applied exactly once"
+    );
 }

@@ -75,10 +75,16 @@ enum Tenancy {
     /// Local single-tenant over a **shared** store: the api handlers' `Arc<Mutex<Store>>`. Both the
     /// handlers and this identity write through the one lock/connection, so writes serialize under
     /// concurrency (AR-1). `handle` is the one bound household.
-    Shared { handle: HouseholdHandle, store: SharedStore },
+    Shared {
+        handle: HouseholdHandle,
+        store: SharedStore,
+    },
     /// Local single-tenant routed through a registry that opens its own connection. `handle` is the
     /// one bound household.
-    LocalRegistry { handle: HouseholdHandle, registry: TenantRegistry },
+    LocalRegistry {
+        handle: HouseholdHandle,
+        registry: TenantRegistry,
+    },
     /// Hosted multi-tenant: `register` derives a fresh handle and provisions its tenant.
     Hosted { registry: TenantRegistry },
 }
@@ -198,14 +204,20 @@ impl ProdIdentity {
         f: impl FnOnce(&mut Store<SystemClock>) -> Result<R, AuthError>,
     ) -> Result<R, AuthError> {
         match &self.tenancy {
-            Tenancy::Shared { handle: bound, store } => {
+            Tenancy::Shared {
+                handle: bound,
+                store,
+            } => {
                 if handle != bound {
                     return Err(AuthError::WrongTenant);
                 }
                 let mut guard = store.lock().map_err(|_| AuthError::BadToken)?;
                 f(&mut guard)
             }
-            Tenancy::LocalRegistry { handle: bound, registry } => {
+            Tenancy::LocalRegistry {
+                handle: bound,
+                registry,
+            } => {
                 if handle != bound {
                     return Err(AuthError::WrongTenant);
                 }
@@ -250,7 +262,11 @@ fn derive_handle(household_name: &str, n: u128) -> HouseholdHandle {
         .collect();
     // Trim leading/trailing underscores for a tidier handle.
     let trimmed = slug.trim_matches('_');
-    slug = if trimmed.is_empty() { "h".to_string() } else { trimmed.to_string() };
+    slug = if trimmed.is_empty() {
+        "h".to_string()
+    } else {
+        trimmed.to_string()
+    };
     // Keep the whole handle within the store's 48-char limit, leaving room for `_<n>`.
     let suffix = format!("_{n}");
     let max_slug = 48usize.saturating_sub(suffix.len());
@@ -291,7 +307,10 @@ impl Identity for ProdIdentity {
                 registry.provision(&handle).map_err(tenant_err_to_auth)?;
                 handle
             }
-            _ => self.bound_handle().expect("single-tenant has a bound handle").clone(),
+            _ => self
+                .bound_handle()
+                .expect("single-tenant has a bound handle")
+                .clone(),
         };
 
         // Mint the first member (a Knight). The existing-Knight guard and the write happen inside
@@ -303,7 +322,12 @@ impl Identity for ProdIdentity {
         self.with_tenant_store(&handle, |store| {
             // Refuse re-registration of an already-bootstrapped household (a fresh hosted tenant is
             // empty, so this is a no-op there).
-            if store.snapshot().users.iter().any(|u| u.role == Role::Knight) {
+            if store
+                .snapshot()
+                .users
+                .iter()
+                .any(|u| u.role == Role::Knight)
+            {
                 return Err(AuthError::Forbidden);
             }
             // System seed → by = None.
@@ -319,15 +343,27 @@ impl Identity for ProdIdentity {
                 )
                 .map_err(|_| AuthError::BadToken)?;
             // Persist the admin's hashed secret IN the tenant's credentials table.
-            store.set_credential(admin, &admin_hash).map_err(|_| AuthError::BadToken)?;
+            store
+                .set_credential(admin, &admin_hash)
+                .map_err(|_| AuthError::BadToken)?;
             Ok(())
         })?;
 
         // Issue a tenant-scoped token for the new admin.
-        let principal = Principal { household: handle.clone(), user: admin, role: Role::Knight };
-        let token = self.signer.issue(&principal, self.now_ms(), self.token_ttl_ms);
+        let principal = Principal {
+            household: handle.clone(),
+            user: admin,
+            role: Role::Knight,
+        };
+        let token = self
+            .signer
+            .issue(&principal, self.now_ms(), self.token_ttl_ms);
 
-        Ok(RegisterHouseholdResp { household: handle, admin, token })
+        Ok(RegisterHouseholdResp {
+            household: handle,
+            admin,
+            token,
+        })
     }
 
     fn login(&self, req: LoginReq) -> Result<LoginResp, AuthError> {
@@ -348,8 +384,14 @@ impl Identity for ProdIdentity {
                 .ok_or(AuthError::BadToken)
         })?;
 
-        let principal = Principal { household: req.household, user: req.user, role };
-        let token = self.signer.issue(&principal, self.now_ms(), self.token_ttl_ms);
+        let principal = Principal {
+            household: req.household,
+            user: req.user,
+            role,
+        };
+        let token = self
+            .signer
+            .issue(&principal, self.now_ms(), self.token_ttl_ms);
         Ok(LoginResp { token, role })
     }
 
@@ -381,7 +423,9 @@ impl Identity for ProdIdentity {
                     })],
                 )
                 .map_err(|_| AuthError::BadToken)?;
-            store.set_credential(new_id, &secret_hash).map_err(|_| AuthError::BadToken)?;
+            store
+                .set_credential(new_id, &secret_hash)
+                .map_err(|_| AuthError::BadToken)?;
             Ok(())
         })?;
 
@@ -418,7 +462,10 @@ impl Identity for ProdIdentity {
             Ok(())
         })?;
 
-        Ok(MintPairCodeResp { code, expires_at: Timestamp(expires_at) })
+        Ok(MintPairCodeResp {
+            code,
+            expires_at: Timestamp(expires_at),
+        })
     }
 
     fn consume_pairing_code(
@@ -432,19 +479,22 @@ impl Identity for ProdIdentity {
         // Take (lookup + delete = single-use) and confirm the member is still active, under one
         // lock. An unknown code, an inactive member, and (below) an expired code ALL surface as the
         // same `BadToken` so `/pair` is not an enumeration oracle.
-        let (user, role, expires_at, display_name) = self.with_tenant_store(household, |store| {
-            let taken = store.take_pairing_code(&code_hash).ok_or(AuthError::BadToken)?;
-            let (user, role, exp) = taken;
-            // Confirm the member is still active AND grab their display name for the greeting.
-            let name = store
-                .snapshot()
-                .users
-                .iter()
-                .find(|u| u.id == user && u.active && u.role == role)
-                .map(|u| u.display_name.clone())
-                .ok_or(AuthError::BadToken)?;
-            Ok((user, role, exp, name))
-        })?;
+        let (user, role, expires_at, display_name) =
+            self.with_tenant_store(household, |store| {
+                let taken = store
+                    .take_pairing_code(&code_hash)
+                    .ok_or(AuthError::BadToken)?;
+                let (user, role, exp) = taken;
+                // Confirm the member is still active AND grab their display name for the greeting.
+                let name = store
+                    .snapshot()
+                    .users
+                    .iter()
+                    .find(|u| u.id == user && u.active && u.role == role)
+                    .map(|u| u.display_name.clone())
+                    .ok_or(AuthError::BadToken)?;
+                Ok((user, role, exp, name))
+            })?;
 
         // Expiry is checked after the take, so an expired code is still consumed (deleted) and can't
         // be retried.
@@ -452,8 +502,18 @@ impl Identity for ProdIdentity {
             return Err(AuthError::BadToken);
         }
 
-        let principal = Principal { household: household.clone(), user, role };
+        let principal = Principal {
+            household: household.clone(),
+            user,
+            role,
+        };
         let token = self.signer.issue(&principal, now, self.token_ttl_ms);
-        Ok(PairResp { token, household: household.clone(), user, role, display_name })
+        Ok(PairResp {
+            token,
+            household: household.clone(),
+            user,
+            role,
+            display_name,
+        })
     }
 }

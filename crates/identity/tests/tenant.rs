@@ -19,7 +19,9 @@ fn each_backend(handles: &[&str], test: impl Fn(Backend)) {
     // SQLite — always. Base dir is a TempDir that drops (and deletes) at scope end.
     {
         let dir = tempfile::tempdir().expect("tempdir");
-        test(Backend::Sqlite { dir: dir.path().to_path_buf() });
+        test(Backend::Sqlite {
+            dir: dir.path().to_path_buf(),
+        });
     }
 
     // Postgres — opt-in, serialized behind a Mutex (shared database).
@@ -32,11 +34,15 @@ fn each_backend(handles: &[&str], test: impl Fn(Backend)) {
         if let Ok(url) = std::env::var("DATABASE_URL") {
             let _guard = PG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
             // Pre-clean any leftover schemas from a previous aborted run.
-            let cleaner = Provisioner::new(Backend::Postgres { base_url: url.clone() });
+            let cleaner = Provisioner::new(Backend::Postgres {
+                base_url: url.clone(),
+            });
             for h in handles {
                 cleaner.deprovision(h).expect("pre-clean schema");
             }
-            test(Backend::Postgres { base_url: url.clone() });
+            test(Backend::Postgres {
+                base_url: url.clone(),
+            });
             // Post-clean.
             for h in handles {
                 cleaner.deprovision(h).expect("post-clean schema");
@@ -69,7 +75,9 @@ fn local_resolves_own_handle_and_rejects_others() {
         reg.provision(&bound).expect("provision bound tenant");
         {
             let mut store = reg.resolve(&bound).expect("resolve bound tenant");
-            store.apply(None, &put_user(1, "knight")).expect("apply to bound store");
+            store
+                .apply(None, &put_user(1, "knight"))
+                .expect("apply to bound store");
         }
         // Re-resolve and snapshot: the write is visible (it's a real, usable store).
         let snap = reg.resolve(&bound).expect("re-resolve bound").snapshot();
@@ -110,9 +118,11 @@ fn hosted_isolation_between_two_households() {
         reg.provision(&beta).expect("provision beta");
         {
             let mut a = reg.resolve(&alpha).expect("resolve alpha");
-            a.apply(None, &put_user(1, "alpha-user")).expect("apply alpha");
+            a.apply(None, &put_user(1, "alpha-user"))
+                .expect("apply alpha");
             let mut b = reg.resolve(&beta).expect("resolve beta");
-            b.apply(None, &put_user(2, "beta-user")).expect("apply beta");
+            b.apply(None, &put_user(2, "beta-user"))
+                .expect("apply beta");
         }
 
         // Each snapshot sees ONLY its own user (full isolation).
@@ -121,11 +131,17 @@ fn hosted_isolation_between_two_households() {
         assert_eq!(a.users.len(), 1, "alpha sees only its own user");
         assert_eq!(a.users[0].id, UserId(1));
         assert_eq!(a.users[0].display_name, "alpha-user");
-        assert!(a.users.iter().all(|u| u.id != UserId(2)), "alpha must not see beta");
+        assert!(
+            a.users.iter().all(|u| u.id != UserId(2)),
+            "alpha must not see beta"
+        );
         assert_eq!(b.users.len(), 1, "beta sees only its own user");
         assert_eq!(b.users[0].id, UserId(2));
         assert_eq!(b.users[0].display_name, "beta-user");
-        assert!(b.users.iter().all(|u| u.id != UserId(1)), "beta must not see alpha");
+        assert!(
+            b.users.iter().all(|u| u.id != UserId(1)),
+            "beta must not see alpha"
+        );
 
         // Deprovision alpha → forgotten → resolve(alpha) errors; beta is untouched.
         reg.deprovision(&alpha).expect("deprovision alpha");
@@ -133,7 +149,10 @@ fn hosted_isolation_between_two_households() {
             Some(TenantError::UnknownTenant(h)) => assert_eq!(h, alpha),
             o => panic!("expected UnknownTenant after deprovision, got {o:?}"),
         }
-        assert!(reg.resolve(&beta).is_ok(), "beta still resolvable after alpha deprovisioned");
+        assert!(
+            reg.resolve(&beta).is_ok(),
+            "beta still resolvable after alpha deprovisioned"
+        );
 
         // Clean up beta (PG harness also post-cleans, but keep the SQLite path tidy too).
         reg.deprovision(&beta).expect("deprovision beta");

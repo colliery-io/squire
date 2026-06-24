@@ -27,7 +27,8 @@ impl ConfigView {
     /// Resolve a [`HouseholdConfig`] into a view, parsing its timezone with a **UTC fallback** on an
     /// unknown/invalid name (never panics).
     pub fn resolve(config: HouseholdConfig) -> Self {
-        let tz = jiff::tz::TimeZone::get(&config.timezone).unwrap_or_else(|_| jiff::tz::TimeZone::UTC);
+        let tz =
+            jiff::tz::TimeZone::get(&config.timezone).unwrap_or_else(|_| jiff::tz::TimeZone::UTC);
         Self { config, tz }
     }
 }
@@ -59,7 +60,11 @@ pub fn valid_timezone(name: &str) -> bool {
 pub fn date_in_zone(millis: i64, tz: &jiff::tz::TimeZone) -> Date {
     let ts = jiff::Timestamp::from_millisecond(millis).unwrap_or_default();
     let civil = ts.to_zoned(tz.clone()).date();
-    let days = days_from_civil(civil.year() as i64, civil.month() as i64, civil.day() as i64);
+    let days = days_from_civil(
+        civil.year() as i64,
+        civil.month() as i64,
+        civil.day() as i64,
+    );
     Date((days + UNIX_TO_MONDAY_EPOCH_OFFSET) as i32)
 }
 
@@ -133,15 +138,25 @@ mod tests {
     // The zone-aware conversion in UTC must agree with the legacy UTC day-count exactly.
     #[test]
     fn utc_agrees_with_legacy() {
-        for millis in [0i64, 1_000_000_000_000, 1_781_000_000_000, 1_900_000_000_000] {
-            assert_eq!(date_in_zone(millis, &tz("UTC")), crate::date_from_unix_millis(millis));
+        for millis in [
+            0i64,
+            1_000_000_000_000,
+            1_781_000_000_000,
+            1_900_000_000_000,
+        ] {
+            assert_eq!(
+                date_in_zone(millis, &tz("UTC")),
+                crate::date_from_unix_millis(millis)
+            );
         }
     }
 
     // An unknown zone string falls back to UTC rather than panicking.
     #[test]
     fn bad_zone_falls_back_to_utc() {
-        let view = ConfigView::resolve(HouseholdConfig { timezone: "Not/AZone".into() });
+        let view = ConfigView::resolve(HouseholdConfig {
+            timezone: "Not/AZone".into(),
+        });
         assert_eq!(view.tz, jiff::tz::TimeZone::UTC);
     }
 }

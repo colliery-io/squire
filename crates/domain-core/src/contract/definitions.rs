@@ -23,20 +23,20 @@ pub struct Quest {
     #[cfg_attr(feature = "serde", serde(default))]
     pub cash: Points,
     pub cadence: Cadence,
-    pub assignment: Assignment,     // which Squires this quest is for (always ≥ 1)
-    pub completion: Completion,     // each assignee does their own, vs. first-to-win
-    pub auto_approve: bool,         // trust-based chores skip parent review
+    pub assignment: Assignment, // which Squires this quest is for (always ≥ 1)
+    pub completion: Completion, // each assignee does their own, vs. first-to-win
+    pub auto_approve: bool,     // trust-based chores skip parent review
     pub repeatable_within_day: bool, // true = claimable multiple times/day for repeat points
-    pub active: bool,               // archived (not deleted) so history stays valid
-    pub icon: Option<String>,       // cosmetic, for the player UI
+    pub active: bool,           // archived (not deleted) so history stays valid
+    pub icon: Option<String>,   // cosmetic, for the player UI
 }
 
 /// Which Squires a quest is for — always at least one.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum Assignment {
-    AllSquires,                  // every active Squire (auto-includes Squires added later)
-    Squires(BTreeSet<UserId>),   // an explicit subset (one or more)
+    AllSquires,                // every active Squire (auto-includes Squires added later)
+    Squires(BTreeSet<UserId>), // an explicit subset (one or more)
 }
 
 /// How an assigned occurrence is satisfied.
@@ -65,9 +65,14 @@ pub enum Cadence {
 #[derive(Clone, Debug)]
 pub enum Schedule {
     Daily,
-    Weekly { days: BTreeSet<Weekday> },
+    Weekly {
+        days: BTreeSet<Weekday>,
+    },
     /// `anchor` fixes the phase so the engine knows which days land.
-    EveryNDays { n: u16, anchor: Date },
+    EveryNDays {
+        n: u16,
+        anchor: Date,
+    },
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -113,9 +118,18 @@ pub struct Achievement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum Criterion {
-    Streak { scope: Scope, length: u32, basis: StreakBasis },
-    TotalCompletions { scope: Scope, count: u32 },
-    PointsEarned { total: Points },
+    Streak {
+        scope: Scope,
+        length: u32,
+        basis: StreakBasis,
+    },
+    TotalCompletions {
+        scope: Scope,
+        count: u32,
+    },
+    PointsEarned {
+        total: Points,
+    },
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

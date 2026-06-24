@@ -52,7 +52,11 @@ type BoxErr = Box<dyn std::error::Error + Send + Sync>;
 pub async fn run_home_server() -> Result<(), BoxErr> {
     let data_dir: PathBuf = std::env::var_os("SQUIRE_DATA_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|| dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("squire"));
+        .unwrap_or_else(|| {
+            dirs::data_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join("squire")
+        });
 
     // OTA app-update dir (SQUIRE-T-0051/0085): default to `<data_dir>/updates` and create it, so the
     // `/app/*` endpoints are always available without setting `SQUIRE_APK_DIR`. An explicit env var
@@ -117,19 +121,31 @@ pub async fn run_home_server() -> Result<(), BoxErr> {
     });
 
     println!("════════════════════════════════════════════════════════════════════");
-    println!("  Squire home server — persistent, data in {}", data_dir.display());
+    println!(
+        "  Squire home server — persistent, data in {}",
+        data_dir.display()
+    );
     println!(
         "  Household:               {}{}",
         handle.0,
-        if first_run { " (newly bootstrapped)" } else { " (loaded)" }
+        if first_run {
+            " (newly bootstrapped)"
+        } else {
+            " (loaded)"
+        }
     );
     println!("  Timezone:                {timezone}   ← daily quests reset at this local midnight");
     if let Some(apk) = std::env::var_os("SQUIRE_APK_DIR") {
-        println!("  App updates (OTA):       {}", PathBuf::from(apk).display());
+        println!(
+            "  App updates (OTA):       {}",
+            PathBuf::from(apk).display()
+        );
     }
     println!("  Keep (parent, loopback): http://127.0.0.1:{keep_port}");
     match &lan_host {
-        Some(h) => println!("  LAN api (phones):        http://{h}:{api_port}   ← phones pair here (QR + mDNS)"),
+        Some(h) => println!(
+            "  LAN api (phones):        http://{h}:{api_port}   ← phones pair here (QR + mDNS)"
+        ),
         None => {
             println!("  LAN api (phones):        http://0.0.0.0:{api_port}");
             println!("  (could not detect a LAN IP — set SQUIRE_PAIR_HOST=<this computer's IP>)");
@@ -152,7 +168,9 @@ pub fn open_household(
     signing_key: &[u8],
     token_ttl_ms: i64,
 ) -> Result<(SharedStore, Arc<dyn Identity>), BoxErr> {
-    let provisioner = Provisioner::new(Backend::Sqlite { dir: dir.to_path_buf() });
+    let provisioner = Provisioner::new(Backend::Sqlite {
+        dir: dir.to_path_buf(),
+    });
     provisioner.provision(&handle.0)?;
     let store: SharedStore = Arc::new(Mutex::new(provisioner.open(&handle.0, SystemClock)?));
     let identity: Arc<dyn Identity> = Arc::new(ProdIdentity::shared_local(
@@ -224,7 +242,8 @@ pub async fn serve(
         store::LocalClock::new(store::live_config(cfg))
     };
     let app = AppState::with_clock(store.clone(), identity.clone(), clock.clone());
-    let keep_state = KeepState::from_parts_with_clock(store.clone(), identity.clone(), handle.clone(), clock);
+    let keep_state =
+        KeepState::from_parts_with_clock(store.clone(), identity.clone(), handle.clone(), clock);
 
     // Held for the process lifetime so the advertisement persists.
     let _mdns = start_mdns(api_port, &handle.0);
@@ -238,7 +257,10 @@ pub async fn serve(
 
 /// Parse a `u16` from env `key`, falling back to `default`.
 pub fn env_u16(key: &str, default: u16) -> u16 {
-    std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
 }
 
 /// Best-effort detection of this machine's **LAN IPv4** — the address a phone on the same Wi-Fi
@@ -307,7 +329,10 @@ fn write_secret(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 /// `SQUIRE_MDNS=off`, and a responder failure only logs — serving never depends on it. The returned
 /// guard must be kept alive for the advertisement to persist. `libmdns` enumerates the host's
 /// interfaces and announces the machine's LAN address (not loopback) itself.
-pub fn start_mdns(api_port: u16, household: &str) -> Option<(libmdns::Responder, libmdns::Service)> {
+pub fn start_mdns(
+    api_port: u16,
+    household: &str,
+) -> Option<(libmdns::Responder, libmdns::Service)> {
     if std::env::var("SQUIRE_MDNS").is_ok_and(|v| v.eq_ignore_ascii_case("off")) {
         println!("  mDNS:                    disabled (SQUIRE_MDNS=off)");
         return None;

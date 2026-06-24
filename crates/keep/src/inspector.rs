@@ -25,7 +25,11 @@ pub async fn quest_log(
     Path(id): Path<String>,
 ) -> Result<Json<Vec<Event>>, StatusCode> {
     let qid = QuestId(id.trim().parse().map_err(|_| StatusCode::BAD_REQUEST)?);
-    let log = state.store.lock().expect("store mutex poisoned").raw_log_for_quest(qid);
+    let log = state
+        .store
+        .lock()
+        .expect("store mutex poisoned")
+        .raw_log_for_quest(qid);
     Ok(Json(log))
 }
 
@@ -37,6 +41,10 @@ pub async fn item_log(
     Path(id): Path<String>,
 ) -> Result<Json<Vec<Event>>, StatusCode> {
     let iid = ItemId(id.trim().parse().map_err(|_| StatusCode::BAD_REQUEST)?);
-    let log = state.store.lock().expect("store mutex poisoned").raw_log_for_item(iid);
+    let log = state
+        .store
+        .lock()
+        .expect("store mutex poisoned")
+        .raw_log_for_item(iid);
     Ok(Json(log))
 }

@@ -15,8 +15,8 @@
 //! `tower::ServiceExt::oneshot`, so the whole request path is exercised in-process.
 
 pub mod app_dist;
-pub mod authoring;
 pub mod auth;
+pub mod authoring;
 pub mod config;
 pub mod control;
 pub mod history;
@@ -63,26 +63,48 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/admin/review-cashout", post(knight::review_cashout))
         .route("/admin/redeem", post(knight::redeem))
         .route("/admin/adjust", post(knight::adjust))
-        .route("/admin/hazards", get(knight::list_hazards).put(knight::set_hazards))
+        .route(
+            "/admin/hazards",
+            get(knight::list_hazards).put(knight::set_hazards),
+        )
         .route("/admin/mark-done", post(knight::mark_done))
         .route("/household-review", get(knight::household_review))
         .route("/admin/squire/{id}/state", get(knight::squire_state))
         // Knight quest authoring from the phone (SQUIRE-T-0064): create / list / archive quests.
-        .route("/admin/quests", get(authoring::list_quests).post(authoring::create_quest))
+        .route(
+            "/admin/quests",
+            get(authoring::list_quests).post(authoring::create_quest),
+        )
         .route("/admin/quests/{id}/archive", post(authoring::archive_quest))
         // Knight achievement authoring from the phone (SQUIRE-T-0072).
-        .route("/admin/achievements", get(authoring::list_achievements).post(authoring::create_achievement))
-        .route("/admin/achievements/{id}/archive", post(authoring::archive_achievement))
+        .route(
+            "/admin/achievements",
+            get(authoring::list_achievements).post(authoring::create_achievement),
+        )
+        .route(
+            "/admin/achievements/{id}/archive",
+            post(authoring::archive_achievement),
+        )
         // Knight reward (item) authoring from the phone (SQUIRE-T-0074).
-        .route("/admin/items", get(authoring::list_items).post(authoring::create_item))
+        .route(
+            "/admin/items",
+            get(authoring::list_items).post(authoring::create_item),
+        )
         .route("/admin/items/{id}/archive", post(authoring::archive_item))
         // Knight member administration from the phone (SQUIRE-T-0075): list + de/reactivate. (Add +
         // mint-pair-code already live on the control-plane /members and /pair/codes, both Knight-gated.)
         .route("/admin/members", get(authoring::list_members))
-        .route("/admin/members/{id}/active", post(authoring::set_member_active))
+        .route(
+            "/admin/members/{id}/active",
+            post(authoring::set_member_active),
+        )
+        .route("/admin/members/{id}/name", post(authoring::rename_member))
         // Household settings from the phone (SQUIRE-T-0113): read + change the timezone, at parity
         // with the Keep's /api/config (hot-swaps the shared live cell).
-        .route("/admin/config", get(config::get_config).put(config::update_config))
+        .route(
+            "/admin/config",
+            get(config::get_config).put(config::update_config),
+        )
         // Household activity history for the phone (SQUIRE-T-0112): recent events, newest first.
         .route("/admin/history", get(history::history))
         // App-update distribution (SQUIRE-T-0051): version manifest + APK download, unauthenticated.

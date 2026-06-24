@@ -53,43 +53,67 @@ impl Repository for InMemoryRepository {
                 Change::Append(e) => self.events.push(e.clone()),
                 Change::PutQuest(q) => {
                     upsert(&mut self.quests, q.clone(), |x| x.id == q.id);
-                    self.audit.push(AuditEntry { by, what: format!("PutQuest({:?})", q.id) });
+                    self.audit.push(AuditEntry {
+                        by,
+                        what: format!("PutQuest({:?})", q.id),
+                    });
                 }
                 Change::PutItem(i) => {
                     upsert(&mut self.items, i.clone(), |x| x.id == i.id);
-                    self.audit.push(AuditEntry { by, what: format!("PutItem({:?})", i.id) });
+                    self.audit.push(AuditEntry {
+                        by,
+                        what: format!("PutItem({:?})", i.id),
+                    });
                 }
                 Change::PutAchievement(a) => {
                     upsert(&mut self.achievements, a.clone(), |x| x.id == a.id);
-                    self.audit.push(AuditEntry { by, what: format!("PutAchievement({:?})", a.id) });
+                    self.audit.push(AuditEntry {
+                        by,
+                        what: format!("PutAchievement({:?})", a.id),
+                    });
                 }
                 Change::PutUser(u) => {
                     upsert(&mut self.users, u.clone(), |x| x.id == u.id);
-                    self.audit.push(AuditEntry { by, what: format!("PutUser({:?})", u.id) });
+                    self.audit.push(AuditEntry {
+                        by,
+                        what: format!("PutUser({:?})", u.id),
+                    });
                 }
                 Change::SetQuestActive(id, active) => {
                     if let Some(q) = self.quests.iter_mut().find(|x| x.id == *id) {
                         q.active = *active;
                     }
-                    self.audit.push(AuditEntry { by, what: format!("SetQuestActive({:?},{})", id, active) });
+                    self.audit.push(AuditEntry {
+                        by,
+                        what: format!("SetQuestActive({:?},{})", id, active),
+                    });
                 }
                 Change::SetItemActive(id, active) => {
                     if let Some(i) = self.items.iter_mut().find(|x| x.id == *id) {
                         i.active = *active;
                     }
-                    self.audit.push(AuditEntry { by, what: format!("SetItemActive({:?},{})", id, active) });
+                    self.audit.push(AuditEntry {
+                        by,
+                        what: format!("SetItemActive({:?},{})", id, active),
+                    });
                 }
                 Change::SetAchievementActive(id, active) => {
                     if let Some(a) = self.achievements.iter_mut().find(|x| x.id == *id) {
                         a.active = *active;
                     }
-                    self.audit.push(AuditEntry { by, what: format!("SetAchievementActive({:?},{})", id, active) });
+                    self.audit.push(AuditEntry {
+                        by,
+                        what: format!("SetAchievementActive({:?},{})", id, active),
+                    });
                 }
                 Change::SetUserActive(id, active) => {
                     if let Some(u) = self.users.iter_mut().find(|x| x.id == *id) {
                         u.active = *active;
                     }
-                    self.audit.push(AuditEntry { by, what: format!("SetUserActive({:?},{})", id, active) });
+                    self.audit.push(AuditEntry {
+                        by,
+                        what: format!("SetUserActive({:?},{})", id, active),
+                    });
                 }
             }
         }

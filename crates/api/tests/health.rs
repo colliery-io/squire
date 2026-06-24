@@ -6,8 +6,8 @@
 use std::sync::Arc;
 
 use api::auth::{Auth, RequireKnight};
-use identity::{DevIdentity, Principal};
 use api::{router, AppState};
+use identity::{DevIdentity, Principal};
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -29,7 +29,9 @@ const SQUIRE_TOKEN: &str = "tok-squire";
 /// seeded with a Knight token and a Squire token, both bound to `house1`.
 fn test_state() -> (Arc<AppState>, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("tempdir");
-    let provisioner = Provisioner::new(Backend::Sqlite { dir: dir.path().to_path_buf() });
+    let provisioner = Provisioner::new(Backend::Sqlite {
+        dir: dir.path().to_path_buf(),
+    });
     let store = provisioner
         .open(HANDLE, SystemClock)
         .expect("open tenant store");

@@ -18,8 +18,8 @@ use diesel::sqlite::SqliteConnection;
 
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, ClaimId, CommandId,
-    Completion, Criterion, Currency, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem, RequestId,
-    Role, Scope, Schedule, StreakBasis, Timestamp, User, UserId, Weekday,
+    Completion, Criterion, Currency, Date, Event, ItemId, Points, Quest, QuestId, RedeemableItem,
+    RequestId, Role, Schedule, Scope, StreakBasis, Timestamp, User, UserId, Weekday,
 };
 use store::rows::{AchievementRow, Audit, EventRow, ItemRow, QuestRow, UserRow};
 use store::schema::{achievements, events, items, quests, users};
@@ -188,11 +188,18 @@ fn arb_basis() -> impl Strategy<Value = StreakBasis> {
 
 fn arb_criterion() -> impl Strategy<Value = Criterion> {
     prop_oneof![
-        (arb_scope(), any::<u32>(), arb_basis())
-            .prop_map(|(scope, length, basis)| Criterion::Streak { scope, length, basis }),
+        (arb_scope(), any::<u32>(), arb_basis()).prop_map(|(scope, length, basis)| {
+            Criterion::Streak {
+                scope,
+                length,
+                basis,
+            }
+        }),
         (arb_scope(), any::<u32>())
             .prop_map(|(scope, count)| Criterion::TotalCompletions { scope, count }),
-        any::<u32>().prop_map(|total| Criterion::PointsEarned { total: total as Points }),
+        any::<u32>().prop_map(|total| Criterion::PointsEarned {
+            total: total as Points
+        }),
     ]
 }
 
@@ -205,14 +212,16 @@ fn arb_achievement() -> impl Strategy<Value = Achievement> {
         any::<u32>(),
         any::<bool>(),
     )
-        .prop_map(|(id, name, description, criterion, bonus, active)| Achievement {
-            id: AchievementId(id),
-            name,
-            description,
-            criterion,
-            bonus_points: bonus as Points,
-            active,
-        })
+        .prop_map(
+            |(id, name, description, criterion, bonus, active)| Achievement {
+                id: AchievementId(id),
+                name,
+                description,
+                criterion,
+                bonus_points: bonus as Points,
+                active,
+            },
+        )
 }
 
 fn arb_opt_user() -> impl Strategy<Value = Option<UserId>> {
@@ -224,24 +233,34 @@ fn arb_event() -> impl Strategy<Value = Event> {
     let ts = any::<i64>().prop_map(Timestamp);
     let date = any::<i32>().prop_map(Date);
     prop_oneof![
-        (any::<u128>(), uid.clone(), any::<u128>(), date.clone(), ts.clone()).prop_map(
-            |(c, s, q, on, at)| Event::CompletionClaimed {
+        (
+            any::<u128>(),
+            uid.clone(),
+            any::<u128>(),
+            date.clone(),
+            ts.clone()
+        )
+            .prop_map(|(c, s, q, on, at)| Event::CompletionClaimed {
                 claim_id: ClaimId(c),
                 squire: s,
                 quest_id: QuestId(q),
                 on,
                 at,
-            }
-        ),
-        (any::<u128>(), uid.clone(), arb_opt_user(), any::<u32>(), ts.clone()).prop_map(
-            |(c, s, actor, points, at)| Event::CompletionApproved {
+            }),
+        (
+            any::<u128>(),
+            uid.clone(),
+            arb_opt_user(),
+            any::<u32>(),
+            ts.clone()
+        )
+            .prop_map(|(c, s, actor, points, at)| Event::CompletionApproved {
                 claim_id: ClaimId(c),
                 squire: s,
                 actor,
                 points: points as Points,
                 at,
-            }
-        ),
+            }),
         (
             any::<u128>(),
             uid.clone(),
@@ -274,14 +293,14 @@ fn arb_event() -> impl Strategy<Value = Event> {
                 cost: cost as Points,
                 at,
             }),
-        (uid.clone(), any::<u128>(), any::<u32>(), ts.clone()).prop_map(
-            |(s, id, bonus, at)| Event::AchievementUnlocked {
+        (uid.clone(), any::<u128>(), any::<u32>(), ts.clone()).prop_map(|(s, id, bonus, at)| {
+            Event::AchievementUnlocked {
                 squire: s,
                 id: AchievementId(id),
                 bonus: bonus as Points,
                 at,
             }
-        ),
+        }),
         (
             any::<u128>(),
             uid.clone(),
@@ -299,14 +318,14 @@ fn arb_event() -> impl Strategy<Value = Event> {
                 reason,
                 at,
             }),
-        (any::<u128>(), uid.clone(), any::<u128>(), ts.clone()).prop_map(
-            |(rq, s, item, at)| Event::RedemptionRequested {
+        (any::<u128>(), uid.clone(), any::<u128>(), ts.clone()).prop_map(|(rq, s, item, at)| {
+            Event::RedemptionRequested {
                 request_id: RequestId(rq),
                 squire: s,
                 item_id: ItemId(item),
                 at,
             }
-        ),
+        }),
         (
             any::<u128>(),
             uid.clone(),
@@ -367,7 +386,12 @@ proptest! {
 
 #[test]
 fn audit_is_carried_on_rows_not_domain() {
-    let u = User { id: UserId(1), role: Role::Squire, display_name: "Ned".into(), active: true };
+    let u = User {
+        id: UserId(1),
+        role: Role::Squire,
+        display_name: "Ned".into(),
+        active: true,
+    };
     let row = UserRow::from_user(&u, AUDIT);
     assert_eq!(row.created_by.as_deref(), Some("7"));
     assert_eq!(row.created_at, 1_000);
@@ -410,9 +434,8 @@ fn each_backend(test: impl Fn(&mut AnyConnection)) {
         if let Ok(url) = std::env::var("DATABASE_URL") {
             let _guard = PG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
             store::pg::provision_clean(&url).expect("reset + migrate postgres");
-            let mut conn = AnyConnection::Pg(
-                diesel::pg::PgConnection::establish(&url).expect("pg connect"),
-            );
+            let mut conn =
+                AnyConnection::Pg(diesel::pg::PgConnection::establish(&url).expect("pg connect"));
             test(&mut conn);
         } else {
             eprintln!("skipping postgres DB round-trip: DATABASE_URL not set");
@@ -435,8 +458,18 @@ fn db_round_trip_users() {
     each_backend(|conn| {
         truncate_all(conn);
         let samples = vec![
-            User { id: UserId(1), role: Role::Knight, display_name: "Robb".into(), active: true },
-            User { id: UserId(2), role: Role::Squire, display_name: "Arya".into(), active: false },
+            User {
+                id: UserId(1),
+                role: Role::Knight,
+                display_name: "Robb".into(),
+                active: true,
+            },
+            User {
+                id: UserId(2),
+                role: Role::Squire,
+                display_name: "Arya".into(),
+                active: false,
+            },
         ];
         for u in &samples {
             let row = UserRow::from_user(u, AUDIT);
@@ -471,7 +504,9 @@ fn db_round_trip_quests() {
             category: Some(Category("chores".into())),
             reward: 5,
             cash: 0,
-            cadence: Cadence::OneOff { due: Some(Date(100)) },
+            cadence: Cadence::OneOff {
+                due: Some(Date(100)),
+            },
             assignment: Assignment::AllSquires,
             completion: Completion::EachAssignee,
             auto_approve: true,
@@ -518,7 +553,10 @@ fn db_round_trip_quests() {
             category: None,
             reward: 7,
             cash: 0,
-            cadence: Cadence::Recurring(Schedule::EveryNDays { n: 3, anchor: Date(-5) }),
+            cadence: Cadence::Recurring(Schedule::EveryNDays {
+                n: 3,
+                anchor: Date(-5),
+            }),
             assignment: Assignment::AllSquires,
             completion: Completion::Race,
             auto_approve: true,
@@ -558,8 +596,7 @@ fn db_round_trip_quests() {
             .order(quests::id.asc())
             .load(conn)
             .expect("load quests");
-        let mut decoded: Vec<Quest> =
-            rows.iter().map(|r| r.to_quest().expect("decode")).collect();
+        let mut decoded: Vec<Quest> = rows.iter().map(|r| r.to_quest().expect("decode")).collect();
         decoded.sort_by_key(|q| q.id.0);
         let mut expected = samples.clone();
         expected.sort_by_key(|q| q.id.0);
@@ -650,7 +687,10 @@ fn db_round_trip_achievements() {
             id: AchievementId(32),
             name: "TotalAny".into(),
             description: None,
-            criterion: Criterion::TotalCompletions { scope: Scope::Any, count: 100 },
+            criterion: Criterion::TotalCompletions {
+                scope: Scope::Any,
+                count: 100,
+            },
             bonus_points: 0,
             active: false,
         },
@@ -678,8 +718,10 @@ fn db_round_trip_achievements() {
             .order(achievements::id.asc())
             .load(conn)
             .expect("load achievements");
-        let mut decoded: Vec<Achievement> =
-            rows.iter().map(|r| r.to_achievement().expect("decode")).collect();
+        let mut decoded: Vec<Achievement> = rows
+            .iter()
+            .map(|r| r.to_achievement().expect("decode"))
+            .collect();
         decoded.sort_by_key(|a| a.id.0);
         let mut expected = samples.clone();
         expected.sort_by_key(|a| a.id.0);

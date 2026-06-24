@@ -98,6 +98,10 @@ internal fun MemberAdminScreen(
     // ── pair dialog ──
     var invite by remember { mutableStateOf<PairInvite?>(null) }
 
+    // ── rename dialog (SQUIRE-T-0120/0126) ──
+    var renaming by remember { mutableStateOf<MemberSummaryDto?>(null) }
+    var renameText by remember { mutableStateOf("") }
+
     fun submitAdd() {
         if (name.isBlank()) { formError = "Add a name."; return }
         if (secret.isBlank()) { formError = "Set an initial secret."; return }
@@ -189,6 +193,8 @@ internal fun MemberAdminScreen(
                             if (m.active) {
                                 OutlinedButton(onClick = { pair(m) }) { Text("Pair") }
                             }
+                            // Rename in place (keeps id, role, pairing) — SQUIRE-T-0120/0126.
+                            OutlinedButton(onClick = { renaming = m; renameText = m.displayName }) { Text("Rename") }
                             // Never offer to deactivate your own account (no self-lockout).
                             if (m.user != selfUser) {
                                 OutlinedButton(onClick = { scope.launch { runCatching { adapter.setMemberActive(m.user, !m.active) }; tick++ } }) {
@@ -216,6 +222,33 @@ internal fun MemberAdminScreen(
                     Text("Household: ${inv.household}", style = MaterialTheme.typography.bodySmall)
                     Text("Single use · expires in ~30 min.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            },
+        )
+    }
+
+    renaming?.let { m ->
+        AlertDialog(
+            onDismissRequest = { renaming = null },
+            confirmButton = {
+                TextButton(
+                    enabled = renameText.isNotBlank() && renameText.trim() != m.displayName,
+                    onClick = {
+                        val next = renameText.trim()
+                        scope.launch { runCatching { adapter.renameMember(m.user, next) }; tick++ }
+                        renaming = null
+                    },
+                ) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { renaming = null }) { Text("Cancel") } },
+            title = { Text("Rename ${m.displayName}") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             },
         )
     }

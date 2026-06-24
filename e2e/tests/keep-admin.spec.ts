@@ -36,6 +36,21 @@ test("adding a member shows the token as a success notice (A1)", async ({ page }
   await page.screenshot({ path: `${SCREENS}/admin-02-member-token.png`, fullPage: true });
 });
 
+test("rename a member in place — same row, role + id kept (SQUIRE-T-0120)", async ({ page }) => {
+  await login(page, "members");
+  const gawain = page.locator("#member-list li", { hasText: "Gawain" });
+  await expect(gawain).toBeVisible();
+  // The Rename button prompts for the new name; accept it.
+  page.once("dialog", (d) => d.accept("Galahad"));
+  await gawain.getByRole("button", { name: "Rename" }).click();
+
+  // Renamed in place: new name present, old gone, still a Squire (role preserved — it's an upsert).
+  const galahad = page.locator("#member-list li", { hasText: "Galahad" });
+  await expect(galahad).toBeVisible();
+  await expect(galahad.locator(".badge-squire")).toHaveText("Squire");
+  await expect(page.locator("#member-list li", { hasText: "Gawain" })).toHaveCount(0);
+});
+
 test("Pair tab renders a framed hand-off card with a QR (A2)", async ({ page }) => {
   await login(page, "pair");
   await page.click("#pair-form button[type=submit]");

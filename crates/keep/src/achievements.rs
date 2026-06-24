@@ -38,7 +38,10 @@ pub async fn list_achievements(
                 .flatten()
                 .map(AuditView::from)
                 .unwrap_or_default();
-            AchievementRow { achievement: a.clone(), audit }
+            AchievementRow {
+                achievement: a.clone(),
+                audit,
+            }
         })
         .collect();
     Json(rows)
@@ -55,7 +58,9 @@ pub async fn create_achievement(
     state
         .commit(Some(op.user), Command::DefineAchievement(achievement))
         .map_err(domain_status)?;
-    Ok(Json(IdResp { id: id.0.to_string() }))
+    Ok(Json(IdResp {
+        id: id.0.to_string(),
+    }))
 }
 
 /// `POST /api/achievements/{id}/archive` (Knight-only) — archive (`ArchiveAchievement`), never
