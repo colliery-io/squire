@@ -13,7 +13,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use domain_core::contract::{AddMemberReq, Change, LoginReq, Role, UserId};
+use domain_core::contract::{AddMemberReq, Change, LoginReq, Role, User, UserId};
 use identity::AuthError;
 
 use crate::quests::AuditView;
@@ -42,6 +42,12 @@ pub struct AddedMember {
 #[derive(Debug, Deserialize)]
 pub struct SetActiveReq {
     pub active: bool,
+}
+
+/// `POST /api/members/{id}/name` body — a member's new display name (SQUIRE-T-0120/0126).
+#[derive(Debug, Deserialize)]
+pub struct RenameReq {
+    pub display_name: String,
 }
 
 /// Map an [`AuthError`] from a member-admin call onto an HTTP status (Forbidden → 403, else 401).
@@ -111,6 +117,34 @@ pub async fn set_active(
     }
     state
         .apply_changes(Some(op.user), &[Change::SetUserActive(uid, req.active)])
+        .map_err(|_| StatusCode::CONFLICT)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `POST /api/members/{id}/name` (Knight-only) — rename a member in place. Reuses the `PutUser`
+/// upsert (keeps id, role, active, and `created_*` audit; moves `updated_*`), audited to the acting
+/// Knight. Blank name → 400; a missing member → 404.
+pub async fn rename(
+    State(state): State<Arc<KeepState>>,
+    Operator(op): Operator,
+    Path(id): Path<String>,
+    Json(req): Json<RenameReq>,
+) -> Result<StatusCode, StatusCode> {
+    let name = req.display_name.trim();
+    if name.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let uid = UserId(id.trim().parse().map_err(|_| StatusCode::BAD_REQUEST)?);
+    let user = state
+        .snapshot()
+        .users
+        .iter()
+        .find(|u| u.id == uid)
+        .cloned()
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let updated = User { display_name: name.to_string(), ..user };
+    state
+        .apply_changes(Some(op.user), &[Change::PutUser(updated)])
         .map_err(|_| StatusCode::CONFLICT)?;
     Ok(StatusCode::NO_CONTENT)
 }

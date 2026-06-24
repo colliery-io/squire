@@ -87,6 +87,7 @@ impl Modify for SecurityAddon {
         // Knight member administration (SQUIRE-T-0075)
         crate::authoring::list_members,
         crate::authoring::set_member_active,
+        crate::authoring::rename_member,
         // Household settings from the phone (SQUIRE-T-0113)
         crate::config::get_config,
         crate::config::update_config,
@@ -104,6 +105,8 @@ impl Modify for SecurityAddon {
         domain_core::contract::CurrencyBalance,
         domain_core::contract::Currency,
         domain_core::contract::AdjustmentView,
+        domain_core::contract::ActivityEntry,
+        domain_core::contract::ActivityKind,
         domain_core::contract::Hazard,
         domain_core::contract::RewardCard,
         domain_core::contract::LockReason,
@@ -185,6 +188,7 @@ impl Modify for SecurityAddon {
         // ── Knight member-admin DTOs (SQUIRE-T-0075) ──
         crate::authoring::MemberSummaryDto,
         crate::authoring::SetActiveReq,
+        crate::authoring::RenameMemberReq,
         // ── Household settings (SQUIRE-T-0113) ──
         crate::config::UpdateConfigReq,
         domain_core::contract::HouseholdConfig,

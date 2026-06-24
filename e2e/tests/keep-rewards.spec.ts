@@ -54,6 +54,31 @@ test("archive a reward (R3)", async ({ page }) => {
   await expect(row).toContainText("archived");
 });
 
+test("edit a reward in place — upsert, not a duplicate (SQUIRE-T-0120)", async ({ page }) => {
+  await login(page);
+  await page.fill("#item-form input[name=name]", "Comic book");
+  await page.fill("#item-form input[name=cost]", "8");
+  await page.click("#item-form button[type=submit]");
+  await expect(page.locator("#item-list li", { hasText: "Comic book" })).toHaveCount(1);
+
+  // Edit: prefilled from the existing reward, submit relabelled.
+  const row = page.locator("#item-list li", { hasText: "Comic book" });
+  await row.getByRole("button", { name: "Edit" }).click();
+  await expect(page.locator("#item-form button[type=submit]")).toHaveText("Save changes");
+  await expect(page.locator("#item-form input[name=name]")).toHaveValue("Comic book");
+  await expect(page.locator("#item-form input[name=cost]")).toHaveValue("8");
+
+  await page.fill("#item-form input[name=name]", "Graphic novel");
+  await page.fill("#item-form input[name=cost]", "15");
+  await page.click("#item-form button[type=submit]");
+
+  // Renamed in place: one row, old name gone, new cost shown; submit back to create mode.
+  await expect(page.locator("#item-list li", { hasText: "Graphic novel" })).toHaveCount(1);
+  await expect(page.locator("#item-list li", { hasText: "Comic book" })).toHaveCount(0);
+  await expect(page.locator("#item-list li", { hasText: "Graphic novel" })).toContainText("15");
+  await expect(page.locator("#item-form button[type=submit]")).toHaveText("Add reward");
+});
+
 test("a newly added achievement appears in the reward gate dropdown (R4)", async ({ page }) => {
   await login(page); // lands on Rewards; go author an achievement first
   await page.locator("#tabs .tab[data-tab=achievements]").click();

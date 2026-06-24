@@ -116,6 +116,7 @@ internal fun AchievementAdminScreen(
     var total by remember { mutableStateOf("100") }
     var bonus by remember { mutableStateOf("10") }
     var formError by remember { mutableStateOf<String?>(null) }
+    var editingId by remember { mutableStateOf<Long?>(null) } // non-null = editing (upsert) — SQUIRE-T-0120
 
     // Quests to pick from when scoping an achievement/streak to one specific quest (SQUIRE-T-0094 #4).
     LaunchedEffect(Unit) {
@@ -127,6 +128,31 @@ internal fun AchievementAdminScreen(
     fun resetForm() {
         name = ""; criterion = "Streak"; achScope = "Any"; category = ""; scopeQuestId = null
         length = "7"; basis = "CalendarDays"; count = "10"; total = "100"; bonus = "10"; formError = null
+        editingId = null
+    }
+
+    // Prefill the form from an existing achievement and enter edit mode (SQUIRE-T-0120/0126).
+    fun startEdit(a: AchievementSummaryDto) {
+        name = a.name
+        criterion = when (a.criterion) {
+            AchCriterionKind.TotalCompletions -> "TotalCompletions"
+            AchCriterionKind.PointsEarned -> "PointsEarned"
+            else -> "Streak"
+        }
+        achScope = when (a.scope) {
+            AchScopeKind.Category -> "Category"
+            AchScopeKind.Quest -> "Quest"
+            else -> "Any"
+        }
+        category = a.scopeCategory ?: ""
+        scopeQuestId = a.scopeQuest
+        length = (a.length ?: 7).toString()
+        basis = a.basis?.name ?: "CalendarDays"
+        count = (a.count ?: 10).toString()
+        total = (a.total ?: 100).toString()
+        bonus = a.bonus.toString()
+        editingId = a.id
+        formError = null
     }
 
     fun create(req: CreateAchievementReq, onDone: () -> Unit = {}) {
@@ -158,7 +184,7 @@ internal fun AchievementAdminScreen(
             }
         }
         formError = null
-        create(req) { resetForm() }
+        create(req.copy(id = editingId)) { resetForm() } // reuse id when editing (upsert) — SQUIRE-T-0120
     }
 
     Scaffold(
@@ -236,10 +262,15 @@ internal fun AchievementAdminScreen(
                         OutlinedTextField(value = bonus, onValueChange = { bonus = it.filter(Char::isDigit) }, label = { Text("Bonus coins (0 = unlock only)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 
                         formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                        Button(
-                            onClick = { submitForm() },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
-                        ) { Text("Add achievement") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = { submitForm() },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
+                            ) { Text(if (editingId == null) "Add achievement" else "Save changes") }
+                            if (editingId != null) {
+                                OutlinedButton(onClick = { resetForm() }) { Text("Cancel") }
+                            }
+                        }
                     }
                 }
             }
@@ -290,6 +321,7 @@ internal fun AchievementAdminScreen(
                         }
                         if (a.bonus > 0) GoldPill(a.bonus.toInt())
                         if (a.active) {
+                            OutlinedButton(onClick = { startEdit(a) }) { Text("Edit") }
                             OutlinedButton(onClick = { scope.launch { runCatching { adapter.archiveAchievement(a.id) }; tick++ } }) { Text("Archive") }
                         }
                     }

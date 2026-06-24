@@ -251,6 +251,13 @@ button.archive {
   background: var(--field); color: var(--stone); border: 1.5px solid var(--line); box-shadow: none;
 }
 button.archive:hover { background: var(--red-soft); border-color: var(--red); color: var(--red-deep); transform: none; }
+/* Edit-in-place affordances (SQUIRE-T-0120): a neutral row "Edit" + the form's "Cancel". */
+button.edit-row {
+  margin-top: 0; margin-right: .4rem; padding: .4rem .8rem; font-size: .78rem; border-radius: 9px;
+  background: var(--field); color: var(--stone); border: 1.5px solid var(--line); box-shadow: none;
+}
+button.edit-row:hover { background: #EFE7FB; border-color: #D8C7E8; transform: none; }
+button.cancel-edit { margin-left: .5rem; background: var(--field); color: var(--stone); border: 1.5px solid var(--line); box-shadow: none; }
 
 details summary {
   cursor: pointer; color: var(--royal); font-weight: 700;

@@ -84,7 +84,9 @@ internal fun HistoryScreen(
                 item { Text("No activity yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             itemsIndexed(entries) { _, e ->
-                HistoryRow(e, squireNames[e.squire] ?: "Squire ${e.squire}")
+                // Prefer the server-resolved name (SQUIRE-T-0121); fall back to the review map, then
+                // the raw id only if neither resolves.
+                HistoryRow(e, e.squireName ?: squireNames[e.squire] ?: "Squire ${e.squire}")
             }
         }
     }
@@ -120,26 +122,32 @@ private fun formatWhen(atMillis: Long): String =
         Instant.ofEpochMilli(atMillis).atZone(ZoneId.systemDefault()).format(whenFmt)
     }.getOrDefault("")
 
-/** A human, present-tense one-liner for an activity entry. Coin/cash deltas are shown signed. */
+/** A human, present-tense one-liner for an activity entry. Names the quest/reward/achievement and
+ * the acting Knight where the server resolved them (SQUIRE-T-0121); coin/cash deltas are shown signed. */
 private fun describe(e: HistoryEntryDto, name: String): String {
     val amt = e.amount
+    val quest = e.questTitle?.let { "“$it”" } ?: "a quest"
+    val reward = e.itemTitle?.let { "“$it”" } ?: "a reward"
+    val achievement = e.achievementName?.let { "“$it”" } ?: "an achievement"
+    // " · approved by Dad" — only when the server knew the actor.
+    fun by(verb: String) = e.actorName?.let { " · $verb $it" } ?: ""
     return when (e.kind) {
-        "Claimed" -> "$name claimed a quest"
-        "Approved" -> "$name earned ${amt ?: 0} coins"
-        "Rejected" -> "$name's quest claim was rejected"
-        "Redeemed" -> "$name redeemed a reward (${amt ?: 0} coins)"
-        "Requested" -> "$name requested a reward"
-        "RedemptionRejected" -> "$name's reward request was rejected"
+        "Claimed" -> "$name claimed $quest"
+        "Approved" -> "$name earned ${amt ?: 0} coins for $quest" + by("approved by")
+        "Rejected" -> "$name's claim for $quest was rejected" + by("by")
+        "Redeemed" -> "$name redeemed $reward (${amt ?: 0} coins)" + by("by")
+        "Requested" -> "$name requested $reward"
+        "RedemptionRejected" -> "$name's request for $reward was rejected" + by("by")
         "CashOutRequested" -> "$name asked to cash out $${amt ?: 0}"
-        "CashedOut" -> "$name cashed out $${kotlin.math.abs(amt ?: 0)}"
-        "CashOutRejected" -> "$name's cash-out was declined"
-        "Unlocked" -> "$name unlocked an achievement (+${amt ?: 0})"
+        "CashedOut" -> "$name cashed out $${kotlin.math.abs(amt ?: 0)}" + by("paid by")
+        "CashOutRejected" -> "$name's cash-out was declined" + by("by")
+        "Unlocked" -> "$name unlocked $achievement (+${amt ?: 0})"
         "Adjusted" -> {
             val unit = if (e.currency == Currency.Cash) "$" else "coins"
             val n = amt ?: 0
             val verb = if (n >= 0) "received" else "lost"
             val magnitude = if (e.currency == Currency.Cash) "$unit${kotlin.math.abs(n)}" else "${kotlin.math.abs(n)} $unit"
-            "$name $verb $magnitude"
+            "$name $verb $magnitude" + by("by")
         }
         else -> "$name · ${e.kind}"
     }
