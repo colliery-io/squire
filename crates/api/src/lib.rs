@@ -21,6 +21,7 @@ pub mod config;
 pub mod control;
 pub mod history;
 pub mod knight;
+mod log;
 pub mod openapi;
 pub mod squire;
 pub mod state;
@@ -110,6 +111,9 @@ pub fn router(state: Arc<AppState>) -> Router {
         // App-update distribution (SQUIRE-T-0051): version manifest + APK download, unauthenticated.
         .route("/app/manifest", get(app_dist::manifest))
         .route("/app/{file}", get(app_dist::download))
+        // Per-request access log (SQUIRE-T-0127): outermost layer, so it wraps every route (incl.
+        // auth rejections) and times the whole request. Runs before `.with_state` as it needs none.
+        .layer(axum::middleware::from_fn(log::access_log))
         .with_state(state)
 }
 

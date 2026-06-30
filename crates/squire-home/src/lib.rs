@@ -45,6 +45,22 @@ pub fn token_ttl_ms() -> i64 {
 
 type BoxErr = Box<dyn std::error::Error + Send + Sync>;
 
+/// Install the global `tracing` subscriber for the process (SQUIRE-T-0127). This crate owns the
+/// entrypoints, so it is the one place a subscriber is set up; the library crates (`api`, `keep`)
+/// only emit against it. Renders to **stderr** (the api access log, handler events, apk-sync /
+/// self-update / mDNS status), honouring `RUST_LOG` (default `info`; e.g.
+/// `RUST_LOG=squire::access=debug` to include `/health` probes, or `=warn` to quieten). Idempotent —
+/// `try_init` makes a second call (e.g. the desktop app already set one up) a harmless no-op.
+pub fn init_tracing() {
+    use tracing_subscriber::{fmt, EnvFilter};
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let _ = fmt()
+        .with_env_filter(filter)
+        .with_target(true)
+        .with_writer(std::io::stderr)
+        .try_init();
+}
+
 /// Run the persistent home server end to end: resolve the data + OTA dirs, open (provision-if-absent)
 /// the household, seed the timezone, optionally bootstrap the admin, advertise the LAN address, start
 /// the background APK sync, and serve the api + Keep until shut down. Shared by the headless
@@ -97,15 +113,17 @@ pub async fn run_home_server() -> Result<(), BoxErr> {
                         admin_secret,
                     })
                     .map_err(|e| format!("failed to bootstrap admin: {e:?}"))?;
-                println!(
-                    "  Bootstrapped household '{}' with admin '{admin_name}' (UserId {}).",
-                    handle.0, resp.admin.0
+                tracing::info!(
+                    household = %handle.0,
+                    admin = %admin_name,
+                    user_id = resp.admin.0,
+                    "bootstrapped household with first admin Knight",
                 );
             }
             Err(_) => {
-                println!(
-                    "  First run — no admin yet. Open the Keep and use \"First run? Create the \
-                     admin Knight\" to set up your account."
+                tracing::info!(
+                    "first run — no admin yet; open the Keep and use \"First run? Create the \
+                     admin Knight\" to set up your account",
                 );
             }
         }
@@ -334,7 +352,7 @@ pub fn start_mdns(
     household: &str,
 ) -> Option<(libmdns::Responder, libmdns::Service)> {
     if std::env::var("SQUIRE_MDNS").is_ok_and(|v| v.eq_ignore_ascii_case("off")) {
-        println!("  mDNS:                    disabled (SQUIRE_MDNS=off)");
+        tracing::info!("mDNS: disabled (SQUIRE_MDNS=off)");
         return None;
     }
     match libmdns::Responder::new() {
@@ -346,11 +364,11 @@ pub fn start_mdns(
                 api_port,
                 &[txt.as_str()],
             );
-            println!("  mDNS:                    advertising _squire._tcp on :{api_port}");
+            tracing::info!(port = api_port, "mDNS: advertising _squire._tcp");
             Some((responder, service))
         }
         Err(e) => {
-            eprintln!("  mDNS:                    disabled (responder failed: {e})");
+            tracing::warn!(error = %e, "mDNS: disabled (responder failed)");
             None
         }
     }

@@ -17,6 +17,10 @@ serde_json = "1"
 sha2 = "0.10"
 # OpenAPI 3 contract emission from the Rust types (SQUIRE-T-0031 / ADR SQUIRE-A-0009).
 utoipa = { version = "5", features = ["axum_extras"] }
+# Structured logging (SQUIRE-T-0127): the per-request access log (`axum::middleware::from_fn`)
+# and handler-level rejection events emit via the `tracing` facade. The subscriber that renders
+# these is installed by the binary crate (squire-home), not here.
+tracing = "0.1"
 
 [features]
 default = []

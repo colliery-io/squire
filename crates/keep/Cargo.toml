@@ -20,6 +20,11 @@ rust-embed = "8"
 # Server-side QR rendering for device pairing (ADR A-0010) — pure Rust, SVG output (no `image`
 # dep, no client-side JS QR library).
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+# Structured logging (SQUIRE-T-0127): the Keep's loopback admin requests get a `tower-http`
+# TraceLayer (method/path/status/latency). Lighter than the LAN api's identity-aware log — the
+# Keep is operator-only on loopback. Subscriber installed by the binary (squire-home / keep main).
+tracing = "0.1"
+tower-http = { version = "0.6", features = ["trace"] }
 
 [features]
 default = []

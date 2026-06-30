@@ -15,13 +15,15 @@ use domain_core::contract::{
 };
 use identity::Principal;
 
-use squire_home::{ensure_timezone, env_u16, open_household, serve, TOKEN_TTL_MS};
+use squire_home::{ensure_timezone, env_u16, init_tracing, open_household, serve, TOKEN_TTL_MS};
 
 /// Fixed on-disk location for the demo tenant, recreated each run for a deterministic seed.
 const DIR: &str = "/tmp/squire-home";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Structured logging (SQUIRE-T-0127): subscriber up front so the api access log renders.
+    init_tracing();
     // DEMO: wipe so every run starts from the same deterministic seed.
     let _ = std::fs::remove_dir_all(DIR);
 

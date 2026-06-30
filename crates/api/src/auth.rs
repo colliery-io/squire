@@ -77,6 +77,15 @@ fn verify(state: &AppState, headers: &HeaderMap) -> Result<Principal, AuthError>
     state.identity.verify(&household, &token)
 }
 
+/// Record the verified caller into the access-log slot the [`crate::log`] middleware seeded, so the
+/// request line names who made it — without a second token verification (SQUIRE-T-0127). A no-op
+/// when there is no slot (e.g. a unit test driving the router without the access-log layer).
+fn record_for_log(parts: &Parts, principal: &Principal) {
+    if let Some(slot) = crate::log::slot_of(parts) {
+        slot.record(principal);
+    }
+}
+
 /// Extractor yielding the verified [`Principal`] for any authenticated caller (no role gate).
 /// 401 on missing / invalid credentials.
 pub struct Auth(pub Principal);
@@ -88,7 +97,9 @@ impl FromRequestParts<Arc<AppState>> for Auth {
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        verify(state, &parts.headers).map(Auth).map_err(status_for)
+        let principal = verify(state, &parts.headers).map_err(status_for)?;
+        record_for_log(parts, &principal);
+        Ok(Auth(principal))
     }
 }
 
@@ -103,7 +114,9 @@ impl FromRequestParts<Arc<AppState>> for RequireKnight {
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        require_role(state, &parts.headers, Role::Knight).map(RequireKnight)
+        let principal = require_role(state, &parts.headers, Role::Knight)?;
+        record_for_log(parts, &principal);
+        Ok(RequireKnight(principal))
     }
 }
 
@@ -118,7 +131,9 @@ impl FromRequestParts<Arc<AppState>> for RequireSquire {
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        require_role(state, &parts.headers, Role::Squire).map(RequireSquire)
+        let principal = require_role(state, &parts.headers, Role::Squire)?;
+        record_for_log(parts, &principal);
+        Ok(RequireSquire(principal))
     }
 }
 

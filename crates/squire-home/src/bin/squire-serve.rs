@@ -17,9 +17,12 @@
 //! * `SQUIRE_SIGNING_KEY` — override the persisted key; `SQUIRE_MDNS=off` — disable mDNS;
 //!   `SQUIRE_SELF_UPDATE=off` — disable self-update.
 
-use squire_home::{maybe_self_update, run_home_server};
+use squire_home::{init_tracing, maybe_self_update, run_home_server};
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Install the tracing subscriber first so the self-update step (and everything after) logs
+    // through it (SQUIRE-T-0127). `RUST_LOG` controls the level (default `info`).
+    init_tracing();
     // Self-update BEFORE the async runtime: `self_update` uses blocking HTTP, and nesting a runtime
     // inside tokio panics. Re-execs into the new binary if it updated (does not return); no-op for a
     // `cargo run` dev build or when SQUIRE_SELF_UPDATE=off.

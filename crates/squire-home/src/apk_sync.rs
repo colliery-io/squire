@@ -19,14 +19,11 @@ const REFRESH: Duration = Duration::from_secs(6 * 60 * 60); // 6h
 /// `SQUIRE_APK_SYNC=off`. Repo overridable via `SQUIRE_DIST_REPO` (`owner/name`).
 pub fn spawn_apk_sync(updates_dir: PathBuf) {
     if std::env::var("SQUIRE_APK_SYNC").is_ok_and(|v| v.eq_ignore_ascii_case("off")) {
-        println!("  App-update sync:         off (SQUIRE_APK_SYNC=off)");
+        tracing::info!("apk-sync: off (SQUIRE_APK_SYNC=off)");
         return;
     }
     let repo = std::env::var("SQUIRE_DIST_REPO").unwrap_or_else(|_| DEFAULT_REPO.to_string());
-    println!(
-        "  App-update sync:         github.com/{repo} → {}",
-        updates_dir.display()
-    );
+    tracing::info!(repo = %repo, dir = %updates_dir.display(), "apk-sync: syncing from GitHub");
 
     tokio::spawn(async move {
         let client = match reqwest::Client::builder()
@@ -36,15 +33,17 @@ pub fn spawn_apk_sync(updates_dir: PathBuf) {
         {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("apk-sync: could not build http client: {e}");
+                tracing::error!(error = %e, "apk-sync: could not build http client");
                 return;
             }
         };
         loop {
             match sync_once(&client, &repo, &updates_dir).await {
-                Ok(Some(file)) => println!("apk-sync: now serving {file}"),
+                Ok(Some(file)) => tracing::info!(file = %file, "apk-sync: now serving"),
                 Ok(None) => {} // up to date / nothing to do
-                Err(e) => eprintln!("apk-sync: {e} (serving whatever is already present)"),
+                Err(e) => {
+                    tracing::warn!(error = %e, "apk-sync: failed (serving whatever is already present)")
+                }
             }
             tokio::time::sleep(REFRESH).await;
         }
@@ -120,9 +119,11 @@ async fn sync_once(
     std::fs::write(&tmp, &bytes).map_err(|e| format!("write {file}: {e}"))?;
     std::fs::rename(&tmp, &target).map_err(|e| format!("install {file}: {e}"))?;
     write_manifest(dir, &file, version_code, &version_name)?;
-    println!(
-        "apk-sync: pulled {file} (v{version_name}, {} bytes)",
-        bytes.len()
+    tracing::info!(
+        file = %file,
+        version = %version_name,
+        bytes = bytes.len(),
+        "apk-sync: pulled new build",
     );
     Ok(Some(file))
 }

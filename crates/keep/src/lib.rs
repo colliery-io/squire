@@ -498,6 +498,11 @@ pub fn router(state: Arc<KeepState>) -> Router {
             "/api/hazards",
             get(hazards::list_hazards).put(hazards::set_hazards),
         )
+        // Request access log (SQUIRE-T-0127): method / path / status / latency for the loopback
+        // admin surface. Lighter than the LAN api's identity-aware log — the Keep is operator-only
+        // on loopback. Emits via `tracing`; rendered when the binary installs a subscriber
+        // (squire-serve), dropped silently under `cargo run -p keep` (no subscriber).
+        .layer(tower_http::trace::TraceLayer::new_for_http())
         .with_state(state)
 }
 

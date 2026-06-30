@@ -214,6 +214,10 @@ pub fn handle_command(
 /// conflict). We keep the single mapping (403) — the Knight rarely races a sibling, and 403 still
 /// signals "this occurrence is closed to you".
 pub(crate) fn domain_status(err: DomainError) -> StatusCode {
+    // Surface *why* a command was rejected (SQUIRE-T-0127): the access-log line carries the status,
+    // but the specific cause (insufficient points, locked, not assigned, …) lives in the
+    // `DomainError`. One event here covers every rejecting endpoint, correlated to the request line.
+    tracing::warn!(target: "squire::domain", error = ?err, "command rejected");
     match err {
         // The Squire isn't allowed to act on this subject / occurrence.
         DomainError::NotAssigned

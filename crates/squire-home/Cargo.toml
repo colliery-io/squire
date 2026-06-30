@@ -33,3 +33,8 @@ getrandom = "0.2"
 # Onboarding (ADR SQUIRE-A-0011, SQUIRE-T-0067): detect the home computer's IANA timezone to seed
 # the household config on first run (validated via `store::valid_timezone`).
 iana-time-zone = "0.1"
+# Structured logging (SQUIRE-T-0127): this crate owns the process entrypoints, so it installs the
+# global subscriber (`init_tracing`). `fmt` renders to stderr; `env-filter` honours `RUST_LOG`
+# (default `info`). The library crates (api/keep) emit via the `tracing` facade against it.
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }

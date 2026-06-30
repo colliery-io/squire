@@ -37,20 +37,22 @@ pub fn maybe_self_update() {
         Some(tok) => {
             builder.auth_token(&tok);
         }
-        None => eprintln!(
-            "self-update: no SQUIRE_UPDATE_TOKEN/GITHUB_TOKEN set — using the unauthenticated GitHub \
-             API (60 req/hr; updates may be rate-limited)"
+        None => tracing::warn!(
+            "self-update: no SQUIRE_UPDATE_TOKEN/GITHUB_TOKEN set — using the unauthenticated \
+             GitHub API (60 req/hr; updates may be rate-limited)"
         ),
     }
     let outcome = builder.build().and_then(|u| u.update());
 
     match outcome {
         Ok(self_update::Status::Updated(v)) => {
-            println!("  Self-update:             updated squire-serve → v{v}; restarting…");
+            tracing::info!(version = %v, "self-update: updated squire-serve; restarting…");
             reexec();
         }
         Ok(self_update::Status::UpToDate(_)) => {}
-        Err(e) => eprintln!("self-update: {e} (continuing on the current build)"),
+        Err(e) => {
+            tracing::warn!(error = %e, "self-update: failed (continuing on the current build)")
+        }
     }
 }
 
@@ -82,7 +84,7 @@ fn reexec() -> ! {
     {
         use std::os::unix::process::CommandExt;
         let err = std::process::Command::new(&exe).args(&args).exec(); // replaces this process
-        eprintln!("self-update: re-exec failed ({err}); exiting so a supervisor can restart");
+        tracing::error!(error = %err, "self-update: re-exec failed; exiting so a supervisor can restart");
         std::process::exit(0);
     }
     #[cfg(not(unix))]
