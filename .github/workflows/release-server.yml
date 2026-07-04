@@ -51,6 +51,14 @@ jobs:
       - name: Build squire-serve (release)
         run: cargo build --release -p squire-home --bin squire-serve --target ${{ matrix.target }}
 
+      # launchd refuses to run an unsigned binary on modern macOS (hangs in dyld before main —
+      # SQUIRE-T-0093), and self-update replaces the household's binary with this artifact byte-for-
+      # byte. An ad-hoc signature is embedded in the Mach-O, so signing here keeps every
+      # self-updated install launchd-runnable without a Developer ID.
+      - name: Ad-hoc sign (macOS)
+        if: runner.os == 'macOS'
+        run: codesign -f -s - "target/${{ matrix.target }}/release/squire-serve"
+
       - name: Package
         id: pkg
         shell: bash
