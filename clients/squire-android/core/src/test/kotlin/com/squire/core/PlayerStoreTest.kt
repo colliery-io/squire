@@ -84,16 +84,19 @@ private class RecordingSubmissionApi : SubmissionApi {
     val claimIds = mutableListOf<Long>()
     val requestIds = mutableListOf<Long>()
 
-    override suspend fun submitClaim(req: SubmitClaimReq) {
+    override suspend fun submitClaim(req: SubmitClaimReq): SubmitResult {
         claimIds += req.claimId
+        return SubmitResult.Ack
     }
 
-    override suspend fun requestRedemption(req: RequestRedemptionReq) {
+    override suspend fun requestRedemption(req: RequestRedemptionReq): SubmitResult {
         requestIds += req.requestId
+        return SubmitResult.Ack
     }
 
-    override suspend fun requestCashOut(req: com.squire.sdk.model.RequestCashOutReq) {
+    override suspend fun requestCashOut(req: com.squire.sdk.model.RequestCashOutReq): SubmitResult {
         requestIds += req.requestId
+        return SubmitResult.Ack
     }
 }
 
