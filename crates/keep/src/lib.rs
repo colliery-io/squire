@@ -268,14 +268,26 @@ async fn login(
     State(state): State<Arc<KeepState>>,
     Form(form): Form<LoginForm>,
 ) -> Result<Response, StatusCode> {
-    // `user` arrives as a string: `serde_urlencoded` does not support `u128`, and a `UserId` is a
-    // u128, so we take it as text and parse here (a non-numeric id is a 400).
-    let user = UserId(
-        form.user
-            .trim()
-            .parse()
-            .map_err(|_| StatusCode::BAD_REQUEST)?,
-    );
+    // `user` arrives as a string and may be either a numeric `UserId` or a display name.
+    // (Numeric-first keeps old logins working; `serde_urlencoded` can't carry a u128 anyway.)
+    // A name must match exactly one *active* member, case-insensitively — zero or several
+    // matches fail as 401 like any other bad credential, so the response doesn't reveal
+    // which names exist.
+    let typed = form.user.trim();
+    let user = match typed.parse().map(UserId) {
+        Ok(id) => id,
+        Err(_) => {
+            let snapshot = state.snapshot();
+            let mut matches = snapshot
+                .users
+                .iter()
+                .filter(|u| u.active && u.display_name.eq_ignore_ascii_case(typed));
+            match (matches.next(), matches.next()) {
+                (Some(u), None) => u.id,
+                _ => return Err(StatusCode::UNAUTHORIZED),
+            }
+        }
+    };
     let resp = state
         .identity
         .login(LoginReq {
@@ -415,8 +427,8 @@ fn content_type_for(path: &str) -> &'static str {
 /// `POST /login` form body (`application/x-www-form-urlencoded`).
 #[derive(Debug, Deserialize)]
 struct LoginForm {
-    /// The Knight's `UserId` as a decimal string (parsed to `u128`; `serde_urlencoded` does not
-    /// support `u128` directly).
+    /// The Knight's `UserId` as a decimal string, or their display name (resolved
+    /// case-insensitively against active members; must be unambiguous).
     user: String,
     secret: String,
 }

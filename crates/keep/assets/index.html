@@ -24,7 +24,7 @@
       <h2><span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2.6 L19 5 V11 C19 15.6 16 19 12 20.6 C8 19 5 15.6 5 11 V5 Z" stroke="#5A3D8E" stroke-width="1.7"/></svg></span>Sign in</h2>
       <p class="sub">Enter the Keep to author quests and review your squires' adventures.</p>
       <form id="login-form" method="post" action="/login">
-        <label>Knight id <input name="user" inputmode="numeric" required /></label>
+        <label>Knight <input name="user" autocomplete="username" required /></label>
         <label>Secret <input name="secret" type="password" required /></label>
         <button type="submit">Sign in</button>
       </form>

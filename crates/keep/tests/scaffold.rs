@@ -247,6 +247,38 @@ async fn operator_login_round_trips_and_gates_whoami() {
     );
 }
 
+/// `POST /login` form-encoded with a raw `user` value (display name or id as typed).
+fn login_req_str(user: &str, secret: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri("/login")
+        .header("content-type", "application/x-www-form-urlencoded")
+        .body(Body::from(format!("user={user}&secret={secret}")))
+        .unwrap()
+}
+
+#[tokio::test]
+async fn login_accepts_display_name() {
+    let (state, admin, secret, _dir) = keep();
+
+    // The fixture admin is "Arthur"; a name resolves case-insensitively to the same Knight.
+    let resp = router(state.clone())
+        .oneshot(login_req_str("arthur", &secret))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "display-name login works");
+    let who = body_json(resp).await;
+    assert_eq!(who["user"].as_u64().unwrap() as u128, admin);
+    assert_eq!(who["display_name"], "Arthur");
+
+    // An unknown name fails like any bad credential — 401, not 400.
+    let resp = router(state)
+        .oneshot(login_req_str("mordred", &secret))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
 #[tokio::test]
 async fn login_rejects_bad_secret_and_non_knight() {
     let (state, admin, _secret, _dir) = keep();
