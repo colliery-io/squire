@@ -666,6 +666,7 @@ fn upsert_quest(
             quests::auto_approve.eq(row.auto_approve),
             quests::repeatable_within_day.eq(row.repeatable_within_day),
             quests::icon.eq(row.icon.clone()),
+            quests::due_time.eq(row.due_time),
             quests::active.eq(row.active),
             quests::updated_by.eq(row.updated_by.clone()),
             quests::updated_at.eq(row.updated_at),

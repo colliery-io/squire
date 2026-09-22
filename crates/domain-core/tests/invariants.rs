@@ -60,6 +60,7 @@ fn quest(
         repeatable_within_day: repeatable,
         active: true,
         icon: None,
+        due_time: None,
     }
 }
 

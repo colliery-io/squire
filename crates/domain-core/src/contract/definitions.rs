@@ -29,6 +29,12 @@ pub struct Quest {
     pub repeatable_within_day: bool, // true = claimable multiple times/day for repeat points
     pub active: bool,           // archived (not deleted) so history stays valid
     pub icon: Option<String>,   // cosmetic, for the player UI
+    /// When in the day this chore wants doing — minutes since midnight in the household timezone
+    /// (SQUIRE-T-0142). Drives the squire's reminder and the order of today's list, and **nothing
+    /// else**: the engine never reads it, so a chore is never overdue and a late claim is never
+    /// refused. `serde(default)` so existing quests and older clients are unaffected.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub due_time: Option<u16>,
 }
 
 /// Which Squires a quest is for — always at least one.

@@ -274,6 +274,7 @@ pub struct QuestRow {
     pub auto_approve: i32,
     pub repeatable_within_day: i32,
     pub icon: Option<String>,
+    pub due_time: Option<i32>,
     pub active: i32,
     pub created_by: Option<String>,
     pub created_at: i64,
@@ -341,6 +342,7 @@ impl QuestRow {
             auto_approve: bool_to_int(q.auto_approve),
             repeatable_within_day: bool_to_int(q.repeatable_within_day),
             icon: q.icon.clone(),
+            due_time: q.due_time.map(i32::from),
             active: bool_to_int(q.active),
             created_by: audit.created_by.map(|c| id_to_text(c.0)),
             created_at: audit.created_at.0,
@@ -429,6 +431,12 @@ impl QuestRow {
             repeatable_within_day: int_to_bool(self.repeatable_within_day),
             active: int_to_bool(self.active),
             icon: self.icon.clone(),
+            // An out-of-range value (a hand-edited row) reads as "no particular time" rather than
+            // failing the whole quest to load.
+            due_time: self
+                .due_time
+                .and_then(|m| u16::try_from(m).ok())
+                .filter(|m| domain_core::contract::valid_minute_of_day(*m)),
         })
     }
 }

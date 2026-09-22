@@ -165,6 +165,24 @@ object NotifyPolicy {
     /** Below this a "streak" is not yet a thing worth defending. */
     const val STREAK_WARN_FLOOR = 2
 
+    /**
+     * Today's chores in the order they want doing (SQUIRE-T-0142): timed ones first by their time,
+     * untimed after in their existing order. A stable sort, so equal times keep the server's order.
+     */
+    fun byDueTime(quests: List<QuestCard>): List<QuestCard> =
+        quests.sortedBy { it.dueTime ?: Int.MAX_VALUE }
+
+    /**
+     * The chores falling due around [minuteOfDay], still undone — one notification for all of them,
+     * never one each (SQUIRE-T-0142). [window] is how far either side counts as "around now", which
+     * matters because the scheduler fires in a window rather than on the dot.
+     */
+    fun dueNow(quests: List<QuestCard>, minuteOfDay: Int, window: Int = 30): List<QuestCard> =
+        unfinishedToday(quests).filter { q ->
+            val due = q.dueTime ?: return@filter false
+            minuteOfDay - due in -window..window
+        }
+
     /** Keys not yet spoken on this device. */
     fun unspoken(keys: List<String>, alreadySpoken: Set<String>): List<String> =
         keys.filterNot { it in alreadySpoken }

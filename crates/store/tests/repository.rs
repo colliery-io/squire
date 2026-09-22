@@ -108,6 +108,7 @@ fn sample_quest() -> Quest {
         repeatable_within_day: false,
         active: true,
         icon: Some("broom".into()),
+        due_time: None,
     }
 }
 
@@ -497,4 +498,45 @@ fn raw_event_seqs(conn: &mut AnyConnection) -> Vec<i64> {
         .order(events::seq.asc())
         .load(conn)
         .expect("load seqs")
+}
+
+/// A chore's due time survives the store (SQUIRE-T-0142) — including the "no particular time"
+/// default, which is what every existing quest has.
+#[test]
+fn quest_due_time_round_trips() {
+    each_backend(|conn| {
+        let mut store = fixed_store(conn, 1_700_000_000_000);
+        use domain_core::contract::Change;
+        let timed = Quest {
+            id: QuestId(11),
+            due_time: Some(7 * 60 + 30), // brush your teeth at 07:30
+            ..sample_quest()
+        };
+        store
+            .apply(
+                Some(UserId(1)),
+                &[
+                    Change::PutQuest(sample_quest()),
+                    Change::PutQuest(timed.clone()),
+                ],
+            )
+            .expect("apply");
+
+        let snap = store.snapshot();
+        let back = snap
+            .quests
+            .iter()
+            .find(|q| q.id == QuestId(11))
+            .expect("timed quest");
+        assert_eq!(back.due_time, Some(7 * 60 + 30));
+        let untimed = snap
+            .quests
+            .iter()
+            .find(|q| q.id == QuestId(10))
+            .expect("sample quest");
+        assert_eq!(
+            untimed.due_time, None,
+            "no particular time stays the default"
+        );
+    });
 }

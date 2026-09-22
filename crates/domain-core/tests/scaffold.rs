@@ -65,6 +65,7 @@ fn upsert_replaces_definition_by_id() {
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     };
     repo.apply(Some(UserId(2)), &[Change::PutQuest(q.clone())])
         .unwrap();
@@ -148,6 +149,7 @@ fn handle_dispatches_every_command_family_without_panicking() {
             repeatable_within_day: false,
             active: true,
             icon: None,
+            due_time: None,
         }),
         Command::ArchiveQuest(QuestId(1)),
         Command::SubmitClaim {

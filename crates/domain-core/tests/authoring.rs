@@ -40,6 +40,7 @@ fn daily_quest(id: u128, assignment: Assignment) -> Quest {
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     }
 }
 fn squires(ids: &[u128]) -> Assignment {

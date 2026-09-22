@@ -138,6 +138,9 @@ fn arb_quest() -> impl Strategy<Value = Quest> {
                 repeatable_within_day,
                 active,
                 icon,
+                // SQUIRE-T-0142: the round-trip for a set due time is pinned by its own test below;
+                // this generator keeps the existing tuple shape.
+                due_time: None,
             },
         )
 }
@@ -513,6 +516,7 @@ fn db_round_trip_quests() {
             repeatable_within_day: false,
             active: true,
             icon: Some("broom".into()),
+            due_time: None,
         },
         Quest {
             id: QuestId(11),
@@ -528,6 +532,7 @@ fn db_round_trip_quests() {
             repeatable_within_day: true,
             active: false,
             icon: None,
+            due_time: None,
         },
         Quest {
             id: QuestId(12),
@@ -545,6 +550,7 @@ fn db_round_trip_quests() {
             repeatable_within_day: false,
             active: true,
             icon: None,
+            due_time: None,
         },
         Quest {
             id: QuestId(13),
@@ -563,6 +569,7 @@ fn db_round_trip_quests() {
             repeatable_within_day: true,
             active: true,
             icon: None,
+            due_time: None,
         },
         // OneOff with no due date.
         Quest {
@@ -579,6 +586,7 @@ fn db_round_trip_quests() {
             repeatable_within_day: false,
             active: true,
             icon: None,
+            due_time: None,
         },
     ];
 

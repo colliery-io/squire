@@ -37,6 +37,7 @@ fn base() -> Quest {
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     }
 }
 fn with_id(mut q: Quest, id: u128) -> Quest {
@@ -267,4 +268,69 @@ fn archived_quest_is_never_due() {
     r.seed(&[Change::PutQuest(with_id(base(), 10))]);
     run(&mut r, Command::ArchiveQuest(QuestId(10))).unwrap();
     assert!(!is_due(&r, 1, 0, 10));
+}
+
+// ─── a due time is presentation, never a rule (SQUIRE-T-0142) ────────────────────────────────
+
+/// **The pin.** A chore's `due_time` drives reminders and ordering; the engine must never read it.
+///
+/// Two quests identical but for the time must be due on the same days, carry the same status, and
+/// score identically — including a claim made long "after" the due time, which is still a perfectly
+/// good claim. If this test ever fails, a due time has quietly become a deadline, and that is a
+/// product decision (and an ADR), not an implementation detail.
+#[test]
+fn due_time_changes_nothing_the_engine_does() {
+    let mut r = repo();
+    let plain = with_id(base(), 1);
+    let timed = Quest {
+        due_time: Some(7 * 60), // 07:00 — long past by the time the claim lands
+        ..with_id(base(), 2)
+    };
+    r.seed(&[
+        Change::PutQuest(plain.clone()),
+        Change::PutQuest(timed.clone()),
+    ]);
+
+    // Due on exactly the same days.
+    for day in 0..7 {
+        assert_eq!(
+            is_due(&r, 1, day, 1),
+            is_due(&r, 1, day, 2),
+            "a due time must not change which days a chore is due (day {day})",
+        );
+    }
+
+    // The same status, before either is claimed.
+    let snap = r.snapshot();
+    assert_eq!(
+        format!("{:?}", quest_status(&snap, UserId(1), &plain, Date(0))),
+        format!("{:?}", quest_status(&snap, UserId(1), &timed, Date(0))),
+    );
+
+    // And a claim is accepted, and scores, identically — "late" is not a thing.
+    let claim_plain = run(
+        &mut r,
+        Command::SubmitClaim {
+            claim_id: ClaimId(1),
+            squire: UserId(1),
+            quest_id: QuestId(1),
+            on: Date(0),
+        },
+    )
+    .expect("a claim on an untimed chore");
+    let claim_timed = run(
+        &mut r,
+        Command::SubmitClaim {
+            claim_id: ClaimId(2),
+            squire: UserId(1),
+            quest_id: QuestId(2),
+            on: Date(0),
+        },
+    )
+    .expect("a claim after the due time is still a good claim");
+    assert_eq!(
+        claim_plain.len(),
+        claim_timed.len(),
+        "the same command must produce the same changes whether or not a time was set",
+    );
 }

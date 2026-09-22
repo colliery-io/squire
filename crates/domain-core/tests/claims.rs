@@ -46,6 +46,7 @@ fn quest(q: QuestSpec) -> Quest {
         repeatable_within_day: q.repeatable,
         active: true,
         icon: None,
+        due_time: None,
     }
 }
 fn each(id: u128, reward: Points, repeatable: bool, auto: bool) -> Quest {

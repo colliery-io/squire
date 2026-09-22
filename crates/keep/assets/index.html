@@ -128,6 +128,11 @@
             </fieldset>
 
             <label><input name="auto_approve" type="checkbox" /> Auto-approve (skip review)</label>
+            <label>Time of day (optional)
+              <input name="due_time" id="quest-due-time" type="time" step="60" />
+            </label>
+            <p class="sub">Leave empty for no particular time. Set one and the squire is reminded then —
+            it never makes the chore late.</p>
             <label><input name="repeat_day" type="checkbox" /> Can be earned multiple times per day</label>
             <button type="submit">Post to the board</button>
           </form>

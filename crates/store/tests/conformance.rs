@@ -108,6 +108,7 @@ fn daily_quest() -> Quest {
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     }
 }
 
@@ -126,6 +127,7 @@ fn race_quest() -> Quest {
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     }
 }
 

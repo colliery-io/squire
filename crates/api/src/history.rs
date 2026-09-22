@@ -308,6 +308,7 @@ mod tests {
             repeatable_within_day: false,
             active: true,
             icon: None,
+            due_time: None,
         };
         let item = RedeemableItem {
             id: ItemId(200),

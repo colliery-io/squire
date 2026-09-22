@@ -71,6 +71,7 @@ fn sample_quest() -> Quest {
         repeatable_within_day: false,
         active: true,
         icon: Some("broom".into()),
+        due_time: None,
     }
 }
 

@@ -85,6 +85,7 @@ fn test_state_with(extra: &[Change]) -> (Arc<AppState>, tempfile::TempDir, Date)
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     };
     let item = RedeemableItem {
         id: ItemId(ITEM_ID),

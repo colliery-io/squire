@@ -53,6 +53,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.squire.core.NotifyPolicy
 import com.squire.app.ui.theme.SquireGoldSoft
 import com.squire.app.ui.components.badgeGlyph
 import com.squire.app.ui.theme.SquireIcons
@@ -385,7 +386,8 @@ private fun ReadyContent(
                     if (view.questsToday.isEmpty()) {
                         item { EmptyHint("No quests today — well done, brave Squire! 🎉") }
                     } else {
-                        items(view.questsToday, key = { "q" + it.questId }) { q ->
+                        // Timed chores first, in time order (SQUIRE-T-0142); untimed after.
+                        items(NotifyPolicy.byDueTime(view.questsToday), key = { "q" + it.questId }) { q ->
                             QuestCardRow(
                                 q,
                                 notYet = notYetReason(view, q),

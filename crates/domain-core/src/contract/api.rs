@@ -182,6 +182,11 @@ pub struct QuestCard {
     pub icon: Option<String>,
     pub on: Date,
     pub status: QuestStatus,
+    /// When this chore wants doing — minutes since midnight in the household timezone
+    /// (SQUIRE-T-0142). Drives the phone's per-chore reminder and the order of today's list. It
+    /// never makes a chore late. `serde(default)` for back-compat.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub due_time: Option<u16>,
 }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

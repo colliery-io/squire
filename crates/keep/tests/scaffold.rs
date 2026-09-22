@@ -163,6 +163,7 @@ fn commit_applies_a_change_through_the_single_writer() {
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     };
     let changes = state
         .commit(Some(UserId(admin)), Command::DefineQuest(quest))

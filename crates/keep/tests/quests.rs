@@ -86,6 +86,7 @@ fn daily_quest(id: u128, reward: u32) -> Quest {
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     }
 }
 

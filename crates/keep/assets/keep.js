@@ -721,6 +721,7 @@
     for (const cb of questForm.querySelectorAll('input[name="squire"]')) cb.checked = ids.includes(cb.value);
     const auto = questForm.querySelector('[name="auto_approve"]'); if (auto) auto.checked = !!q.auto_approve;
     const rep = questForm.querySelector('[name="repeat_day"]'); if (rep) rep.checked = !!q.repeatable_within_day;
+    set("due_time", q.due_time != null ? hhmm(q.due_time) : "");
     syncQuestFields();
     questEdit.enter(q.id);
   }
@@ -771,6 +772,7 @@
     const extras = [];
     if (q.completion === "Race") extras.push("race");
     if (q.repeatable_within_day) extras.push("repeatable/day");
+    if (q.due_time != null) extras.push("at " + hhmm(q.due_time));
     if (q.auto_approve) extras.push("auto-approve");
     return `${cadence} · ${who}${extras.length ? " · " + extras.join(", ") : ""}`;
   }
@@ -868,6 +870,9 @@
         repeatable_within_day: fd.get("repeat_day") === "on",
         active: true,
         icon: null,
+        // Minutes since midnight in the household timezone, or null for "no particular time"
+        // (SQUIRE-T-0142). A due time drives the reminder and the order of the day — never lateness.
+        due_time: minutesOfDay(fd.get("due_time")),
       };
       const res = await fetch("/api/quests", {
         method: "POST",

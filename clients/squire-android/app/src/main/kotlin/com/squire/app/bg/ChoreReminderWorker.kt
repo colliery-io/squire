@@ -46,8 +46,14 @@ class ChoreReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         }
         if (state != null) announce(ctx, state, slot)
 
-        // Re-arm for tomorrow from the settings we just saw (a parent may have moved the times).
-        schedule(ctx, state?.notify?.choreTimes.orEmpty(), state?.notify?.timezone)
+        // Re-arm for tomorrow from what we just saw (a parent may have moved the times, or given a
+        // chore a new one).
+        schedule(
+            ctx,
+            state?.notify?.choreTimes.orEmpty(),
+            state?.notify?.timezone,
+            state?.questsToday?.mapNotNull { it.dueTime }.orEmpty(),
+        )
         return Result.success()
     }
 
@@ -68,6 +74,10 @@ class ChoreReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                 announceStreak(ctx, state, today)
                 return
             }
+            if (slot >= SLOT_DUE_BASE) {
+                announceDue(ctx, state, today, ZonedDateTime.now(zone))
+                return
+            }
             val (title, text) = NotifyPolicy.choreReminder(state.questsToday) ?: return
             Notifier.post(
                 ctx = ctx,
@@ -79,6 +89,28 @@ class ChoreReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                 tab = SquireNotifyWorker.TAB_TODAY,
                 settings = state.notify,
                 notificationId = NOTIF_BASE + slot,
+            )
+        }
+
+        /**
+         * The per-chore nudge (SQUIRE-T-0142): everything falling due around now that is still
+         * undone, in **one** notification — three chores at 07:30 must not mean three buzzes.
+         */
+        private fun announceDue(ctx: Context, state: StateView, today: LocalDate, now: ZonedDateTime) {
+            val minute = now.hour * 60 + now.minute
+            val due = NotifyPolicy.dueNow(state.questsToday, minute)
+            if (due.isEmpty()) return
+            val title = if (due.size == 1) "Time to ${due.single().title.replaceFirstChar { it.lowercase() }}"
+            else "${due.size} chores due now"
+            Notifier.post(
+                ctx = ctx,
+                channel = Notifier.Channel.Reminders,
+                key = "due:$today:" + due.joinToString(",") { it.questId.toString() },
+                title = title,
+                text = due.joinToString(" · ") { q -> q.title + (q.reward.let { " · $it coins" }) },
+                tab = SquireNotifyWorker.TAB_TODAY,
+                settings = state.notify,
+                notificationId = NOTIF_BASE + SLOT_DUE_BASE,
             )
         }
 
@@ -104,7 +136,7 @@ class ChoreReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
          * Arm one one-shot per chore time, each for its next occurrence in the household's zone.
          * Called after every state fetch, so a change made in the Keep lands within a poll.
          */
-        fun schedule(ctx: Context, choreTimes: List<Int>, timezone: String?) {
+        fun schedule(ctx: Context, choreTimes: List<Int>, timezone: String?, dueTimes: List<Int> = emptyList()) {
             val wm = WorkManager.getInstance(ctx)
             val zone = zoneOf(timezone)
             // Cancel every slot first: a parent dropping from two times to one must not leave the
@@ -120,6 +152,11 @@ class ChoreReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                 wm.enqueueUniqueWork(WORK_PREFIX + slot, ExistingWorkPolicy.REPLACE, request)
             }
             choreTimes.take(MAX_CHORE_SLOTS).forEachIndexed { slot, minutes -> arm(slot, minutes) }
+            // One armed slot per distinct chore due time (SQUIRE-T-0142) — several chores sharing a
+            // time share a slot, and are announced together.
+            dueTimes.distinct().sorted().take(MAX_DUE_SLOTS).forEachIndexed { i, minutes ->
+                arm(SLOT_DUE_BASE + i, minutes)
+            }
             // The streak check is not a household setting: two hours before the household's midnight,
             // late enough to be a real last call and early enough to still do a chore. It is armed
             // whether or not chore times are set — the streak is the child's, not the schedule's.
@@ -149,7 +186,11 @@ class ChoreReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         /** The evening streak check, scheduled like a chore time but never configured as one. */
         private const val SLOT_STREAK = 9
         private const val STREAK_CHECK_MINUTE = 22 * 60 // 22:00 household time — two hours to midnight
-        private val ALL_SLOTS = (0 until MAX_CHORE_SLOTS) + SLOT_STREAK
+        /** Slots for per-chore due times, above the household ones and the streak check. */
+        private const val SLOT_DUE_BASE = 10
+        private const val MAX_DUE_SLOTS = 8
+        private val ALL_SLOTS =
+            (0 until MAX_CHORE_SLOTS) + SLOT_STREAK + (SLOT_DUE_BASE until SLOT_DUE_BASE + MAX_DUE_SLOTS)
         private const val NOTIF_BASE = 4930
     }
 }

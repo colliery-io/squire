@@ -65,6 +65,7 @@ fn keep() -> (Arc<KeepState>, u128, String, tempfile::TempDir) {
                 repeatable_within_day: false,
                 active: true,
                 icon: None,
+                due_time: None,
             }),
         )
         .expect("author quest");

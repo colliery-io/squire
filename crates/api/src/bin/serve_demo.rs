@@ -91,6 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     };
     let review_quest = Quest {
         id: QuestId(101),
@@ -106,6 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     };
     let reward = RedeemableItem {
         id: ItemId(200),

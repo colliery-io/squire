@@ -41,6 +41,7 @@ diesel::table! {
         auto_approve -> Integer,
         repeatable_within_day -> Integer,
         icon -> Nullable<Text>,
+        due_time -> Nullable<Integer>,
         active -> Integer,
         created_by -> Nullable<Text>,
         created_at -> BigInt,

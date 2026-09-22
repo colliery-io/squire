@@ -575,6 +575,7 @@ fn quests_today(snap: &Snapshot, squire: UserId, today: Date) -> Vec<QuestCard> 
                 icon: q.icon.clone(),
                 on: today,
                 status,
+                due_time: q.due_time,
             })
         })
         .collect()

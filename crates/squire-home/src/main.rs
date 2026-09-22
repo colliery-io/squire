@@ -78,6 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     };
     let streak = Achievement {
         id: AchievementId(300),

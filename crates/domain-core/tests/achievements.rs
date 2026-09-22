@@ -39,6 +39,7 @@ fn daily(id: u128, reward: Points, auto: bool, repeatable: bool, category: Optio
         repeatable_within_day: repeatable,
         active: true,
         icon: None,
+        due_time: None,
     }
 }
 
@@ -62,6 +63,7 @@ fn mwf(id: u128, reward: Points, auto: bool) -> Quest {
         repeatable_within_day: false,
         active: true,
         icon: None,
+        due_time: None,
     }
 }
 

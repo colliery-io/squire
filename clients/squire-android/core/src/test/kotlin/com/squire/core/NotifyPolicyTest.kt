@@ -214,4 +214,40 @@ class NotifyPolicyTest {
         )
         assertEquals("Room Master", pick?.name)
     }
+
+    // ── per-chore due times (SQUIRE-T-0142) ────────────────────────────────────────────────────
+
+    private fun timed(id: Long, title: String, due: Int?, status: QuestStatus = QuestStatus.Available) =
+        QuestCard(on = 1, questId = id, reward = 3, status = status, title = title, dueTime = due)
+
+    @Test
+    fun `timed chores sort ahead of untimed ones`() {
+        val sorted = NotifyPolicy.byDueTime(
+            listOf(
+                timed(1, "Homework", 18 * 60),
+                timed(2, "Anytime chore", null),
+                timed(3, "Brush teeth", 7 * 60 + 30),
+            ),
+        )
+        assertEquals(listOf("Brush teeth", "Homework", "Anytime chore"), sorted.map { it.title })
+    }
+
+    @Test
+    fun `only undone chores near the time count as due now`() {
+        val quests = listOf(
+            timed(1, "Brush teeth", 7 * 60 + 30),
+            timed(2, "Homework", 18 * 60),
+            timed(3, "Already done", 7 * 60 + 30, status = QuestStatus.CompletedToday),
+            timed(4, "Anytime", null),
+        )
+        val now = NotifyPolicy.dueNow(quests, minuteOfDay = 7 * 60 + 30)
+        assertEquals(listOf("Brush teeth"), now.map { it.title }, "done, far-off and untimed all excluded")
+        assertTrue(NotifyPolicy.dueNow(quests, minuteOfDay = 12 * 60).isEmpty(), "midday has nothing due")
+    }
+
+    @Test
+    fun `several due at once are collected, to be said in one breath`() {
+        val quests = listOf(timed(1, "Brush teeth", 450), timed(2, "Make bed", 455))
+        assertEquals(2, NotifyPolicy.dueNow(quests, minuteOfDay = 452).size)
+    }
 }

@@ -167,6 +167,7 @@ impl ApiWorld {
             repeatable_within_day: false,
             active: true,
             icon: None,
+            due_time: None,
         };
         self.app()
             .store

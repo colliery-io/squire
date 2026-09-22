@@ -2482,6 +2482,15 @@
               }
             ]
           },
+          "due_time": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Optional time of day this chore wants doing — minutes since midnight in the household\ntimezone (SQUIRE-T-0142). Absent/null ⇒ no particular time, which is the default.",
+            "minimum": 0
+          },
           "id": {
             "oneOf": [
               {
@@ -3293,6 +3302,15 @@
             ],
             "description": "The quest's authored blurb, shown in the tap-to-expand detail (SQUIRE-T-0094 #8). `serde(default)`\nfor back-compat with older servers / clients."
           },
+          "due_time": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "When this chore wants doing — minutes since midnight in the household timezone\n(SQUIRE-T-0142). Drives the phone's per-chore reminder and the order of today's list. It\nnever makes a chore late. `serde(default)` for back-compat.",
+            "minimum": 0
+          },
           "icon": {
             "type": [
               "string",
@@ -3411,6 +3429,15 @@
                 "$ref": "#/components/schemas/Date"
               }
             ]
+          },
+          "due_time": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The chore's time of day, if it has one (SQUIRE-T-0142) — so the authoring list and the edit\nform can show it. Minutes since midnight, household timezone.",
+            "minimum": 0
           },
           "icon": {
             "type": [

@@ -122,6 +122,8 @@ internal fun QuestAdminScreen(
     val chosenSquires = remember { mutableStateListOf<Long>() }
     var repeatDay by remember { mutableStateOf(false) }
     var autoApprove by remember { mutableStateOf(false) }
+    // Optional time of day (SQUIRE-T-0142): "07:30", or blank for no particular time.
+    var dueTimeText by remember { mutableStateOf("") }
     var due by remember { mutableStateOf<Int?>(null) }
     var dueLabel by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -132,7 +134,7 @@ internal fun QuestAdminScreen(
     fun resetForm() {
         title = ""; description = ""; reward = "5"; cash = "0"; category = ""; cadence = "Daily"
         weekdays.clear(); completion = "EachAssignee"; assignAll = true
-        chosenSquires.clear(); repeatDay = false; autoApprove = false
+        chosenSquires.clear(); repeatDay = false; autoApprove = false; dueTimeText = ""
         due = null; dueLabel = null; formError = null
         editingId = null
         composing = false
@@ -156,6 +158,7 @@ internal fun QuestAdminScreen(
         chosenSquires.clear(); chosenSquires.addAll(q.squires.orEmpty())
         repeatDay = q.repeatableWithinDay
         autoApprove = q.autoApprove
+        dueTimeText = q.dueTime?.let { "%02d:%02d".format(it / 60, it % 60) } ?: ""
         due = q.due
         dueLabel = q.due?.let { "day $it" }
         editingId = q.id
@@ -184,6 +187,7 @@ internal fun QuestAdminScreen(
                 cadence = CadenceKind.valueOf(cadence),
                 completion = CompletionDto.valueOf(completion),
                 repeatableWithinDay = repeatDay,
+                dueTime = parseTimeOfDay(dueTimeText),
                 reward = rewardN,
                 cash = cash.toLongOrNull() ?: 0,
                 title = title.trim(),
@@ -283,6 +287,17 @@ internal fun QuestAdminScreen(
                                 OutlinedTextField(value = cash, onValueChange = { cash = it.filter(Char::isDigit) }, label = { Text("Cash $") }, singleLine = true, modifier = Modifier.weight(1f))
                                 OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category") }, singleLine = true, modifier = Modifier.weight(2f))
                             }
+
+                            // Optional time of day — a chore with one reminds the squire then, and
+                            // sorts ahead of untimed chores. It never makes the chore late.
+                            OutlinedTextField(
+                                value = dueTimeText,
+                                onValueChange = { dueTimeText = it },
+                                label = { Text("Time of day (optional, e.g. 07:30)") },
+                                singleLine = true,
+                                isError = dueTimeText.isNotBlank() && parseTimeOfDay(dueTimeText) == null,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
 
                             Text("How often", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -439,4 +454,17 @@ internal fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> U
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onChange)
     }
+}
+
+/**
+ * "07:30" → minutes since midnight, or null when blank or unparseable (SQUIRE-T-0142). Lenient on
+ * the separator and on a missing leading zero, because a parent typing on a phone should not have
+ * to be precise about it.
+ */
+internal fun parseTimeOfDay(text: String): Int? {
+    val m = Regex("^\\s*(\\d{1,2})[:.]?(\\d{2})\\s*$").find(text) ?: return null
+    val h = m.groupValues[1].toIntOrNull() ?: return null
+    val min = m.groupValues[2].toIntOrNull() ?: return null
+    if (h > 23 || min > 59) return null
+    return h * 60 + min
 }

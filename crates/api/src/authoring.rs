@@ -14,6 +14,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use domain_core::contract::valid_minute_of_day;
 use domain_core::contract::{
     Achievement, AchievementId, Assignment, Availability, Cadence, Category, Change, Clock,
     Command, Completion, Criterion, Date, ItemId, Quest, QuestId, RedeemableItem, Repository, Role,
@@ -129,6 +130,10 @@ pub struct CreateQuestReq {
     pub squires: Option<Vec<u64>>,
     pub repeatable_within_day: bool,
     pub auto_approve: bool,
+    /// Optional time of day this chore wants doing — minutes since midnight in the household
+    /// timezone (SQUIRE-T-0142). Absent/null ⇒ no particular time, which is the default.
+    #[serde(default)]
+    pub due_time: Option<u16>,
 }
 
 /// The id of a created / edited quest, echoed back.
@@ -155,6 +160,10 @@ pub struct QuestSummaryDto {
     pub completion: CompletionDto,
     pub repeatable_within_day: bool,
     pub auto_approve: bool,
+    /// The chore's time of day, if it has one (SQUIRE-T-0142) — so the authoring list and the edit
+    /// form can show it. Minutes since midnight, household timezone.
+    #[serde(default)]
+    pub due_time: Option<u16>,
     pub active: bool,
     // Raw fields so the phone can pre-fill the edit form (SQUIRE-T-0120/0126) — the labels above are
     // for display; these round-trip into `CreateQuestReq`. `serde(default)` for back-compat.
@@ -237,6 +246,7 @@ pub async fn create_quest(
         repeatable_within_day: req.repeatable_within_day,
         active: true,
         icon: None,
+        due_time: req.due_time.filter(|m| valid_minute_of_day(*m)),
     };
     handle_command(&state, Some(principal.user), Command::DefineQuest(quest))
         .map_err(domain_status)?;
@@ -279,6 +289,7 @@ pub async fn list_quests(
                 completion: q.completion.into(),
                 repeatable_within_day: q.repeatable_within_day,
                 auto_approve: q.auto_approve,
+                due_time: q.due_time,
                 active: q.active,
                 cash: q.cash as i64,
                 cadence,
