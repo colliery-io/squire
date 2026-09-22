@@ -48,6 +48,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.squire.app.ui.theme.SquireSeal
+import com.squire.app.ui.theme.SquireDisplay
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import com.squire.app.ui.theme.tinctureOf
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -340,12 +349,57 @@ private fun ReadyContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (fromCache) item { OfflineBanner() }
-
-        item {
-            SectionTitle(
-                if (pendingCount == 0) "Your Squires" else "Your Squires · $pendingCount awaiting your seal",
+        // The queue FIRST (SQUIRE-T-0134): clearing it is the parent's daily job, so it opens the
+        // screen — headline count, then "Seal all" when there is more than one thing waiting.
+        item(key = "queue-head") {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    when (pendingCount) {
+                        0 -> "Nothing waiting"
+                        1 -> "1 waiting for your seal"
+                        else -> "$pendingCount waiting for your seal"
+                    },
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                if (pendingCount > 1) {
+                    SealButton(label = "Seal all", onClick = {
+                        review.pendingClaims.forEach { onApproveClaim(it.claimId) }
+                        review.pendingRequests.forEach { onApproveRequest(it.requestId) }
+                        cashouts.forEach { onApproveCashOut(it.requestId) }
+                    })
+                }
+            }
+        }
+        if (pendingCount == 0) {
+            item { EmptyNote("All caught up. Turned-in quests and reward requests land here.") }
+        }
+        items(review.pendingClaims, key = { it.claimId }) { claim ->
+            PendingClaimRow(
+                claim = claim,
+                squire = review.squires.firstOrNull { it.squire == claim.squire },
+                today = review.today,
+                onApprove = { onApproveClaim(claim.claimId) },
+                onReject = { rejectClaimFor = claim },
             )
         }
+        items(review.pendingRequests, key = { it.requestId }) { req ->
+            PendingRequestRow(
+                request = req,
+                squire = review.squires.firstOrNull { it.squire == req.squire },
+                onApprove = { onApproveRequest(req.requestId) },
+                onReject = { rejectRequestFor = req },
+            )
+        }
+        items(cashouts, key = { "co" + it.requestId }) { co ->
+            PendingCashOutRow(
+                cashout = co,
+                squire = review.squires.firstOrNull { it.squire == co.squire },
+                onApprove = { onApproveCashOut(co.requestId) },
+                onReject = { rejectCashOutFor = co },
+            )
+        }
+        item(key = "squires-head") { SectionTitle("Your Squires") }
         if (review.squires.isEmpty()) {
             item { EmptyNote("No Squires yet. Pair a child device to add one.") }
         } else {
@@ -360,50 +414,7 @@ private fun ReadyContent(
                 )
             }
         }
-
-        item { SectionTitle("Quests to approve") }
-        if (review.pendingClaims.isEmpty()) {
-            item { EmptyNote("All caught up — no quests waiting.") }
-        } else {
-            items(review.pendingClaims, key = { it.claimId }) { claim ->
-                PendingClaimRow(
-                    claim = claim,
-                    squireName = names[claim.squire] ?: "Squire ${claim.squire}",
-                    onApprove = { onApproveClaim(claim.claimId) },
-                    onReject = { rejectClaimFor = claim },
-                )
-            }
-        }
-
-        item { SectionTitle("Rewards to grant") }
-        if (review.pendingRequests.isEmpty()) {
-            item { EmptyNote("No reward requests waiting.") }
-        } else {
-            items(review.pendingRequests, key = { it.requestId }) { req ->
-                PendingRequestRow(
-                    request = req,
-                    squireName = names[req.squire] ?: "Squire ${req.squire}",
-                    onApprove = { onApproveRequest(req.requestId) },
-                    onReject = { rejectRequestFor = req },
-                )
-            }
-        }
-
-        item { SectionTitle("Cash-outs to pay") }
-        if (cashouts.isEmpty()) {
-            item { EmptyNote("No cash-outs waiting.") }
-        } else {
-            items(cashouts, key = { "co" + it.requestId }) { co ->
-                PendingCashOutRow(
-                    cashout = co,
-                    squireName = names[co.squire] ?: "Squire ${co.squire}",
-                    onApprove = { onApproveCashOut(co.requestId) },
-                    onReject = { rejectCashOutFor = co },
-                )
-            }
-        }
     }
-
     fundsFor?.let { target ->
         AddFundsDialog(
             squireName = target.displayName,
@@ -542,50 +553,51 @@ private fun SquireRow(
     onRedeem: () -> Unit,
     onMarkDone: () -> Unit,
 ) {
+    // One line per squire (SQUIRE-T-0134): crest in their colour, name, purse. The three direct
+    // actions (mark done / redeem / add funds) moved behind the row's menu — they are rare, and on
+    // the old card they were eight buttons standing between the parent and the approval queue.
+    var menuOpen by remember { mutableStateOf(false) }
+    val t = tinctureOf(s.tincture)
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(start = 14.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Row 1: name + Open (the name flexes/ellipsizes so it never pushes Open off).
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Surface(color = t.tint, shape = CircleShape) {
                 Text(
-                    "⚔ ${s.displayName}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = tinctureOf(s.tincture).tint, // their colour (SQUIRE-T-0136)
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+                    s.displayName.take(1).uppercase(),
+                    color = Color.White,
+                    fontFamily = SquireDisplay,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                 )
-                // Drop into this Squire's home and act on their behalf (SQUIRE-T-0055).
-                FilledTonalButton(onClick = onOpen) { Text("Open") }
             }
-            // Row 2: currency (coins + any real-money owed).
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GoldPill(amount = s.balance.toInt())
-                val owed = s.cashBalance ?: 0
-                if (owed > 0) CashPill(owed.toLong(), large = false)
-            }
-            // Row 3: the same actions for every squire (uniform cards). Cash payout is NOT here —
-            // "cashing out" is modelled as a redemption (drawing down the owed-cash balance, parent-
-            // approved), handled through the rewards/redemption flow, so the card never grows a
-            // variable extra button.
-            // Tighter than Material's 24dp default: Lexend runs wider than Roboto, and at the default
-            // the third button wrapped — making every squire card a row taller and pushing the
-            // approval queue further down the screen.
-            val tight = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onMarkDone, contentPadding = tight) { Text("Mark done") }
-                OutlinedButton(onClick = onRedeem, contentPadding = tight) { Text("Redeem") }
-                OutlinedButton(onClick = onAddFunds, contentPadding = tight) { Text("Add funds") }
+            Text(
+                s.displayName,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            GoldPill(amount = s.balance.toInt())
+            val owed = s.cashBalance ?: 0
+            if (owed > 0) CashPill(owed.toLong(), large = false)
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Text("⋮", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(text = { Text("Mark a quest done") }, onClick = { menuOpen = false; onMarkDone() })
+                    DropdownMenuItem(text = { Text("Redeem a reward") }, onClick = { menuOpen = false; onRedeem() })
+                    DropdownMenuItem(text = { Text("Add funds") }, onClick = { menuOpen = false; onAddFunds() })
+                    if (owed > 0) DropdownMenuItem(text = { Text("Pay $$owed") }, onClick = { menuOpen = false; onPay() })
+                }
             }
         }
     }
@@ -625,49 +637,78 @@ private fun PickDialog(
 }
 
 @Composable
-private fun PendingClaimRow(claim: PendingClaim, squireName: String, onApprove: () -> Unit, onReject: () -> Unit) {
+private fun PendingClaimRow(claim: PendingClaim, squire: SquireSummary?, today: Int, onApprove: () -> Unit, onReject: () -> Unit) {
     ReviewCard(
         title = claim.questTitle,
-        subtitle = "$squireName · day ${claim.on}",
+        squire = squire,
+        detail = whenLabel(claim.on, today),
         leading = { Medallion(null, claim.questTitle) },
-        trailing = { StatusChip("Quest", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer) },
+        amount = {}, // a pending claim carries no reward amount on the wire (see task notes)
+        approveLabel = "Seal it",
         onApprove = onApprove,
         onReject = onReject,
     )
 }
 
 @Composable
-private fun PendingRequestRow(request: PendingRequest, squireName: String, onApprove: () -> Unit, onReject: () -> Unit) {
+private fun PendingRequestRow(request: PendingRequest, squire: SquireSummary?, onApprove: () -> Unit, onReject: () -> Unit) {
     ReviewCard(
         title = request.itemName,
-        subtitle = "$squireName · ${request.cost} coins",
+        squire = squire,
+        detail = "wants to spend it",
         leading = { Medallion(null, request.itemName, reward = true) },
-        trailing = { StatusChip("Reward", MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) },
+        amount = { GoldPill(request.cost) },
+        approveLabel = "Grant it",
         onApprove = onApprove,
         onReject = onReject,
     )
 }
 
-/** A pending cash-out (SQUIRE-T-0118): approve pays out the owed dollars; reject leaves them owed. */
 @Composable
-private fun PendingCashOutRow(cashout: PendingCashOut, squireName: String, onApprove: () -> Unit, onReject: () -> Unit) {
+private fun PendingCashOutRow(cashout: PendingCashOut, squire: SquireSummary?, onApprove: () -> Unit, onReject: () -> Unit) {
     ReviewCard(
-        title = "Cash out \$${cashout.amount}",
-        subtitle = "$squireName · real money owed",
-        leading = { Text("💵", style = MaterialTheme.typography.headlineMedium) },
-        trailing = { StatusChip("Cash", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer) },
+        title = "Cash out",
+        squire = squire,
+        detail = "asks to be paid",
+        leading = { Medallion("💵", "cash") },
+        amount = { CashPill(cashout.amount.toLong(), large = false) },
+        approveLabel = "Pay it",
         onApprove = onApprove,
         onReject = onReject,
     )
 }
 
-/** A parchment card for one pending item: title + who/when, a kind chip, and Approve / Reject. */
+/** "today", "yesterday", "Mon 15 Sep" — never a raw epoch-day (SQUIRE-T-0134). `on` and `today` are
+ *  the server's day numbers (days since the epoch), so this is a difference plus a calendar. */
+internal fun whenLabel(on: Int, today: Int): String = when (today - on) {
+    0 -> "today"
+    1 -> "yesterday"
+    else -> java.time.LocalDate.ofEpochDay(on.toLong()).format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM"))
+}
+
+/** Approving is sealing (SQUIRE-T-0134): the quiet primary button with a small wax dot — the seal
+ *  colour is for the mark on the squire's screen, so the adult's control stays calm. */
+@Composable
+internal fun SealButton(label: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+    ) {
+        Box(Modifier.size(10.dp).clip(CircleShape).background(SquireSeal))
+        Spacer(Modifier.width(8.dp))
+        Text(label, fontWeight = FontWeight.SemiBold)
+    }
+}
+
 @Composable
 private fun ReviewCard(
     title: String,
-    subtitle: String,
+    squire: SquireSummary?,
+    detail: String,
     leading: @Composable () -> Unit,
-    trailing: @Composable () -> Unit,
+    amount: @Composable () -> Unit,
+    approveLabel: String,
     onApprove: () -> Unit,
     onReject: () -> Unit,
 ) {
@@ -676,29 +717,26 @@ private fun ReviewCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 leading()
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(title, fontWeight = FontWeight.SemiBold)
-                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (squire != null) {
+                            val t = tinctureOf(squire.tincture)
+                            StatusChip(squire.displayName, t.soft, t.deep)
+                        }
+                        Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-                trailing()
+                Spacer(Modifier.width(8.dp))
+                amount()
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 12.dp)) {
-                Button(
-                    onClick = onApprove,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary,
-                        contentColor = MaterialTheme.colorScheme.onTertiary,
-                    ),
-                ) { Text("Approve ✓") }
-                OutlinedButton(onClick = onReject) { Text("Reject") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 10.dp)) {
+                SealButton(label = approveLabel, onClick = onApprove)
+                OutlinedButton(onClick = onReject, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) { Text("Not yet…") }
             }
         }
     }

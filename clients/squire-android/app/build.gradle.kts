@@ -26,8 +26,8 @@ android {
         applicationId = "com.squire.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 22
-        versionName = "0.7.19"
+        versionCode = 23
+        versionName = "0.7.20"
     }
 
     compileOptions {

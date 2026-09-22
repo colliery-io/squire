@@ -3,7 +3,7 @@ name = "squire-home"
 # Tracks the release tag so the self-updater (SQUIRE-T-0089) compares correctly against the dist
 # repo's latest GitHub Release. Set to the UPCOMING release so a build is only ever "older" than a
 # release published after it (no update loop).
-version = "0.7.19"
+version = "0.7.20"
 edition = "2021"
 description = "Squire home server — runs the Keep (loopback admin) AND the LAN api over ONE shared store, so the parent's Keep and the child's phone share a household. Demo/dev entrypoint."
 
