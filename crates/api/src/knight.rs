@@ -468,13 +468,13 @@ pub async fn household_review(
     State(state): State<Arc<AppState>>,
     RequireKnight(_principal): RequireKnight,
 ) -> Json<HouseholdReview> {
-    let snap = {
-        let store = state.store.lock().expect("store mutex poisoned");
-        store.snapshot()
-    };
+    let store = state.store.lock().expect("store mutex poisoned");
+    let snap = store.snapshot();
     let now = state.clock.now();
     let today = state.clock.today();
-    Json(assemble_review(&snap, now, today))
+    let mut review = assemble_review(&snap, now, today);
+    crate::tincture::fill(&store, &mut review.squires);
+    Json(review)
 }
 
 /// `GET /admin/squire/{id}/state` — the **"assume Squire"** read (SQUIRE-T-0053): a Knight fetches
@@ -570,6 +570,7 @@ fn squire_summaries(snap: &Snapshot) -> Vec<SquireSummary> {
         .map(|u| SquireSummary {
             squire: u.id,
             display_name: u.display_name.clone(),
+            tincture: String::new(), // config-table value; the handler fills it in
             balance: Proj::balance(snap, u.id).max(0) as domain_core::contract::Points,
             cash_balance: Proj::balance_in(snap, u.id, Currency::Cash).max(0)
                 as domain_core::contract::Points,

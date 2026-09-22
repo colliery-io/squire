@@ -18,7 +18,9 @@ use identity::DevIdentity;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 
-use domain_core::contract::{AddMemberResp, LoginResp, RegisterHouseholdResp, Role};
+use domain_core::contract::{
+    AddMemberResp, HouseholdReview, LoginResp, RegisterHouseholdResp, Role, StateView,
+};
 use store::tenant::{Backend, Provisioner};
 use store::SystemClock;
 
@@ -314,4 +316,91 @@ async fn knight_renames_a_member_in_place() {
         arr.iter().all(|m| m["display_name"] != "Lancelot"),
         "the old name is gone (renamed, not duplicated)"
     );
+}
+
+/// A squire's tincture (SQUIRE-T-0136): the squire sets their own, a Knight can set anyone's, the
+/// state and review views carry it, an unknown colour is refused, and unset reads as the default.
+#[tokio::test]
+async fn tincture_round_trips_through_state_and_review() {
+    let (state, _dir) = test_state();
+    let reg = register(state.clone()).await;
+    let knight = (reg.token.0.as_str(), reg.household.0.as_str());
+
+    let add_body =
+        serde_json::json!({ "role": "Squire", "display_name": "Matrim", "initial_secret": "oak" })
+            .to_string();
+    let resp = router(state.clone())
+        .oneshot(req("POST", "/members", Some(knight), Some(add_body)))
+        .await
+        .unwrap();
+    let added: AddMemberResp = json_body(resp).await;
+    let login_body = serde_json::json!({
+        "household": reg.household.0, "user": added.user.0, "secret": "oak",
+    })
+    .to_string();
+    let resp = router(state.clone())
+        .oneshot(req("POST", "/login", None, Some(login_body)))
+        .await
+        .unwrap();
+    let login: LoginResp = json_body(resp).await;
+    let squire = (login.token.0.as_str(), reg.household.0.as_str());
+
+    // Unset → the default.
+    let resp = router(state.clone())
+        .oneshot(req("GET", "/state", Some(squire), None))
+        .await
+        .unwrap();
+    let view: StateView = json_body(resp).await;
+    assert_eq!(view.tincture, "vert");
+
+    // The squire picks red. Case/whitespace are normalised; nonsense is 400.
+    let body = |t: &str| Some(serde_json::json!({ "tincture": t }).to_string());
+    let resp = router(state.clone())
+        .oneshot(req("POST", "/me/tincture", Some(squire), body(" Gules ")))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    let resp = router(state.clone())
+        .oneshot(req("POST", "/me/tincture", Some(squire), body("plaid")))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    let resp = router(state.clone())
+        .oneshot(req("GET", "/state", Some(squire), None))
+        .await
+        .unwrap();
+    let view: StateView = json_body(resp).await;
+    assert_eq!(view.tincture, "gules");
+
+    // A Knight can set it too, and the review carries it.
+    let path = format!("/admin/members/{}/tincture", added.user.0);
+    let resp = router(state.clone())
+        .oneshot(req("POST", &path, Some(knight), body("azure")))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    let resp = router(state.clone())
+        .oneshot(req("GET", "/household-review", Some(knight), None))
+        .await
+        .unwrap();
+    let review: HouseholdReview = json_body(resp).await;
+    let mat = review
+        .squires
+        .iter()
+        .find(|s| s.squire == added.user)
+        .expect("summary");
+    assert_eq!(mat.tincture, "azure");
+
+    // A squire cannot set a Knight's.
+    let resp = router(state)
+        .oneshot(req(
+            "POST",
+            "/admin/members/1/tincture",
+            Some(squire),
+            body("sable"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }

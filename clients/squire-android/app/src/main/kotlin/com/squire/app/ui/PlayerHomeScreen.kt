@@ -53,6 +53,13 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.squire.app.ui.theme.Tinctures
+import com.squire.app.ui.theme.tinctureOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -110,6 +117,7 @@ fun PlayerHomeScreen(
     onMarkDone: (questId: Long) -> Unit,
     onRedeem: (itemId: Long) -> Unit,
     onCashOut: (amount: Long) -> Unit = {},
+    onPickTincture: ((String) -> Unit)? = null,
     onForget: () -> Unit = {},
     onCheckUpdate: () -> Unit = {},
     headerLabel: String? = null,
@@ -170,10 +178,12 @@ fun PlayerHomeScreen(
                     ),
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(color = MaterialTheme.colorScheme.secondary, shape = CircleShape) {
+                            // The initial sits on a white disc in the squire's own colour: a small
+                            // crest against the tinted bar (SQUIRE-T-0136).
+                            Surface(color = MaterialTheme.colorScheme.surface, shape = CircleShape) {
                                 Text(
                                     firstName.take(1).uppercase(),
-                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
                                 )
@@ -265,6 +275,7 @@ fun PlayerHomeScreen(
                 onMarkDone = { qid -> cheer("Sent! ⏳ A grown-up will check it"); onMarkDone(qid) },
                 onRedeem = { iid -> cheer("Sent! 🎁 Asked a grown-up"); onRedeem(iid) },
                 onCashOut = { amt -> cheer("Sent! 💵 Asked a grown-up to pay you"); onCashOut(amt) },
+                onPickTincture = onPickTincture,
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
         }
@@ -279,6 +290,7 @@ private fun ReadyContent(
     onMarkDone: (questId: Long) -> Unit,
     onRedeem: (itemId: Long) -> Unit,
     onCashOut: (amount: Long) -> Unit,
+    onPickTincture: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     // Owed real money + whether a cash-out is already awaiting a grown-up (SQUIRE-T-0118).
@@ -329,6 +341,12 @@ private fun ReadyContent(
                     }
                 }
                 SquireTab.Me -> {
+                    // My colours (SQUIRE-T-0136): pick the tincture the whole app wears. Hidden in
+                    // assume mode (a Knight looking in), where there is no one to pick for.
+                    if (onPickTincture != null) {
+                        item { SectionTitle("My colours") }
+                        item { TincturePicker(chosen = view.tincture, onPick = onPickTincture) }
+                    }
                     val badges = view.badges.orEmpty()
                     val goals = view.goals.orEmpty()
                     if (badges.isEmpty() && view.streaks.isEmpty() && goals.isEmpty()) {
@@ -795,6 +813,35 @@ internal fun goalDetail(g: GoalView) = DetailContent(
     },
     note = "Not unlocked yet — keep going!",
 )
+
+/** Six swatches; the chosen one is ringed in ink. Tapping one recolours the app (SQUIRE-T-0136). */
+@Composable
+private fun TincturePicker(chosen: String?, onPick: (String) -> Unit) {
+    val current = tinctureOf(chosen).name
+    QuestCard {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Tinctures.forEach { t ->
+                val picked = t.name == current
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .then(if (picked) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+                        .padding(if (picked) 5.dp else 3.dp)
+                        .clip(CircleShape)
+                        .background(t.tint)
+                        .clickable(enabled = !picked) { onPick(t.name) }
+                        .semantics { contentDescription = t.name.replaceFirstChar { c -> c.uppercase() } },
+                )
+            }
+        }
+        Text(
+            "Pick the colour your Squire wears.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 10.dp),
+        )
+    }
+}
 
 /** A plain card wrapper for quests/rewards/streaks. */
 @Composable

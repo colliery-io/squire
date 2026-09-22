@@ -19,6 +19,10 @@
     for (const [re, e] of table) if (re.test(t)) return e;
     return fallback;
   }
+  // The tinctures a squire may choose (mirrors `contract::TINCTURES`; hex mirrors the Android theme).
+  const TINCTURES = ["gules", "azure", "vert", "purpure", "tenne", "sable"];
+  const TINCTURE_HEX = { gules: "#C22B3A", azure: "#2457C5", vert: "#187A4F", purpure: "#6B3FA0", tenne: "#B8561B", sable: "#2E3440" };
+
   const QUEST_EMOJI = [
     [/bed|wake|morning/i, "🛏"], [/tidy|room|clean|vacuum|dust/i, "🧹"],
     [/dog|walk|pet|biscuit|cat|feed/i, "🐕"], [/piano|music|practice|guitar|violin/i, "🎹"],
@@ -225,6 +229,7 @@
     for (const s of r.squires) {
       const li = el("li", "list-row");
       const av = el("span", "medallion avatar-green", (s.display_name || "?").slice(0, 1).toUpperCase());
+      if (s.tincture && TINCTURE_HEX[s.tincture]) av.style.setProperty("--t", TINCTURE_HEX[s.tincture]);
       const info = el("div", "grow");
       info.appendChild(el("div", "card-title", s.display_name));
       const owed = Number(s.cash_balance || 0);
@@ -303,6 +308,34 @@
         inactive.textContent = "Inactive";
         inactive.style.marginLeft = ".35rem";
         info.append(inactive);
+      }
+
+      // Their colours (SQUIRE-T-0136): a swatch per tincture; the chosen one is ringed. Squires only —
+      // it is the colour THEIR screens wear.
+      if (m.role === "Squire") {
+        const swatches = document.createElement("span");
+        swatches.className = "tinctures";
+        swatches.setAttribute("role", "radiogroup");
+        swatches.setAttribute("aria-label", `${m.display_name}'s colour`);
+        for (const t of TINCTURES) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "tincture" + (m.tincture === t ? " chosen" : "");
+          b.style.setProperty("--t", TINCTURE_HEX[t]);
+          b.title = t[0].toUpperCase() + t.slice(1);
+          b.setAttribute("aria-label", b.title);
+          b.setAttribute("aria-pressed", String(m.tincture === t));
+          b.addEventListener("click", async () => {
+            const r = await fetch(`/api/members/${m.user}/tincture`, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ tincture: t }),
+            });
+            if (r.ok) loadMembers();
+          });
+          swatches.appendChild(b);
+        }
+        info.append(swatches);
       }
 
       // Rename in place (SQUIRE-T-0120/0126) — keeps the member's id, role, and pairing.

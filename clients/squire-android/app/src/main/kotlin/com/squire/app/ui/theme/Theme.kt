@@ -121,11 +121,38 @@ private val SquireShapes = Shapes(
     large = RoundedCornerShape(22.dp),
 )
 
-/** The app's theme — wrap the whole UI so both the Squire and Knight surfaces inherit it. */
+/** A squire's chosen colour (SQUIRE-T-0136): the tint their screens wear, a soft ground, and a
+ *  deep text-on-soft. Names and hex mirror `contract::TINCTURES` and the Keep's swatches. */
+data class Tincture(val name: String, val tint: Color, val soft: Color, val deep: Color)
+
+val Tinctures: List<Tincture> = listOf(
+    Tincture("gules",   Color(0xFFC22B3A), Color(0xFFFAE1E4), Color(0xFF7A1521)),
+    Tincture("azure",   Color(0xFF2457C5), Color(0xFFDEE8FB), Color(0xFF153A8C)),
+    Tincture("vert",    Color(0xFF187A4F), Color(0xFFDCF0E6), Color(0xFF0F5C3A)),
+    Tincture("purpure", Color(0xFF6B3FA0), Color(0xFFECE3F7), Color(0xFF47276E)),
+    Tincture("tenne",   Color(0xFFB8561B), Color(0xFFFBE6D8), Color(0xFF7A3609)),
+    Tincture("sable",   Color(0xFF2E3440), Color(0xFFE4E7ED), Color(0xFF16203F)),
+)
+
+/** Resolve a stored tincture name (unknown/blank → the default, vert). */
+fun tinctureOf(name: String?): Tincture =
+    Tinctures.firstOrNull { it.name == name?.trim()?.lowercase() } ?: Tinctures[2]
+
+/** The app's theme — wrap the whole UI so both the Squire and Knight surfaces inherit it.
+ *
+ *  [tincture] is the squire's colour: their top bar (`primary`) and their actions (`tertiary`)
+ *  wear it. The Knight's surfaces pass nothing and stay on midnight ink. */
 @Composable
-fun SquireTheme(content: @Composable () -> Unit) {
+fun SquireTheme(tincture: String? = null, content: @Composable () -> Unit) {
+    val scheme = if (tincture == null) SquireColors else {
+        val t = tinctureOf(tincture)
+        SquireColors.copy(
+            primary = t.tint, primaryContainer = t.soft, onPrimaryContainer = t.deep,
+            tertiary = t.tint, tertiaryContainer = t.soft, onTertiaryContainer = t.deep,
+        )
+    }
     MaterialTheme(
-        colorScheme = SquireColors,
+        colorScheme = scheme,
         typography = SquireType,
         shapes = SquireShapes,
         content = content,

@@ -840,6 +840,69 @@
         ]
       }
     },
+    "/admin/members/{id}/tincture": {
+      "post": {
+        "tags": [
+          "knight"
+        ],
+        "summary": "`POST /admin/members/{id}/tincture` ([`RequireKnight`]) — a Knight sets a member's colour.",
+        "operationId": "set_member_tincture",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Member user id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTinctureReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Tincture saved"
+          },
+          "400": {
+            "description": "Not one of the known tinctures"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Authenticated but not a Knight"
+          },
+          "404": {
+            "description": "No such member"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/admin/quests": {
       "get": {
         "tags": [
@@ -1474,6 +1537,55 @@
             "description": "Too many failed logins for this member; the secret was not tested. Retry after the `Retry-After` header's seconds."
           }
         }
+      }
+    },
+    "/me/tincture": {
+      "post": {
+        "tags": [
+          "squire"
+        ],
+        "summary": "`POST /me/tincture` ([`RequireSquire`]) — the signed-in squire picks their own colour.",
+        "operationId": "set_my_tincture",
+        "parameters": [
+          {
+            "name": "X-Household",
+            "in": "header",
+            "description": "Opaque household handle routing the request to its tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTinctureReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Tincture saved"
+          },
+          "400": {
+            "description": "Not one of the known tinctures"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Not a Squire"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
       }
     },
     "/members": {
@@ -3593,6 +3705,19 @@
           }
         }
       },
+      "SetTinctureReq": {
+        "type": "object",
+        "description": "`POST /me/tincture` / `POST /admin/members/{id}/tincture` body.",
+        "required": [
+          "tincture"
+        ],
+        "properties": {
+          "tincture": {
+            "type": "string",
+            "description": "One of `gules`, `azure`, `vert`, `purpure`, `tenne`, `sable`."
+          }
+        }
+      },
       "SquireSummary": {
         "type": "object",
         "required": [
@@ -3612,6 +3737,10 @@
           },
           "squire": {
             "$ref": "#/components/schemas/UserId"
+          },
+          "tincture": {
+            "type": "string",
+            "description": "This squire's tincture (SQUIRE-T-0136), so the parent's screens tag them in their colour."
           }
         }
       },
@@ -3710,6 +3839,10 @@
             "items": {
               "$ref": "#/components/schemas/StreakView"
             }
+          },
+          "tincture": {
+            "type": "string",
+            "description": "The squire's chosen tincture (SQUIRE-T-0136) — `\"gules\"`, `\"azure\"`, … (see\n`contract::TINCTURES`); empty from an older server, which the app treats as the default."
           }
         }
       },

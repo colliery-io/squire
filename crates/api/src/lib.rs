@@ -25,6 +25,7 @@ mod log;
 pub mod openapi;
 pub mod squire;
 pub mod state;
+pub mod tincture;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -56,6 +57,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         // ── Squire-role endpoints (SQUIRE-T-0015) ──────────────────────────────
         .route("/state", get(squire::get_state))
         .route("/claims", post(squire::submit_claim))
+        .route("/me/tincture", post(tincture::set_my_tincture))
         .route("/redemption-requests", post(squire::request_redemption))
         .route("/cash-out-requests", post(squire::request_cashout))
         // ── Knight-role privileged endpoints (SQUIRE-T-0016) ───────────────────
@@ -100,6 +102,10 @@ pub fn router(state: Arc<AppState>) -> Router {
             post(authoring::set_member_active),
         )
         .route("/admin/members/{id}/name", post(authoring::rename_member))
+        .route(
+            "/admin/members/{id}/tincture",
+            post(tincture::set_member_tincture),
+        )
         // Household settings from the phone (SQUIRE-T-0113): read + change the timezone, at parity
         // with the Keep's /api/config (hot-swaps the shared live cell).
         .route(

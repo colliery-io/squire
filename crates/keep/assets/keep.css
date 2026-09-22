@@ -384,6 +384,19 @@ li {
 .badge-squire { background: var(--vert-soft); color: var(--green-deep); }
 .badge-muted  { background: var(--line-soft); color: var(--stone); }
 
+/* A squire's colours (SQUIRE-T-0136): swatches on their member row. */
+.tinctures { display: inline-flex; gap: 6px; margin-left: .6rem; vertical-align: middle; }
+.tincture {
+  width: 22px; height: 22px; margin: 0; padding: 0; border-radius: 50%;
+  background: var(--t); border: 2px solid var(--card); box-shadow: 0 0 0 1px var(--line);
+  cursor: pointer; transition: transform .1s ease;
+}
+.tincture:hover { transform: scale(1.12); background: var(--t); }
+.tincture.chosen { box-shadow: 0 0 0 2px var(--ink); }
+.tincture:focus-visible { outline: none; box-shadow: var(--focus); }
+/* A member's initial wears THEIR tincture, not always vert. */
+.medallion.avatar-green { background: var(--t, var(--vert)); }
+
 /* ── Notices & code ──────────────────────────────────────────────────────── */
 .error { color: var(--red-deep); font-weight: 400; background: var(--red-soft); border-radius: 8px; padding: .55rem .8rem; }
 .sub { color: var(--stone); font-size: .85rem; }

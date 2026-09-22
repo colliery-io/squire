@@ -88,6 +88,8 @@ impl Modify for SecurityAddon {
         crate::authoring::list_members,
         crate::authoring::set_member_active,
         crate::authoring::rename_member,
+        crate::tincture::set_my_tincture,
+        crate::tincture::set_member_tincture,
         // Household settings from the phone (SQUIRE-T-0113)
         crate::config::get_config,
         crate::config::update_config,
@@ -189,6 +191,7 @@ impl Modify for SecurityAddon {
         crate::authoring::MemberSummaryDto,
         crate::authoring::SetActiveReq,
         crate::authoring::RenameMemberReq,
+        crate::tincture::SetTinctureReq,
         // ── Household settings (SQUIRE-T-0113) ──
         crate::config::UpdateConfigReq,
         domain_core::contract::HouseholdConfig,

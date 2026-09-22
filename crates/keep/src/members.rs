@@ -13,8 +13,12 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use domain_core::contract::{AddMemberReq, Change, LoginReq, Role, User, UserId};
+use domain_core::contract::{
+    config_keys, valid_tincture, AddMemberReq, Change, LoginReq, Repository, Role, User, UserId,
+    DEFAULT_TINCTURE,
+};
 use identity::AuthError;
+use store::{Store, SystemClock};
 
 use crate::quests::AuditView;
 use crate::{KeepState, Operator};
@@ -27,6 +31,8 @@ pub struct MemberRow {
     pub role: Role,
     pub display_name: String,
     pub active: bool,
+    /// The colour this member's screens wear (SQUIRE-T-0136); Squires only in practice.
+    pub tincture: String,
     pub audit: AuditView,
 }
 
@@ -84,6 +90,7 @@ pub async fn list_members(
                 role: u.role,
                 display_name: u.display_name.clone(),
                 active: u.active,
+                tincture: tincture_of(&guard, u.id),
                 audit,
             }
         })
@@ -161,5 +168,42 @@ pub async fn rename(
     state
         .apply_changes(Some(op.user), &[Change::PutUser(updated)])
         .map_err(|_| StatusCode::CONFLICT)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// The stored tincture for `user`, or the default (SQUIRE-T-0136).
+pub fn tincture_of(store: &Store<SystemClock>, user: UserId) -> String {
+    store
+        .get_setting(&config_keys::tincture(user))
+        .as_deref()
+        .and_then(valid_tincture)
+        .unwrap_or(DEFAULT_TINCTURE)
+        .to_string()
+}
+
+/// `POST /api/members/{id}/tincture` body.
+#[derive(Debug, Deserialize)]
+pub struct TinctureReq {
+    pub tincture: String,
+}
+
+/// `POST /api/members/{id}/tincture` (Knight-only) — set the colour a squire's screens wear.
+/// Presentation only, so it lives in the config table (audited to the acting Knight), not the
+/// domain model. 400 for an unknown tincture, 404 for an unknown member.
+pub async fn set_tincture(
+    State(state): State<Arc<KeepState>>,
+    Operator(op): Operator,
+    Path(id): Path<String>,
+    Json(req): Json<TinctureReq>,
+) -> Result<StatusCode, StatusCode> {
+    let tincture = valid_tincture(&req.tincture).ok_or(StatusCode::BAD_REQUEST)?;
+    let uid = UserId(id.trim().parse().map_err(|_| StatusCode::BAD_REQUEST)?);
+    let store = state.store.lock().expect("store mutex poisoned");
+    if !store.snapshot().users.iter().any(|u| u.id == uid) {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    store
+        .set_setting(&config_keys::tincture(uid), tincture, Some(op.user))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(StatusCode::NO_CONTENT)
 }

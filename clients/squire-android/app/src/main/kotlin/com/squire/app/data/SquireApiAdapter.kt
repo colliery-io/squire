@@ -54,6 +54,11 @@ class SquireApiAdapter(
         api.getState(xHousehold = household)
     }
 
+    /** Pick my colour (SQUIRE-T-0136). Direct, not through the outbox: a preference, not a claim. */
+    suspend fun setTincture(tincture: String) = withContext(Dispatchers.IO) {
+        api.setMyTincture(household, com.squire.sdk.model.SetTinctureReq(tincture))
+    }
+
     override suspend fun submitClaim(req: SubmitClaimReq): SubmitResult = submit {
         api.submitClaim(xHousehold = household, submitClaimReq = req)
     }

@@ -17,8 +17,8 @@ use serde::{Deserialize, Serialize};
 
 use domain_core::contract::{
     ClaimId, Clock, Command, CommandId, Currency, Date, Decision, Event, HouseholdReview, ItemId,
-    ItemOption, PendingCashOut, PendingClaim, PendingRequest, Projections, QuestOption, RequestId,
-    Role, Snapshot, SquireSummary, Timestamp, UserId,
+    ItemOption, PendingCashOut, PendingClaim, PendingRequest, Projections, QuestOption, Repository,
+    RequestId, Role, Snapshot, SquireSummary, Timestamp, UserId,
 };
 use domain_core::Proj;
 
@@ -105,10 +105,15 @@ pub async fn get_review(
     State(state): State<Arc<KeepState>>,
     _op: Operator,
 ) -> Json<HouseholdReview> {
-    let snap = state.snapshot();
+    let store = state.store.lock().expect("store mutex poisoned");
+    let snap = store.snapshot();
     let now = state.clock.now();
     let today = state.clock.today();
-    Json(assemble_review(&snap, now, today))
+    let mut review = assemble_review(&snap, now, today);
+    for s in &mut review.squires {
+        s.tincture = crate::members::tincture_of(&store, s.squire);
+    }
+    Json(review)
 }
 
 // ─── action handlers (Knight-only, engine-direct) ────────────────────────────────────────────
@@ -241,6 +246,7 @@ fn squire_summaries(snap: &Snapshot) -> Vec<SquireSummary> {
         .map(|u| SquireSummary {
             squire: u.id,
             display_name: u.display_name.clone(),
+            tincture: String::new(), // config-table value; the handler fills it in
             balance: Proj::balance(snap, u.id).max(0) as domain_core::contract::Points,
             cash_balance: Proj::balance_in(snap, u.id, domain_core::contract::Currency::Cash).max(0)
                 as domain_core::contract::Points,

@@ -11,6 +11,10 @@ use super::*;
 pub struct StateView {
     pub squire: UserId,
     pub generated_at: Timestamp,
+    /// The squire's chosen tincture (SQUIRE-T-0136) — `"gules"`, `"azure"`, … (see
+    /// `contract::TINCTURES`); empty from an older server, which the app treats as the default.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub tincture: String,
     /// The Squire's **coin** balance (back-compat; equals the `Coins` entry of `balances`).
     pub balance: Points,
     /// Every currency the household uses, with this Squire's floored balance (SQUIRE-A-0013). Lets the
@@ -518,6 +522,9 @@ pub struct HouseholdReview {
 pub struct SquireSummary {
     pub squire: UserId,
     pub display_name: String,
+    /// This squire's tincture (SQUIRE-T-0136), so the parent's screens tag them in their colour.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub tincture: String,
     pub balance: Points,
     #[cfg_attr(feature = "serde", serde(default))]
     pub cash_balance: Points,

@@ -350,11 +350,14 @@ class ScreenshotTests {
                 GoalView(id = 8L, name = "Century", description = "Earn 100 coins", bonus = 0, current = 40, target = 100),
             ),
         )
+        // Wears the squire's tincture (SQUIRE-T-0136) exactly as the host does: theme from the view.
+        val red = view.copy(tincture = "gules")
         paparazzi.snapshot {
-            SquireTheme {
+            SquireTheme(tincture = red.tincture) {
                 PlayerHomeScreen(
-                    state = PlayerUiState.Ready(view, fromCache = false),
+                    state = PlayerUiState.Ready(red, fromCache = false),
                     onRefresh = {}, onMarkDone = {}, onRedeem = {},
+                    onPickTincture = {},
                     headerLabel = "Matrim Oakenfury", // realistic long name — stresses the header layout
                 )
             }
@@ -406,9 +409,10 @@ class ScreenshotTests {
             ),
         )
         paparazzi.snapshot {
-            SquireTheme {
+            SquireTheme(tincture = "gules") {
                 PlayerHomeScreen(
-                    state = PlayerUiState.Ready(view, fromCache = false),
+                    state = PlayerUiState.Ready(view.copy(tincture = "gules"), fromCache = false),
+                    onPickTincture = {},
                     onRefresh = {}, onMarkDone = {}, onRedeem = {},
                     initialTab = SquireTab.Me,
                 )

@@ -48,14 +48,16 @@ pub async fn get_state(
     State(state): State<Arc<AppState>>,
     RequireSquire(principal): RequireSquire,
 ) -> Json<StateView> {
-    let snap = {
-        let store = state.store.lock().expect("store mutex poisoned");
-        store.snapshot()
-    };
     let squire = principal.user;
+    let (snap, tincture) = {
+        let store = state.store.lock().expect("store mutex poisoned");
+        (store.snapshot(), crate::tincture::of(&store, squire))
+    };
     let today = state.clock.today();
     let now = state.clock.now();
-    Json(assemble_state(&snap, squire, today, now))
+    let mut view = assemble_state(&snap, squire, today, now);
+    view.tincture = tincture;
+    Json(view)
 }
 
 /// `POST /claims` (RequireSquire) — submit a completion claim for the authenticated Squire.
@@ -268,6 +270,8 @@ pub(crate) fn assemble_state(
     StateView {
         squire,
         generated_at: now,
+        // Lives in the config table, not the snapshot: the handler fills it in.
+        tincture: String::new(),
         balance,
         balances,
         quests_today,

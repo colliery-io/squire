@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -161,8 +163,9 @@ internal fun PlayerHomeHost(
     val db = remember { SquireDb.build(context) }
     val ids = remember { AtomicLong(System.currentTimeMillis()) }
 
+    val adapter = remember(session) { SquireApiAdapter(session.baseUrl, session.household, session.token) }
+    val scope = rememberCoroutineScope()
     val viewModel = remember(session) {
-        val adapter = SquireApiAdapter(session.baseUrl, session.household, session.token)
         val outbox = RoomOutbox(db.outboxDao(), json)
         val store = PlayerStore(
             fetcher = adapter,
@@ -224,9 +227,18 @@ internal fun PlayerHomeHost(
     Column(modifier = Modifier.fillMaxSize()) {
         update?.let { info -> UpdateBanner(info) }
         Box(modifier = Modifier.weight(1f)) {
+            // The squire's screens wear THEIR colour (SQUIRE-T-0136); the cached view keeps it offline.
+            val tincture = (state as? PlayerUiState.Ready)?.view?.tincture
+            SquireTheme(tincture = tincture ?: "vert") {
             PlayerHomeScreen(
                 state = state,
                 onRefresh = { viewModel.refresh() },
+                onPickTincture = { t ->
+                    scope.launch {
+                        runCatching { adapter.setTincture(t) }
+                        viewModel.refresh()
+                    }
+                },
                 onMarkDone = { questId ->
                     val on = (state as? PlayerUiState.Ready)
                         ?.view
@@ -242,6 +254,7 @@ internal fun PlayerHomeHost(
                 onCheckUpdate = { checkNonce++ },
                 headerLabel = session.displayName.ifBlank { null }, // "Hi, <name>!" when paired with a name
             )
+            }
         }
     }
 }

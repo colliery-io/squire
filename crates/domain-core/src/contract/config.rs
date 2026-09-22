@@ -28,4 +28,22 @@ impl Default for HouseholdConfig {
 pub mod config_keys {
     /// IANA timezone name. See [`super::HouseholdConfig::timezone`].
     pub const TIMEZONE: &str = "timezone";
+
+    /// A squire's chosen **tincture** — the colour their screens wear (SQUIRE-T-0136). One key per
+    /// member, in the household config table, so no domain-model change: `tincture:<user id>`.
+    pub fn tincture(user: crate::contract::UserId) -> String {
+        format!("tincture:{}", user.0)
+    }
+}
+
+/// The tinctures a squire may choose from — heraldry's colours, plus sable. Closed set: the apps map
+/// each name to a palette, so an unknown value would render nothing. [`DEFAULT_TINCTURE`] is what an
+/// unset squire wears.
+pub const TINCTURES: [&str; 6] = ["gules", "azure", "vert", "purpure", "tenne", "sable"];
+pub const DEFAULT_TINCTURE: &str = "vert";
+
+/// Normalise a chosen tincture: trimmed + lowercased, and only if it is one of [`TINCTURES`].
+pub fn valid_tincture(s: &str) -> Option<&'static str> {
+    let s = s.trim().to_ascii_lowercase();
+    TINCTURES.iter().copied().find(|t| *t == s)
 }
