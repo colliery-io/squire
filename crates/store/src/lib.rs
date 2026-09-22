@@ -417,6 +417,18 @@ impl<C: Clock> Store<C> {
         if let Some(m) = minute(config_keys::NOTIFY_WAKE_TO) {
             cfg.notify_wake_to = m;
         }
+        if let Some(raw) = self.get_setting(config_keys::CHORE_TIMES) {
+            // Stored comma-separated; anything unparseable is dropped rather than failing the view.
+            let mut times: Vec<u16> = raw
+                .split(',')
+                .filter_map(|t| t.trim().parse::<u16>().ok())
+                .filter(|m| domain_core::contract::valid_minute_of_day(*m))
+                .collect();
+            times.sort_unstable();
+            times.dedup();
+            times.truncate(domain_core::contract::MAX_CHORE_TIMES);
+            cfg.chore_times = times;
+        }
         cfg
     }
 }

@@ -20,7 +20,15 @@ pub struct HouseholdConfig {
     pub notify_wake_from: u16,
     #[cfg_attr(feature = "serde", serde(default = "default_wake_to"))]
     pub notify_wake_to: u16,
+    /// **Chore times** (SQUIRE-T-0140): minutes since local midnight at which a squire's phone
+    /// reminds them what is left — e.g. 16:30 after school and 19:00 last call. Empty = no nudge,
+    /// which is the default: a household opts in rather than being nagged out of the box.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub chore_times: Vec<u16>,
 }
+
+/// At most this many nudges a day. Two is a nudge; five is nagging, and a child stops reading them.
+pub const MAX_CHORE_TIMES: usize = 2;
 
 fn default_wake_from() -> u16 {
     7 * 60
@@ -35,6 +43,7 @@ impl Default for HouseholdConfig {
             timezone: "UTC".to_string(),
             notify_wake_from: default_wake_from(),
             notify_wake_to: default_wake_to(),
+            chore_times: Vec::new(),
         }
     }
 }
@@ -52,6 +61,8 @@ pub mod config_keys {
     /// Waking window, minutes since local midnight (SQUIRE-T-0138).
     pub const NOTIFY_WAKE_FROM: &str = "notify_wake_from";
     pub const NOTIFY_WAKE_TO: &str = "notify_wake_to";
+    /// Chore times, comma-separated minutes since local midnight (SQUIRE-T-0140).
+    pub const CHORE_TIMES: &str = "chore_times";
 
     /// A squire's chosen **tincture** — the colour their screens wear (SQUIRE-T-0136). One key per
     /// member, in the household config table, so no domain-model change: `tincture:<user id>`.

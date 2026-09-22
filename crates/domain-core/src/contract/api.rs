@@ -532,6 +532,9 @@ pub struct NotifySettings {
     /// Waking window: outside it a squire's phone stays silent.
     pub wake_from_minutes: u16,
     pub wake_to_minutes: u16,
+    /// When to remind a squire what is left today (SQUIRE-T-0140). Empty = no nudge.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub chore_times: Vec<u16>,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -2810,6 +2810,15 @@
           "timezone"
         ],
         "properties": {
+          "chore_times": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "description": "**Chore times** (SQUIRE-T-0140): minutes since local midnight at which a squire's phone\nreminds them what is left — e.g. 16:30 after school and 19:00 last call. Empty = no nudge,\nwhich is the default: a household opts in rather than being nagged out of the box."
+          },
           "notify_wake_from": {
             "type": "integer",
             "format": "int32",
@@ -3116,6 +3125,15 @@
           "wake_to_minutes"
         ],
         "properties": {
+          "chore_times": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "description": "When to remind a squire what is left today (SQUIRE-T-0140). Empty = no nudge."
+          },
           "timezone": {
             "type": "string",
             "description": "The household's IANA timezone — the frame for every time below."

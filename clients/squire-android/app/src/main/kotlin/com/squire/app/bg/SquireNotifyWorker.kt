@@ -122,6 +122,10 @@ class SquireNotifyWorker(ctx: Context, params: WorkerParameters) : CoroutineWork
                 .putInt(KEY_BALANCE, state.balance)
                 .putString(KEY_CLAIMS, NotifyPolicy.markers(claims).joinToString("\n"))
                 .apply()
+
+            // Keep the chore-time reminders armed from the settings we just saw, so a change a
+            // parent makes in the Keep lands on the phone within a poll (SQUIRE-T-0140).
+            ChoreReminderWorker.schedule(ctx, state.notify?.choreTimes.orEmpty(), state.notify?.timezone)
         }
 
         /**

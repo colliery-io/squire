@@ -38,6 +38,7 @@ pub(crate) fn notify_settings(store: &store::Store<store::SystemClock>) -> Notif
         timezone: cfg.timezone,
         wake_from_minutes: cfg.notify_wake_from,
         wake_to_minutes: cfg.notify_wake_to,
+        chore_times: cfg.chore_times,
     }
 }
 

@@ -1325,6 +1325,9 @@
     // Quiet hours (SQUIRE-T-0138): stored as minutes since midnight, shown as a clock time.
     document.getElementById("settings-wake-from").value = hhmm(cfg.notify_wake_from);
     document.getElementById("settings-wake-to").value = hhmm(cfg.notify_wake_to);
+    const chores = cfg.chore_times || [];
+    document.getElementById("settings-chore-1").value = chores[0] != null ? hhmm(chores[0]) : "";
+    document.getElementById("settings-chore-2").value = chores[1] != null ? hhmm(chores[1]) : "";
   }
 
   /** minutes-since-midnight → "07:00" for an <input type=time>. */
@@ -1355,10 +1358,15 @@
         error.hidden = false;
         return;
       }
+      // Sorted + de-duplicated, so "19:00 and 16:30" means the same as "16:30 and 19:00".
+      const chore_times = [
+        minutesOfDay(document.getElementById("settings-chore-1").value),
+        minutesOfDay(document.getElementById("settings-chore-2").value),
+      ].filter((m) => m !== null).sort((a, b) => a - b).filter((m, i, a) => a.indexOf(m) === i);
       const res = await fetch("/api/config", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ timezone, notify_wake_from: wakeFrom, notify_wake_to: wakeTo }),
+        body: JSON.stringify({ timezone, notify_wake_from: wakeFrom, notify_wake_to: wakeTo, chore_times }),
       });
       if (res.ok) {
         const cfg = await res.json();

@@ -3,6 +3,8 @@ package com.squire.core
 import com.squire.sdk.model.ClaimState
 import com.squire.sdk.model.ClaimStateKind
 import com.squire.sdk.model.ClaimStatus
+import com.squire.sdk.model.QuestCard
+import com.squire.sdk.model.QuestStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -124,5 +126,55 @@ class NotifyPolicyTest {
             listOf("sealed:2"),
             NotifyPolicy.unspoken(listOf("sealed:1", "sealed:2", "reminder:2026-09-22:0"), spoken),
         )
+    }
+
+    // ── the chore-time nudge (SQUIRE-T-0140) ───────────────────────────────────────────────────
+
+    private fun quest(id: Long, title: String, status: QuestStatus) =
+        QuestCard(on = 1, questId = id, reward = 5, status = status, title = title)
+
+    @Test
+    fun `nothing left means nothing said`() {
+        // The rule that keeps the reminder worth reading.
+        assertEquals(null, NotifyPolicy.choreReminder(emptyList()))
+        assertEquals(
+            null,
+            NotifyPolicy.choreReminder(
+                listOf(
+                    quest(1, "Tidy your room", QuestStatus.CompletedToday),
+                    quest(2, "Feed the dog", QuestStatus.Pending),
+                    quest(3, "Walk the dog", QuestStatus.TakenByOther),
+                ),
+            ),
+            "sealed, waiting on a grown-up, and a sibling's chore are all 'not left'",
+        )
+    }
+
+    @Test
+    fun `what is left is named`() {
+        val one = NotifyPolicy.choreReminder(listOf(quest(1, "Tidy your room", QuestStatus.Available)))!!
+        assertEquals("1 chore left today", one.first)
+        assertEquals("Tidy your room", one.second)
+
+        val two = NotifyPolicy.choreReminder(
+            listOf(
+                quest(1, "Tidy your room", QuestStatus.Available),
+                quest(2, "Practice piano", QuestStatus.Available),
+                quest(3, "Feed the dog", QuestStatus.CompletedToday),
+            ),
+        )!!
+        assertEquals("2 chores left today", two.first)
+        assertTrue(two.second.contains("Tidy your room") && two.second.contains("Practice piano"))
+    }
+
+    @Test
+    fun `the next chore time is today when ahead and tomorrow once passed`() {
+        assertEquals(90, NotifyPolicy.minutesUntilNext(minuteOfDay = 16 * 60 + 30, nowMinuteOfDay = 15 * 60))
+        assertEquals(
+            23 * 60 + 30,
+            NotifyPolicy.minutesUntilNext(minuteOfDay = 16 * 60 + 30, nowMinuteOfDay = 17 * 60),
+            "already gone today, so tomorrow",
+        )
+        assertEquals(24 * 60, NotifyPolicy.minutesUntilNext(minuteOfDay = 600, nowMinuteOfDay = 600), "never zero")
     }
 }

@@ -12,7 +12,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-use domain_core::contract::{config_keys, valid_minute_of_day, HouseholdConfig};
+use domain_core::contract::{config_keys, valid_minute_of_day, HouseholdConfig, MAX_CHORE_TIMES};
 use store::{valid_timezone, ConfigView};
 
 use crate::{KeepState, Operator};
@@ -40,6 +40,9 @@ pub struct UpdateConfigReq {
     pub notify_wake_from: Option<u16>,
     #[serde(default)]
     pub notify_wake_to: Option<u16>,
+    /// Chore times (SQUIRE-T-0140). Omitted = unchanged; an empty list clears them.
+    #[serde(default)]
+    pub chore_times: Option<Vec<u16>>,
 }
 
 /// `PUT /api/config` (Knight-only) — change the household timezone. Validates the IANA zone (400 on
@@ -60,6 +63,11 @@ pub async fn update_config(
             return Err(StatusCode::BAD_REQUEST);
         }
     }
+    if let Some(times) = &req.chore_times {
+        if times.len() > MAX_CHORE_TIMES || times.iter().any(|m| !valid_minute_of_day(*m)) {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
     {
         let store = state.store.lock().expect("store mutex poisoned");
         store
@@ -74,6 +82,16 @@ pub async fn update_config(
                     .set_setting(key, &m.to_string(), Some(op.user))
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             }
+        }
+        if let Some(times) = &req.chore_times {
+            let joined = times
+                .iter()
+                .map(|m| m.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            store
+                .set_setting(config_keys::CHORE_TIMES, &joined, Some(op.user))
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         }
     }
     // Re-load the typed view and hot-swap the shared live cell (the clock reads it lock-free).

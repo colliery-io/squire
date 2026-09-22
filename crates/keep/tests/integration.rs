@@ -401,3 +401,57 @@ async fn quiet_hours_round_trip_and_reject_an_inverted_window() {
     assert_eq!(cfg["notify_wake_from"], json!(400));
     assert_eq!(cfg["notify_wake_to"], json!(1260));
 }
+
+/// Chore times round-trip, are capped, and can be cleared (SQUIRE-T-0140).
+#[tokio::test]
+async fn chore_times_round_trip_and_are_capped() {
+    let (state, _admin, token, _dir) = keep();
+
+    // None by default: a household opts in rather than being nagged out of the box.
+    let (_, cfg) = send(&state, "GET", "/api/config", Some(&token), None).await;
+    assert_eq!(cfg["chore_times"], json!([]));
+
+    let put = |times: Value| json!({ "timezone": "America/Detroit", "chore_times": times });
+    let (st, cfg) = send(
+        &state,
+        "PUT",
+        "/api/config",
+        Some(&token),
+        Some(put(json!([990, 1140]))),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(cfg["chore_times"], json!([990, 1140]));
+
+    // More than the cap is refused rather than silently truncated — a parent should know.
+    let (st, _) = send(
+        &state,
+        "PUT",
+        "/api/config",
+        Some(&token),
+        Some(put(json!([600, 990, 1140]))),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    // …and an impossible minute too.
+    let (st, _) = send(
+        &state,
+        "PUT",
+        "/api/config",
+        Some(&token),
+        Some(put(json!([2000]))),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+
+    // An empty list clears them; omitting the field leaves them alone.
+    let (_, cfg) = send(
+        &state,
+        "PUT",
+        "/api/config",
+        Some(&token),
+        Some(put(json!([]))),
+    )
+    .await;
+    assert_eq!(cfg["chore_times"], json!([]));
+}

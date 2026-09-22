@@ -4,6 +4,8 @@ import com.squire.sdk.model.ClaimState
 import com.squire.sdk.model.ClaimStateKind
 import com.squire.sdk.model.ClaimStatus
 import com.squire.sdk.model.NotifySettings
+import com.squire.sdk.model.QuestCard
+import com.squire.sdk.model.QuestStatus
 
 /**
  * **Whether to speak, and what to say** — the pure half of notifications (SQUIRE-T-0138, ADR
@@ -108,6 +110,41 @@ object NotifyPolicy {
         if (previousBalance < 0 || currentBalance <= previousBalance) return 0
         val explained = sealed.filter { it.sealed }.sumOf { it.coins }
         return (currentBalance - previousBalance - explained).coerceAtLeast(0)
+    }
+
+    /**
+     * What is still to do today — the reminder's whole reason to exist (SQUIRE-T-0140).
+     *
+     * A quest counts as left only while it is genuinely actionable: claimed-and-waiting or already
+     * sealed are done as far as the child is concerned, and one taken by a sibling is not theirs.
+     */
+    fun unfinishedToday(quests: List<QuestCard>): List<QuestCard> =
+        quests.filter { it.status == QuestStatus.Available }
+
+    /**
+     * The chore-time nudge, or `null` to stay silent.
+     *
+     * Silence is the important half. A reminder that fires when there is nothing left is how a child
+     * learns to ignore the app, so an empty list says nothing at all — and because the phone reads
+     * its **cached** state, this stays true with the server unreachable.
+     */
+    fun choreReminder(quests: List<QuestCard>): Pair<String, String>? {
+        val left = unfinishedToday(quests)
+        return when (left.size) {
+            0 -> null
+            1 -> "1 chore left today" to left.single().title
+            else -> "${left.size} chores left today" to left.joinToString(" · ") { it.title }
+        }
+    }
+
+    /**
+     * Minutes until [minuteOfDay] next comes round, given the current [nowMinuteOfDay] — today if it
+     * is still ahead, otherwise tomorrow. Pure arithmetic so the scheduler's one piece of reasoning
+     * is testable (SQUIRE-T-0140).
+     */
+    fun minutesUntilNext(minuteOfDay: Int, nowMinuteOfDay: Int): Int {
+        val delta = minuteOfDay - nowMinuteOfDay
+        return if (delta > 0) delta else delta + 24 * 60
     }
 
     /** Keys not yet spoken on this device. */
