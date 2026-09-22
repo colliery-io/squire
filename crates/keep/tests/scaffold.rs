@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use keep::{admin_addr, router, KeepState};
+use keep::{admin_addr, bind_target, router, KeepState};
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -52,7 +52,7 @@ async fn body_json(resp: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap_or(Value::Null)
 }
 
-// ─── loopback bind (the load-bearing A-0008 control) ─────────────────────────────────────────
+// ─── loopback bind (the A-0008 DEFAULT — defense in depth; authz is the primary control) ─────
 
 #[test]
 fn admin_addr_is_loopback_only() {
@@ -62,6 +62,18 @@ fn admin_addr_is_loopback_only() {
         "the Keep must bind loopback only, got {addr}"
     );
     assert!(!addr.ip().is_unspecified(), "must never be 0.0.0.0 / LAN");
+}
+
+/// `KEEP_BIND` (SQUIRE-T-0129) is opt-in: absent or blank still yields the loopback default, so a
+/// bare-metal install is unchanged; a named interface (IP or hostname) is bound verbatim.
+#[test]
+fn bind_target_defaults_to_loopback_and_honours_override() {
+    assert_eq!(bind_target(None, 4920), "127.0.0.1:4920");
+    assert_eq!(bind_target(Some("  "), 4920), "127.0.0.1:4920");
+    assert_eq!(bind_target(Some("squire"), 4920), "squire:4920");
+    assert_eq!(bind_target(Some("172.18.0.2"), 4920), "172.18.0.2:4920");
+    assert_eq!(bind_target(Some("::1"), 4920), "[::1]:4920");
+    assert_eq!(bind_target(Some("[::1]"), 4920), "[::1]:4920");
 }
 
 // ─── embedded shell + health ─────────────────────────────────────────────────────────────────
@@ -184,6 +196,31 @@ fn login_req(user: u128, secret: &str) -> Request<Body> {
         .header("content-type", "application/x-www-form-urlencoded")
         .body(Body::from(format!("user={user}&secret={secret}")))
         .unwrap()
+}
+
+/// The Keep's operator login is throttled too (SQUIRE-T-0130): past the allowance of wrong
+/// secrets, even the right one gets a 429 and no session cookie.
+#[tokio::test]
+async fn operator_login_locks_after_repeated_failures() {
+    let (state, admin, secret, _dir) = keep();
+
+    for _ in 0..identity::throttle::FREE_FAILURES {
+        let resp = router(state.clone())
+            .oneshot(login_req(admin, "wrong"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    let resp = router(state)
+        .oneshot(login_req(admin, &secret))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert!(
+        resp.headers().get("set-cookie").is_none(),
+        "a locked login must not mint a session"
+    );
 }
 
 #[tokio::test]
@@ -316,4 +353,82 @@ async fn login_rejects_bad_secret_and_non_knight() {
         StatusCode::FORBIDDEN,
         "a Squire cannot operate the Keep"
     );
+}
+
+// ─── change my secret (SQUIRE-T-0131) ────────────────────────────────────────────────────────
+
+fn change_secret_req(cookie: Option<&str>, current: &str, new: &str) -> Request<Body> {
+    let mut b = Request::builder()
+        .method("POST")
+        .uri("/api/me/secret")
+        .header("content-type", "application/json");
+    if let Some(c) = cookie {
+        b = b.header("cookie", c);
+    }
+    b.body(Body::from(
+        serde_json::json!({ "current_secret": current, "new_secret": new }).to_string(),
+    ))
+    .unwrap()
+}
+
+#[tokio::test]
+async fn operator_changes_their_own_secret_from_the_keep() {
+    let (state, admin, secret, _dir) = keep();
+
+    // No session → 401: this is a privileged route like any other.
+    let resp = router(state.clone())
+        .oneshot(change_secret_req(None, &secret, "a-brand-new-secret"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+    let resp = router(state.clone())
+        .oneshot(login_req(admin, &secret))
+        .await
+        .unwrap();
+    let cookie = resp
+        .headers()
+        .get("set-cookie")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(';').next())
+        .expect("session cookie")
+        .to_string();
+
+    // Wrong current secret → 401; too-short new one → 400; neither changes anything.
+    let resp = router(state.clone())
+        .oneshot(change_secret_req(
+            Some(&cookie),
+            "wrong",
+            "a-brand-new-secret",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    let resp = router(state.clone())
+        .oneshot(change_secret_req(Some(&cookie), &secret, "short"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    let resp = router(state.clone())
+        .oneshot(change_secret_req(
+            Some(&cookie),
+            &secret,
+            "a-brand-new-secret",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+
+    // The old secret no longer signs in; the new one does.
+    let resp = router(state.clone())
+        .oneshot(login_req(admin, &secret))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    let resp = router(state)
+        .oneshot(login_req(admin, "a-brand-new-secret"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
 }

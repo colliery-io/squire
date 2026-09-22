@@ -619,3 +619,61 @@ async fn concurrent_control_plane_and_feature_writes_serialize() {
         "every concurrent adjust applied exactly once"
     );
 }
+
+// ─── login throttling (SQUIRE-T-0130) ────────────────────────────────────────────────────────
+
+/// Repeated wrong secrets lock the account: the next attempt — even with the RIGHT secret — is a
+/// 429 carrying `Retry-After`, not a token. Lives in THIS harness on purpose: throttling is a
+/// [`ProdIdentity`] behaviour, and the `control.rs` harness runs the dev-only `DevIdentity`.
+#[tokio::test]
+async fn login_locks_after_repeated_failures_with_429_and_retry_after() {
+    each_backend_async(&["lockout"], |backend| async move {
+        let (state, _today) = prod_app(backend, "lockout");
+        let reg = register(&state, "Lockout", "Arthur", "excalibur").await;
+        let attempt = |secret: &'static str| {
+            let state = state.clone();
+            let handle = reg.household.0.clone();
+            let user = reg.admin.0;
+            async move {
+                router(state)
+                    .oneshot(build(
+                        "POST",
+                        "/login",
+                        None,
+                        Some(
+                            json!({ "household": handle, "user": user, "secret": secret })
+                                .to_string(),
+                        ),
+                    ))
+                    .await
+                    .unwrap()
+            }
+        };
+
+        for n in 1..=identity::throttle::FREE_FAILURES {
+            let resp = attempt("wrong").await;
+            assert_eq!(
+                resp.status(),
+                StatusCode::UNAUTHORIZED,
+                "failure {n} is a plain 401"
+            );
+        }
+
+        let resp = attempt("excalibur").await;
+        assert_eq!(
+            resp.status(),
+            StatusCode::TOO_MANY_REQUESTS,
+            "the right secret must not beat the lock"
+        );
+        let retry: u32 = resp
+            .headers()
+            .get("retry-after")
+            .expect("Retry-After header")
+            .to_str()
+            .unwrap()
+            .parse()
+            .expect("Retry-After is whole seconds");
+        assert!((1..=30).contains(&retry), "first lock is ≤30s, got {retry}");
+    })
+    .await;
+}

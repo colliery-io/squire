@@ -19,6 +19,10 @@
 //! protected request and yields the acting Knight's [`Principal`], which handlers stamp as `by` /
 //! `actor` for audit (A-0005, A-0007). Unauthenticated admin actions are refused.
 //!
+//! That check — not the loopback bind — is the **primary** security control (ADR A-0008, amended
+//! 2026-09-20): a privileged route without the [`Operator`] extractor is a bug on any interface.
+//! Loopback remains the default bind as defense in depth; `KEEP_BIND` is the opt-in to move it.
+//!
 //! [SQUIRE-A-0008]: the Keep admin-UI ADR.
 
 use std::net::SocketAddr;
@@ -41,7 +45,7 @@ use domain_core::DomainEngine;
 use store::tenant::{Backend, ProvisionError, Provisioner};
 use store::{live_config, LocalClock, SystemClock};
 
-use identity::{Identity, Principal, ProdIdentity, SharedStore, TokenSigner};
+use identity::{AuthError, Identity, Principal, ProdIdentity, SharedStore, TokenSigner};
 
 /// Build a household-local clock seeded from the store's persisted config (ADR SQUIRE-A-0011) —
 /// the handler-facing clock whose `today()` honours the household timezone.
@@ -50,6 +54,7 @@ pub(crate) fn clock_from_store(store: &SharedStore) -> LocalClock {
     LocalClock::new(live_config(cfg))
 }
 
+pub mod account;
 pub mod achievements;
 pub mod app_install;
 pub mod config;
@@ -295,7 +300,18 @@ async fn login(
             user,
             secret: form.secret,
         })
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+        .map_err(|e| match e {
+            // Locked after repeated failures (SQUIRE-T-0130) — the secret was not tested.
+            AuthError::Throttled { retry_after_s } => {
+                tracing::warn!(
+                    user = user.0,
+                    retry_after_s,
+                    "Keep login refused: account locked after repeated failures"
+                );
+                StatusCode::TOO_MANY_REQUESTS
+            }
+            _ => StatusCode::UNAUTHORIZED,
+        })?;
     if resp.role != Role::Knight {
         return Err(StatusCode::FORBIDDEN);
     }
@@ -418,6 +434,9 @@ fn content_type_for(path: &str) -> &'static str {
         Some("js") => "text/javascript; charset=utf-8",
         Some("json") => "application/json",
         Some("svg") => "image/svg+xml",
+        // Bundled typefaces (SQUIRE-T-0132): served from the binary so the Keep needs no internet.
+        Some("woff2") => "font/woff2",
+        Some("txt") => "text/plain; charset=utf-8",
         _ => "application/octet-stream",
     }
 }
@@ -506,6 +525,7 @@ pub fn router(state: Arc<KeepState>) -> Router {
             "/api/config",
             get(config::get_config).put(config::update_config),
         )
+        .route("/api/me/secret", post(account::change_my_secret))
         .route(
             "/api/hazards",
             get(hazards::list_hazards).put(hazards::set_hazards),
@@ -518,21 +538,50 @@ pub fn router(state: Arc<KeepState>) -> Router {
         .with_state(state)
 }
 
-/// The Keep's admin bind address: **loopback only** (`127.0.0.1:port`). Authoring is delivered
-/// over HTTP, so binding to loopback (never `0.0.0.0` / the LAN) is the load-bearing control that
-/// keeps it off the network (ADR A-0008 / AR-8).
+/// The Keep's **default** admin bind address: loopback (`127.0.0.1:port`). Per ADR A-0008 as
+/// amended 2026-09-20, this is defense in depth — the primary control is authorization (the
+/// [`Operator`] extractor on every privileged route, plus login throttling, SQUIRE-T-0130).
+/// `KEEP_BIND` can move the listener (see [`bind_target`]); the default must stay loopback.
 pub fn admin_addr(port: u16) -> SocketAddr {
     SocketAddr::from(([127, 0, 0, 1], port))
 }
 
-/// Bind the **loopback** admin address and serve the Keep until the process exits.
+/// The `host:port` the Keep binds: [`admin_addr`] (loopback) unless `bind` — the `KEEP_BIND` env —
+/// names another interface, as an IP **or a hostname** (SQUIRE-T-0129).
+///
+/// The override exists for **containers**: a Docker port mapping delivers traffic to the container's
+/// bridge interface, which a loopback listener never sees, so the A-0008 control moves out to the
+/// mapping (`127.0.0.1:4920:4920` — the *host's* loopback). The deploy stack sets `KEEP_BIND` to the
+/// container's own hostname, which Docker resolves to the bridge address: the Keep then listens on
+/// that one interface and stays off any other in the namespace (the Tailscale sidecar's tailnet
+/// interface in particular). `0.0.0.0` is the explicit opt-in to serve the Keep on all of them.
+pub fn bind_target(bind: Option<&str>, port: u16) -> String {
+    match bind.map(str::trim).filter(|b| !b.is_empty()) {
+        None => admin_addr(port).to_string(),
+        // A bare IPv6 literal needs brackets to take a port.
+        Some(b) if b.contains(':') && !b.starts_with('[') => format!("[{b}]:{port}"),
+        Some(b) => format!("{b}:{port}"),
+    }
+}
+
+/// Bind the admin address — **loopback** unless `KEEP_BIND` says otherwise (see [`bind_target`]) —
+/// and serve the Keep until the process exits.
 pub async fn serve(
     state: Arc<KeepState>,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let addr = admin_addr(port);
-    debug_assert!(addr.ip().is_loopback(), "the Keep must bind loopback only");
-    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let target = bind_target(std::env::var("KEEP_BIND").ok().as_deref(), port);
+    let listener = tokio::net::TcpListener::bind(&target)
+        .await
+        .map_err(|e| format!("the Keep could not bind {target}: {e}"))?;
+    let addr = listener.local_addr()?;
+    if !addr.ip().is_loopback() {
+        tracing::warn!(
+            %addr,
+            "the Keep is bound beyond loopback (KEEP_BIND) — whatever publishes this port must keep \
+             it operator-only",
+        );
+    }
     axum::serve(listener, router(state)).await?;
     Ok(())
 }

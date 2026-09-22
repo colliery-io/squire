@@ -114,6 +114,16 @@
     if (!document.getElementById("shell").hidden) showTab(currentTab());
   });
 
+  // Restore the session on load. The `keep_session` cookie outlives the page, but the shell used
+  // to be revealed only by the login form's submit handler — so a refresh (or reopening the tab)
+  // dumped a signed-in Knight back at the login form. Ask the server who we are first.
+  (async () => {
+    try {
+      const res = await fetch("/api/whoami");
+      if (res.ok) enterShell(await res.json(), "Knight");
+    } catch (_) { /* offline or server down: the login form is already showing */ }
+  })();
+
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     errEl.hidden = true;
@@ -124,7 +134,10 @@
       body,
     });
     if (!res.ok) {
-      errEl.textContent = res.status === 403 ? "Only Knights can operate the Keep." : "Sign-in failed.";
+      errEl.textContent =
+        res.status === 403 ? "Only Knights can operate the Keep."
+        : res.status === 429 ? "Too many failed attempts — this account is locked for a while. Try again later."
+        : "Sign-in failed.";
       errEl.hidden = false;
       return;
     }
@@ -701,27 +714,26 @@
     ul.innerHTML = "";
     for (const row of rows) {
       const q = row.quest;
+      // The quests page lists what a squire can work towards right now — archived
+      // quests stay in the store (and in achievement scopes) but are not shown here.
+      if (!q.active) continue;
       const accent = q.auto_approve ? "accent-green" : "accent-royal";
-      const li = el("li", "card-row " + accent + (q.active ? "" : " is-archived"));
+      const li = el("li", "card-row " + accent);
       li.appendChild(medallion(questEmoji(q)));
-      const meta = [questSummary(q)];
-      if (!q.active) meta.push("archived");
-      li.appendChild(cardBody(q.title, meta));
+      li.appendChild(cardBody(q.title, [questSummary(q)]));
       if (q.auto_approve) li.appendChild(el("span", "chip chip-auto", "Auto"));
       if (Number(q.cash) > 0) li.appendChild(el("span", "chip", `$${Number(q.cash)}`));
       li.appendChild(coinPill(q.reward));
-      if (q.active) {
-        const editBtn = el("button", "edit-row", "Edit");
-        editBtn.addEventListener("click", () => fillQuestForm(q));
-        li.appendChild(editBtn);
-        const btn = el("button", "archive", "Archive");
-        btn.addEventListener("click", async () => {
-          await fetch(`/api/quests/${q.id}/archive`, { method: "POST" });
-          loadQuests();
-          loadAchScopeQuests();
-        });
-        li.appendChild(btn);
-      }
+      const editBtn = el("button", "edit-row", "Edit");
+      editBtn.addEventListener("click", () => fillQuestForm(q));
+      li.appendChild(editBtn);
+      const btn = el("button", "archive", "Archive");
+      btn.addEventListener("click", async () => {
+        await fetch(`/api/quests/${q.id}/archive`, { method: "POST" });
+        loadQuests();
+        loadAchScopeQuests();
+      });
+      li.appendChild(btn);
       ul.appendChild(li);
     }
   }
@@ -1255,6 +1267,40 @@
       } else {
         error.textContent = res.status === 400 ? `"${timezone}" isn't a valid IANA timezone.` : "Could not save settings.";
         error.hidden = false;
+      }
+    });
+  }
+
+  // ── Change my secret (SQUIRE-T-0131) ─────────────────────────────────────────────────────────
+  const secretForm = document.getElementById("secret-form");
+  if (secretForm) {
+    secretForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const status = document.getElementById("secret-status");
+      const error = document.getElementById("secret-error");
+      status.hidden = true;
+      error.hidden = true;
+      const fail = (msg) => { error.textContent = msg; error.hidden = false; };
+      const current_secret = document.getElementById("secret-current").value;
+      const new_secret = document.getElementById("secret-new").value;
+      if (new_secret !== document.getElementById("secret-confirm").value) return fail("The two new secrets don't match.");
+      if (new_secret.trim().length < 8) return fail("The new secret needs at least 8 characters.");
+      const res = await fetch("/api/me/secret", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ current_secret, new_secret }),
+      });
+      if (res.ok) {
+        secretForm.reset();
+        status.textContent = "Secret changed. Use the new one next time you sign in.";
+        status.hidden = false;
+      } else {
+        fail(
+          res.status === 401 ? "That isn't your current secret."
+          : res.status === 429 ? "Too many failed attempts — this account is locked for a while. Try again later."
+          : res.status === 400 ? "The new secret needs at least 8 characters."
+          : "Could not change the secret."
+        );
       }
     });
   }

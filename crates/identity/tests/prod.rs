@@ -547,3 +547,210 @@ fn expired_pairing_code_is_rejected() {
         AuthError::BadToken
     );
 }
+
+// ─── login throttling (SQUIRE-T-0130) ────────────────────────────────────────────────────────
+
+/// After the free allowance of wrong secrets the account locks, and while locked even the CORRECT
+/// secret is refused — a lock that a right guess walks through would bound nothing.
+#[test]
+fn repeated_wrong_secrets_lock_the_account_even_against_the_right_secret() {
+    use identity::throttle::FREE_FAILURES;
+
+    let (id, handle, _inspector, _dir) = local_identity(60_000);
+    let admin = id
+        .register(RegisterHouseholdReq {
+            household_name: "The Round Table".into(),
+            admin_name: "Arthur".into(),
+            admin_secret: "excalibur".into(),
+        })
+        .expect("register")
+        .admin;
+    let attempt = |secret: &str| {
+        id.login(LoginReq {
+            household: handle.clone(),
+            user: admin,
+            secret: secret.into(),
+        })
+        .map(|_| ())
+    };
+
+    for n in 1..=FREE_FAILURES {
+        assert_eq!(
+            attempt("wrong"),
+            Err(AuthError::BadToken),
+            "failure {n} is a plain 401"
+        );
+    }
+    match attempt("excalibur") {
+        Err(AuthError::Throttled { retry_after_s }) => {
+            assert!(
+                (1..=30).contains(&retry_after_s),
+                "first lock is ≤30s, got {retry_after_s}"
+            )
+        }
+        other => panic!("the correct secret must NOT beat the lock, got {other:?}"),
+    }
+}
+
+/// A success inside the allowance clears the streak, so ordinary typos never accumulate to a lock.
+#[test]
+fn a_successful_login_resets_the_failure_streak() {
+    use identity::throttle::FREE_FAILURES;
+
+    let (id, handle, _inspector, _dir) = local_identity(60_000);
+    let admin = id
+        .register(RegisterHouseholdReq {
+            household_name: "The Round Table".into(),
+            admin_name: "Arthur".into(),
+            admin_secret: "excalibur".into(),
+        })
+        .expect("register")
+        .admin;
+    let attempt = |secret: &str| {
+        id.login(LoginReq {
+            household: handle.clone(),
+            user: admin,
+            secret: secret.into(),
+        })
+        .map(|_| ())
+    };
+
+    for _round in 0..3 {
+        for _ in 0..(FREE_FAILURES - 1) {
+            assert_eq!(attempt("wrong"), Err(AuthError::BadToken));
+        }
+        assert_eq!(attempt("excalibur"), Ok(()), "still inside the allowance");
+    }
+}
+
+/// Failures are only counted for accounts that have a credential, so made-up user ids can neither
+/// lock anything nor grow the throttle's map.
+#[test]
+fn unknown_users_are_never_throttled() {
+    let (id, handle, _inspector, _dir) = local_identity(60_000);
+    id.register(RegisterHouseholdReq {
+        household_name: "The Round Table".into(),
+        admin_name: "Arthur".into(),
+        admin_secret: "excalibur".into(),
+    })
+    .expect("register");
+
+    for _ in 0..25 {
+        let got = id
+            .login(LoginReq {
+                household: handle.clone(),
+                user: UserId(999_999),
+                secret: "whatever".into(),
+            })
+            .map(|_| ());
+        assert_eq!(got, Err(AuthError::BadToken));
+    }
+}
+
+// ─── change my secret (SQUIRE-T-0131) ────────────────────────────────────────────────────────
+
+/// Registers Arthur/"excalibur" and returns (identity, handle, Arthur's Principal, tempdir).
+fn arthur() -> (ProdIdentity, HouseholdHandle, Principal, tempfile::TempDir) {
+    let (id, handle, _inspector, dir) = local_identity(60_000);
+    let admin = id
+        .register(RegisterHouseholdReq {
+            household_name: "The Round Table".into(),
+            admin_name: "Arthur".into(),
+            admin_secret: "excalibur".into(),
+        })
+        .expect("register")
+        .admin;
+    let me = Principal {
+        household: handle.clone(),
+        user: admin,
+        role: Role::Knight,
+    };
+    (id, handle, me, dir)
+}
+
+fn try_login(id: &ProdIdentity, me: &Principal, secret: &str) -> Result<(), AuthError> {
+    id.login(LoginReq {
+        household: me.household.clone(),
+        user: me.user,
+        secret: secret.into(),
+    })
+    .map(|_| ())
+}
+
+#[test]
+fn change_secret_swaps_the_credential_and_keeps_old_tokens_valid() {
+    let (id, handle, me, _dir) = arthur();
+    let old_token = id
+        .login(LoginReq {
+            household: handle.clone(),
+            user: me.user,
+            secret: "excalibur".into(),
+        })
+        .expect("login")
+        .token;
+
+    assert_eq!(
+        id.change_secret(&me, "excalibur", "caliburn-the-second"),
+        Ok(())
+    );
+
+    assert_eq!(
+        try_login(&id, &me, "excalibur"),
+        Err(AuthError::BadToken),
+        "old secret is dead"
+    );
+    assert_eq!(
+        try_login(&id, &me, "caliburn-the-second"),
+        Ok(()),
+        "new secret works"
+    );
+    // Documented limitation, pinned so a change to it is deliberate: no revocation list.
+    assert!(
+        id.verify(&handle, &old_token).is_ok(),
+        "already-issued tokens stay valid"
+    );
+}
+
+#[test]
+fn change_secret_requires_the_current_secret_and_strikes_the_throttle() {
+    use identity::throttle::FREE_FAILURES;
+    let (id, _handle, me, _dir) = arthur();
+
+    for _ in 0..FREE_FAILURES {
+        assert_eq!(
+            id.change_secret(&me, "not-my-secret", "a-perfectly-long-secret"),
+            Err(AuthError::BadToken)
+        );
+    }
+    // Locked now — for change_secret AND for login: one budget, no side door for guessing.
+    assert!(matches!(
+        id.change_secret(&me, "excalibur", "a-perfectly-long-secret"),
+        Err(AuthError::Throttled { .. })
+    ));
+    assert!(matches!(
+        try_login(&id, &me, "excalibur"),
+        Err(AuthError::Throttled { .. })
+    ));
+}
+
+#[test]
+fn a_too_short_new_secret_is_refused_without_costing_a_strike() {
+    use identity::throttle::FREE_FAILURES;
+    let (id, _handle, me, _dir) = arthur();
+
+    for _ in 0..(FREE_FAILURES * 3) {
+        assert_eq!(
+            id.change_secret(&me, "excalibur", "short"),
+            Err(AuthError::WeakSecret)
+        );
+        assert_eq!(
+            id.change_secret(&me, "excalibur", "  1234567  "),
+            Err(AuthError::WeakSecret)
+        );
+    }
+    assert_eq!(
+        try_login(&id, &me, "excalibur"),
+        Ok(()),
+        "unchanged, and never locked"
+    );
+}

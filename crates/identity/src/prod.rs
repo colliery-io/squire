@@ -65,8 +65,9 @@ fn hash_code(code: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(code.as_bytes()))
 }
 
-use crate::creds::{hash_secret, verify_secret};
+use crate::creds::{hash_secret, verify_secret, MIN_SECRET_LEN};
 use crate::tenant::{TenantError, TenantRegistry};
+use crate::throttle::LoginThrottle;
 use crate::token::TokenSigner;
 use crate::{AuthError, Identity, Principal, SharedStore};
 
@@ -99,6 +100,9 @@ pub struct ProdIdentity {
     token_ttl_ms: i64,
     /// Deterministic monotonic source for fresh `UserId`s and hosted handle suffixes (no rand).
     counter: Mutex<u128>,
+    /// Failed-login bookkeeping (SQUIRE-T-0130). `login` holds this lock across check → verify →
+    /// record; nothing else takes it, so there is no ordering hazard with the store lock.
+    throttle: Mutex<LoginThrottle>,
 }
 
 /// The highest user id currently in `store` (the id high-water mark), or 0 if empty / unreadable.
@@ -133,6 +137,7 @@ impl ProdIdentity {
             clock: SystemClock,
             token_ttl_ms,
             counter: Mutex::new(seed),
+            throttle: Mutex::new(LoginThrottle::default()),
         }
     }
 
@@ -151,6 +156,7 @@ impl ProdIdentity {
             clock: SystemClock,
             token_ttl_ms,
             counter: Mutex::new(0),
+            throttle: Mutex::new(LoginThrottle::default()),
         }
     }
 
@@ -163,6 +169,7 @@ impl ProdIdentity {
             clock: SystemClock,
             token_ttl_ms,
             counter: Mutex::new(0),
+            throttle: Mutex::new(LoginThrottle::default()),
         }
     }
 
@@ -174,6 +181,57 @@ impl ProdIdentity {
         let mut c = self.counter.lock().expect("ProdIdentity counter poisoned");
         *c += 1;
         *c
+    }
+
+    /// Verify `secret` for `(household, user)` under the login throttle (SQUIRE-T-0130), then run
+    /// `then` inside the SAME store access with the member's current role. Shared by `login` and
+    /// `change_secret` so the security-critical sequence exists once.
+    ///
+    /// The throttle lock is held across check → verify → record, so a burst of concurrent attempts
+    /// cannot all pass the check before the first failure is counted. A locked account is refused
+    /// BEFORE the secret is tested — a correct guess must not beat the lock.
+    fn with_verified_secret<R>(
+        &self,
+        household: &HouseholdHandle,
+        user: UserId,
+        secret: &str,
+        then: impl FnOnce(&mut Store<SystemClock>, Role) -> Result<R, AuthError>,
+    ) -> Result<R, AuthError> {
+        let mut throttle = self.throttle.lock().expect("login throttle poisoned");
+        let key = (household.0.clone(), user.0);
+        let now_ms = self.now_ms();
+        if let Err(retry_after_s) = throttle.check(&key, now_ms) {
+            return Err(AuthError::Throttled { retry_after_s });
+        }
+
+        let mut wrong_secret = false;
+        let mut verified = false;
+        let outcome = self.with_tenant_store(household, |store| {
+            // A missing credential or a mismatch is an authentication failure (BadToken), never 403.
+            let hash = store.credential(user).ok_or(AuthError::BadToken)?;
+            if !verify_secret(secret, &hash) {
+                // Counted only for accounts that HAVE a credential, so made-up user ids cannot
+                // grow the throttle's map (see `throttle` — bounded memory).
+                wrong_secret = true;
+                return Err(AuthError::BadToken);
+            }
+            verified = true;
+            // Resolve the member's current role; missing / inactive → BadToken.
+            let role = store
+                .snapshot()
+                .users
+                .iter()
+                .find(|u| u.id == user && u.active)
+                .map(|u| u.role)
+                .ok_or(AuthError::BadToken)?;
+            then(store, role)
+        });
+        if wrong_secret {
+            throttle.record_failure(key, now_ms);
+        } else if verified {
+            throttle.record_success(&key);
+        }
+        outcome
     }
 
     /// Current wall-clock time in unix millis, from the injected clock.
@@ -367,22 +425,10 @@ impl Identity for ProdIdentity {
     }
 
     fn login(&self, req: LoginReq) -> Result<LoginResp, AuthError> {
-        // Verify the secret and resolve the role inside one store access (one lock hold for Shared).
-        let role = self.with_tenant_store(&req.household, |store| {
-            // A missing credential or a mismatch is an authentication failure (BadToken), never 403.
-            let hash = store.credential(req.user).ok_or(AuthError::BadToken)?;
-            if !verify_secret(&req.secret, &hash) {
-                return Err(AuthError::BadToken);
-            }
-            // Resolve the member's current role; missing / inactive → BadToken.
-            store
-                .snapshot()
-                .users
-                .iter()
-                .find(|u| u.id == req.user && u.active)
-                .map(|u| u.role)
-                .ok_or(AuthError::BadToken)
-        })?;
+        let role =
+            self.with_verified_secret(&req.household, req.user, &req.secret, |_store, role| {
+                Ok(role)
+            })?;
 
         let principal = Principal {
             household: req.household,
@@ -393,6 +439,33 @@ impl Identity for ProdIdentity {
             .signer
             .issue(&principal, self.now_ms(), self.token_ttl_ms);
         Ok(LoginResp { token, role })
+    }
+
+    fn change_secret(
+        &self,
+        caller: &Principal,
+        current_secret: &str,
+        new_secret: &str,
+    ) -> Result<(), AuthError> {
+        // Judged before the current secret is tested, so a too-short new one never costs the
+        // caller a throttle strike.
+        if new_secret.trim().chars().count() < MIN_SECRET_LEN {
+            return Err(AuthError::WeakSecret);
+        }
+        let new_hash = hash_secret(new_secret);
+        // Proving the CURRENT secret (not just holding a token) is the point: tokens are long-lived
+        // and sit on paired devices, and a borrowed phone must not be able to take the account over.
+        // It goes through the same throttle as login, so this is not a side door for guessing.
+        self.with_verified_secret(
+            &caller.household,
+            caller.user,
+            current_secret,
+            |store, _role| {
+                store
+                    .set_credential(caller.user, &new_hash)
+                    .map_err(|_| AuthError::BadToken)
+            },
+        )
     }
 
     fn add_member(

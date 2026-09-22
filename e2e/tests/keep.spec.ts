@@ -67,6 +67,19 @@ test("edit a quest in place — upsert, not a duplicate (SQUIRE-T-0120)", async 
   await expect(page.locator("#quest-form button[type=submit]")).toHaveText("Post to the board");
 });
 
+test("an archived quest disappears from the quests page", async ({ page }) => {
+  await login(page);
+  await page.fill("#quest-form input[name=title]", "Polish the armour");
+  await page.fill("#quest-form input[name=reward]", "3");
+  await page.click("#quest-form button[type=submit]");
+  const row = page.locator("#quest-list li", { hasText: "Polish the armour" });
+  await expect(row).toHaveCount(1);
+
+  // The quests page is only what a squire can work towards right now.
+  await row.getByRole("button", { name: "Archive" }).click();
+  await expect(row).toHaveCount(0);
+});
+
 test("import a quest from the starter library", async ({ page }) => {
   await login(page);
   await page.locator("#library summary").click(); // expand the collapsible library

@@ -37,6 +37,8 @@ fn status_for(err: AuthError) -> StatusCode {
         AuthError::MissingToken | AuthError::BadToken | AuthError::WrongTenant => {
             StatusCode::UNAUTHORIZED
         }
+        AuthError::Throttled { .. } => StatusCode::TOO_MANY_REQUESTS,
+        AuthError::WeakSecret => StatusCode::BAD_REQUEST,
     }
 }
 

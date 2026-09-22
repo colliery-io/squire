@@ -22,6 +22,11 @@ use argon2::Argon2;
 /// The returned string is the **only** thing that should be persisted for a credential
 /// (NFR-2.3): it carries the algorithm, parameters, salt, and digest. Two calls with the same
 /// secret return different strings (independent random salts).
+/// Shortest secret a member may *choose* (SQUIRE-T-0131) — `change_secret` and the `reset_secret`
+/// recovery tool. Deliberately modest: the login throttle (SQUIRE-T-0130), not length, is what bounds
+/// guessing, and a parent has to be able to type this on a phone.
+pub const MIN_SECRET_LEN: usize = 8;
+
 pub fn hash_secret(secret: &str) -> String {
     let salt = SaltString::generate(&mut OsRng);
     Argon2::default()

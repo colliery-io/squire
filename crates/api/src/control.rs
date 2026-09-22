@@ -16,7 +16,9 @@
 use std::sync::Arc;
 
 use axum::extract::State;
+use axum::http::header::RETRY_AFTER;
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 
 use domain_core::contract::{
@@ -37,6 +39,8 @@ fn status_for(err: AuthError) -> StatusCode {
         AuthError::MissingToken | AuthError::BadToken | AuthError::WrongTenant => {
             StatusCode::UNAUTHORIZED
         }
+        AuthError::Throttled { .. } => StatusCode::TOO_MANY_REQUESTS,
+        AuthError::WeakSecret => StatusCode::BAD_REQUEST,
     }
 }
 
@@ -59,7 +63,7 @@ pub async fn register(
 }
 
 /// `POST /login` (unauthenticated) — exchange a member secret for a tenant-scoped token. A bad
-/// secret (or unknown member) is a 401.
+/// secret (or unknown member) is a 401; repeated bad secrets lock the account → 429 (SQUIRE-T-0130).
 #[utoipa::path(
     post,
     path = "/login",
@@ -68,13 +72,32 @@ pub async fn register(
     responses(
         (status = 200, description = "A tenant-scoped token and the member's role", body = LoginResp),
         (status = 401, description = "Bad secret or unknown member"),
+        (status = 429, description = "Too many failed logins for this member; the secret was not tested. Retry after the `Retry-After` header's seconds."),
     ),
 )]
-pub async fn login(
-    State(state): State<Arc<AppState>>,
-    Json(req): Json<LoginReq>,
-) -> Result<Json<LoginResp>, StatusCode> {
-    state.identity.login(req).map(Json).map_err(status_for)
+pub async fn login(State(state): State<Arc<AppState>>, Json(req): Json<LoginReq>) -> Response {
+    let user = req.user.0;
+    match state.identity.login(req) {
+        Ok(resp) => Json(resp).into_response(),
+        Err(AuthError::Throttled { retry_after_s }) => {
+            tracing::warn!(
+                user,
+                retry_after_s,
+                "login refused: account locked after repeated failures"
+            );
+            throttled(retry_after_s)
+        }
+        Err(e) => status_for(e).into_response(),
+    }
+}
+
+/// `429` + `Retry-After` for a locked account (SQUIRE-T-0130).
+fn throttled(retry_after_s: u32) -> Response {
+    (
+        StatusCode::TOO_MANY_REQUESTS,
+        [(RETRY_AFTER, retry_after_s.to_string())],
+    )
+        .into_response()
 }
 
 /// `POST /members` ([`RequireKnight`]) — add a member (Knight or Squire). The acting caller comes

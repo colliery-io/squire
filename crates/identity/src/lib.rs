@@ -13,6 +13,7 @@
 pub mod creds;
 pub mod prod;
 pub mod tenant;
+pub mod throttle;
 pub mod token;
 
 pub use prod::ProdIdentity;
@@ -53,7 +54,8 @@ impl Principal {
 
 /// Why authentication / authorization failed. The auth extractor maps these onto HTTP status:
 /// [`MissingToken`](AuthError::MissingToken) / [`BadToken`](AuthError::BadToken) /
-/// [`WrongTenant`](AuthError::WrongTenant) → **401**; [`Forbidden`](AuthError::Forbidden) → **403**.
+/// [`WrongTenant`](AuthError::WrongTenant) → **401**; [`Forbidden`](AuthError::Forbidden) → **403**;
+/// [`Throttled`](AuthError::Throttled) → **429**.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AuthError {
     /// No `Authorization: Bearer` / `X-Household` header (or it was empty).
@@ -64,6 +66,11 @@ pub enum AuthError {
     WrongTenant,
     /// The caller is authenticated but lacks the required role for this route.
     Forbidden,
+    /// Too many failed logins for this account (SQUIRE-T-0130, see [`throttle`]); the secret was
+    /// **not** tested. Maps to **429** with `Retry-After: retry_after_s`.
+    Throttled { retry_after_s: u32 },
+    /// A chosen secret is shorter than [`creds::MIN_SECRET_LEN`] (SQUIRE-T-0131). Maps to **400**.
+    WeakSecret,
 }
 
 /// The authentication & membership port the API authorizes every call against.
@@ -88,6 +95,19 @@ pub trait Identity: Send + Sync {
     /// Knight-only: add a member (Knight or Squire). Body lands in T-0017.
     fn add_member(&self, caller: &Principal, req: AddMemberReq)
         -> Result<AddMemberResp, AuthError>;
+
+    /// Replace the CALLER's own login secret (SQUIRE-T-0131). Requires the current secret — a token
+    /// alone is not enough — and shares the login throttle. Wrong current secret → `BadToken`;
+    /// too-short new one → `WeakSecret`. Tokens already issued stay valid (there is no revocation
+    /// list), so this rotates the *secret*, it does not sign other devices out. Default: unsupported.
+    fn change_secret(
+        &self,
+        _caller: &Principal,
+        _current_secret: &str,
+        _new_secret: &str,
+    ) -> Result<(), AuthError> {
+        Err(AuthError::Forbidden)
+    }
 
     /// Knight-only: mint a one-time device-pairing code for member `target` (ADR SQUIRE-A-0010).
     /// Returns the plaintext code (shown once, in the Keep's QR) + its expiry. Default: unsupported.

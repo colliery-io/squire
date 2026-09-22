@@ -10,6 +10,7 @@ authoritative list, sourced from the server binary
 |----------|---------|---------|
 | `API_PORT` | `8080` | Local API the phones connect to. |
 | `KEEP_PORT` | `4920` | The Keep (parent admin web UI). |
+| `KEEP_BIND` | `127.0.0.1` | Interface the Keep binds — an IP or hostname. Leave it alone on a normal install: loopback is what keeps the admin UI off the network. It exists for containers, where a port mapping cannot reach loopback; see [Docker + Tailscale](../how-to/docker-tailscale.md). |
 | `SQUIRE_DATA_DIR` | OS data dir (`…/squire`) | Durable data directory. Everything persists here. |
 | `SQUIRE_HOUSEHOLD` | `home` | Tenant handle for this household. |
 
@@ -20,6 +21,9 @@ authoritative list, sourced from the server binary
 | `SQUIRE_ADMIN_NAME` | — | Display name of the first admin Knight, created on first run. |
 | `SQUIRE_ADMIN_SECRET` | — | First admin's login secret. **Optional** — omit both to create the admin from the Keep's first-run form instead. Ignored after the household exists. |
 
+> A **blank** value counts as unset (so `SQUIRE_ADMIN_SECRET=` never creates an admin with an empty
+> password).
+>
 > First-run admin variables only take effect when the data dir is empty. On later starts the server
 > opens the existing household untouched.
 
@@ -41,6 +45,22 @@ authoritative list, sourced from the server binary
 | `SQUIRE_PAIR_HOST` / `SQUIRE_PAIR_PORT` | — | Override the host/port encoded into pairing QR codes (e.g. when behind a tunnel). |
 | `SQUIRE_SIGNING_KEY` | persisted | Override the persisted token-signing key. Normally generated once and stored. |
 | `SQUIRE_TZ` | host zone | Household timezone seed on first run (also settable in the Keep's Settings tab). |
+
+## Login throttling
+
+Not configurable, but worth knowing: after **5** consecutive wrong secrets an account is locked for
+30 seconds, doubling with each further failure up to 15 minutes. While locked, login answers
+`429` with a `Retry-After` header and the secret is not tested — even the correct one. A successful
+login (or an hour of quiet) clears the count. It applies to the Keep and to the phone API's `/login`
+alike, and is per account, so a locked Knight can still use a device that is already signed in.
+
+## Changing or recovering a login secret
+
+A signed-in Knight changes their own secret in the Keep under **Settings → Change my secret** (it asks
+for the current one; at least 8 characters). Phones that are already paired stay signed in — this
+rotates what you type, it does not sign devices out. If the secret is *forgotten*, whoever runs the
+server recovers the account with the `reset_secret` tool (`angreal deploy reset-secret` in the
+container stack): same account, new secret.
 
 The Keep's **Settings** tab exposes the live household timezone (and other per-household settings)
 without touching the environment:

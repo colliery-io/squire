@@ -1444,7 +1444,7 @@
         "tags": [
           "control"
         ],
-        "summary": "`POST /login` (unauthenticated) — exchange a member secret for a tenant-scoped token. A bad\nsecret (or unknown member) is a 401.",
+        "summary": "`POST /login` (unauthenticated) — exchange a member secret for a tenant-scoped token. A bad\nsecret (or unknown member) is a 401; repeated bad secrets lock the account → 429 (SQUIRE-T-0130).",
         "operationId": "login",
         "requestBody": {
           "content": {
@@ -1469,6 +1469,9 @@
           },
           "401": {
             "description": "Bad secret or unknown member"
+          },
+          "429": {
+            "description": "Too many failed logins for this member; the secret was not tested. Retry after the `Retry-After` header's seconds."
           }
         }
       }
