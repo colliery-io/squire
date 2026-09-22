@@ -63,7 +63,18 @@ object FastPoll {
         WorkManager.getInstance(ctx).enqueueUniqueWork(name, ExistingWorkPolicy.KEEP, request)
     }
 
-    /** Re-arm from inside a worker that has just finished, continuing the chain. */
+    /**
+     * Re-arm from inside a worker that has just finished, continuing the chain.
+     *
+     * **The cancel is load-bearing — do not "simplify" it away.** This runs from inside the worker,
+     * so that worker's own unique-work record is still RUNNING, and `KEEP` would see unfinished work
+     * under the name and silently drop the next tick. The chain would then stop dead, with nothing
+     * failing and nothing logged; only the 15-minute backstop would ever revive it.
+     *
+     * Cancelling first means the worker cancels itself, which is fine: it is one statement from
+     * returning, and a cancelled worker's `Result` is discarded anyway. The new request is enqueued
+     * afterwards, so it is not caught by the cancel.
+     */
     fun rearm(ctx: Context, knight: Boolean) {
         val wm = WorkManager.getInstance(ctx)
         wm.cancelUniqueWork(if (knight) KNIGHT_WORK else SQUIRE_WORK)
