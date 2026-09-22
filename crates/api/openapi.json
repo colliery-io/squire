@@ -3180,6 +3180,10 @@
           "quest_title": {
             "type": "string"
           },
+          "reward": {
+            "$ref": "#/components/schemas/u32",
+            "description": "The coins the quest pays on approval (SQUIRE-T-0134 follow-up), so the parent's queue can\nshow what sealing is worth. `#[serde(default)]` for back-compat with older servers."
+          },
           "squire": {
             "$ref": "#/components/schemas/UserId"
           }

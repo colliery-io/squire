@@ -104,7 +104,7 @@ class ScreenshotTests {
                 SquireSummary(balance = 40, displayName = "Percival", squire = 3),
             ),
             pendingClaims = listOf(
-                PendingClaim(claimId = 9L, on = 20624, questTitle = "Tidy your room", squire = 2),
+                PendingClaim(claimId = 9L, on = 20624, questTitle = "Tidy your room", squire = 2, reward = 10),
             ),
             pendingRequests = listOf(
                 PendingRequest(cost = 15, itemName = "Movie night", requestId = 5L, squire = 2),

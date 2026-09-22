@@ -15,6 +15,9 @@ async function login(page: Page, tab = "quests") {
   await page.click("#login-form button[type=submit]");
   await expect(page.locator("#tabs .tab.active")).toBeVisible();
   await page.locator(`#tabs .tab[data-tab=${tab}]`).click();
+  // Authoring forms sit behind a "New …" toggle; open it so tests can fill the form directly.
+  const compose = page.locator(`section[id^="${tab}"] details.compose`).first();
+  if (await compose.count()) await compose.evaluate((d) => { (d as HTMLDetailsElement).open = true; });
 }
 
 test("login lands on Review when something is waiting (SQUIRE-T-0135)", async ({ page }) => {

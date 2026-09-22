@@ -53,6 +53,8 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.squire.app.ui.theme.SquireGoldSoft
+import com.squire.app.ui.components.badgeGlyph
 import com.squire.app.ui.theme.SquireIcons
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.mutableStateMapOf
@@ -219,7 +221,14 @@ fun PlayerHomeScreen(
                             )
                             if (balance != null) {
                                 Spacer(Modifier.width(8.dp))
-                                GoldPill(balance, large = false)
+                                // Coins landing is a moment (SQUIRE-T-0133 follow-up): the purse counts UP
+                                // to a higher balance rather than jumping. A drop (a spend, a hazard) just changes.
+                                val shown = remember { androidx.compose.animation.core.Animatable(balance.toFloat()) }
+                                LaunchedEffect(balance) {
+                                    if (balance > shown.value) shown.animateTo(balance.toFloat(), androidx.compose.animation.core.tween(700))
+                                    else shown.snapTo(balance.toFloat())
+                                }
+                                GoldPill(shown.value.toInt(), large = false)
                             }
                             if (cashOwed > 0) {
                                 Spacer(Modifier.width(6.dp))
@@ -658,9 +667,10 @@ private fun CashOutRow(owed: Long, pending: Boolean, onCashOut: () -> Unit) {
 
 @Composable
 private fun BadgeCardRow(badge: BadgeView, onClick: () -> Unit) {
+    // Earned: the picture on a GOLD disc. Locked goals below sit on grey — the two must never look alike.
     QuestCard(onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Medallion("🏅")
+            Medallion(badgeGlyph(badge.name), disc = SquireGoldSoft)
             Spacer(Modifier.width(12.dp))
             Text(badge.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             GoldPill(badge.bonus)
@@ -672,7 +682,7 @@ private fun BadgeCardRow(badge: BadgeView, onClick: () -> Unit) {
 private fun GoalCardRow(goal: GoalView, onClick: () -> Unit) {
     QuestCard(onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Medallion("🎯")
+            Medallion(badgeGlyph(goal.name), disc = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(goal.name, style = MaterialTheme.typography.titleMedium)

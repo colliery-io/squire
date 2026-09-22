@@ -4,6 +4,13 @@ import * as fs from "fs";
 const SCREENS = "screens";
 fs.mkdirSync(SCREENS, { recursive: true });
 
+/** Open a tab and, if it has an authoring form behind a "New …" toggle, open that too. */
+async function openTab(page: Page, tab: string) {
+  await page.locator(`#tabs .tab[data-tab=${tab}]`).click();
+  const compose = page.locator(`section[id^="${{items: "items"}[tab] ?? tab}"] details.compose`).first();
+  if (await compose.count()) await compose.evaluate((d) => { (d as HTMLDetailsElement).open = true; });
+}
+
 async function login(page: Page) {
   await page.goto("/");
   await page.fill("#login-form input[name=user]", "1");
@@ -11,6 +18,8 @@ async function login(page: Page) {
   await page.click("#login-form button[type=submit]");
   await page.locator("#tabs .tab.active").waitFor();
   await page.locator("#tabs .tab[data-tab=rewards]").click();
+  // The form sits behind a "New …" toggle; open it so tests can fill it directly.
+  await page.locator("section[id^=items] details.compose").first().evaluate((d) => { (d as HTMLDetailsElement).open = true; });
 }
 
 test("create a reward (R1)", async ({ page }) => {
@@ -81,7 +90,7 @@ test("edit a reward in place — upsert, not a duplicate (SQUIRE-T-0120)", async
 
 test("a newly added achievement appears in the reward gate dropdown (R4)", async ({ page }) => {
   await login(page); // lands on Rewards; go author an achievement first
-  await page.locator("#tabs .tab[data-tab=achievements]").click();
+  await openTab(page, "achievements");
   await page.fill("#achievement-form input[name=name]", "Gatekeeper Goal");
   await page.selectOption("#ach-criterion", "PointsEarned");
   await page.fill("#ach-points-fields input[name=total]", "50");
@@ -90,7 +99,7 @@ test("a newly added achievement appears in the reward gate dropdown (R4)", async
   await expect(page.locator("#achievement-list")).toContainText("Gatekeeper Goal");
 
   // Back on Rewards, the gate dropdown must include the just-created achievement (no reload).
-  await page.locator("#tabs .tab[data-tab=rewards]").click();
+  await openTab(page, "rewards");
   await expect(page.locator("#item-gate")).toContainText("Gatekeeper Goal");
   await page.screenshot({ path: `${SCREENS}/reward-04-gate.png`, fullPage: true });
 });

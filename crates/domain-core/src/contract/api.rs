@@ -555,6 +555,10 @@ pub struct PendingClaim {
     pub squire: UserId,
     pub quest_title: String,
     pub on: Date,
+    /// The coins the quest pays on approval (SQUIRE-T-0134 follow-up), so the parent's queue can
+    /// show what sealing is worth. `#[serde(default)]` for back-compat with older servers.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub reward: Points,
 }
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

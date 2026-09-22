@@ -162,13 +162,13 @@ fun SealSlot(size: androidx.compose.ui.unit.Dp = 40.dp) {
  * [icon] (emoji) or let it infer one from [label]; set [reward] to use the treasure icon table.
  */
 @Composable
-fun Medallion(icon: String?, label: String = "", reward: Boolean = false, modifier: Modifier = Modifier) {
+fun Medallion(icon: String?, label: String = "", reward: Boolean = false, modifier: Modifier = Modifier, disc: Color = SquireWash) {
     val glyph = icon ?: inferEmoji(label, reward)
     androidx.compose.foundation.layout.Box(
         modifier = modifier
             .size(44.dp)
             .clip(CircleShape)
-            .background(SquireWash),
+            .background(disc),
         contentAlignment = Alignment.Center,
     ) {
         Text(glyph, fontSize = 22.sp)
@@ -262,5 +262,22 @@ fun Banner(text: String, container: Color, content: Color, trailing: @Composable
             Text(text, color = content, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             trailing?.invoke()
         }
+    }
+}
+
+/** A badge's picture, inferred from its name (achievements carry no icon of their own — a domain
+ *  change for another day). The medal is the fallback, so nothing is worse than before. */
+fun badgeGlyph(name: String): String {
+    val t = name.lowercase()
+    fun has(vararg ks: String) = ks.any { t.contains(it) }
+    return when {
+        has("streak", "days", "week", "early", "bird", "morning") -> "🔥"
+        has("century", "100", "hundred", "master", "champion", "legend") -> "👑"
+        has("friend", "together", "team", "family") -> "🤝"
+        has("saver", "saving", "coins", "rich", "treasure") -> "💰"
+        has("clean", "tidy", "room", "chore") -> "🧹"
+        has("read", "book", "study", "homework") -> "📚"
+        has("pet", "dog", "cat") -> "🐾"
+        else -> "🏅"
     }
 }

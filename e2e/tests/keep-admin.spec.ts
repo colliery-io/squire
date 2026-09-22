@@ -11,6 +11,9 @@ async function login(page: Page, tab: string) {
   await page.click("#login-form button[type=submit]");
   await page.locator("#tabs .tab.active").waitFor();
   await page.locator(`#tabs .tab[data-tab=${tab}]`).click();
+  // Authoring forms sit behind a "New …" toggle; open it so tests can fill the form directly.
+  const compose = page.locator(`section[id^="${tab}"] details.compose`).first();
+  if (await compose.count()) await compose.evaluate((d) => { (d as HTMLDetailsElement).open = true; });
 }
 
 test("Members tab shows a roster with role badges (A1)", async ({ page }) => {

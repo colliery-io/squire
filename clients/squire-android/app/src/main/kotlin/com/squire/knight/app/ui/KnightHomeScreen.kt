@@ -646,7 +646,7 @@ private fun PendingClaimRow(claim: PendingClaim, squire: SquireSummary?, today: 
         squire = squire,
         detail = whenLabel(claim.on, today),
         leading = { Medallion(null, claim.questTitle) },
-        amount = {}, // a pending claim carries no reward amount on the wire (see task notes)
+        amount = { claim.reward?.takeIf { it > 0 }?.let { GoldPill(it) } },
         approveLabel = "Seal it",
         onApprove = onApprove,
         onReject = onReject,

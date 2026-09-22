@@ -419,6 +419,23 @@ li {
 /* A member's initial wears THEIR tincture, not always vert. */
 .medallion.avatar-green { background: var(--t, var(--vert)); }
 
+/* Forms open on demand (SQUIRE-T-0135 follow-up): a closed <details> is a button; open, a panel. */
+details.compose { margin: .6rem 0 1rem; }
+details.compose > summary {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0;
+  padding: .55rem 1.1rem; border-radius: 999px;
+  background: var(--ink); color: #fff; font-weight: 500; font-size: .9rem; cursor: pointer;
+  list-style: none; user-select: none;
+}
+details.compose > summary::-webkit-details-marker { display: none; }
+details.compose > summary::before { content: "+"; font-weight: 600; }
+details.compose[open] > summary::before { content: "×"; }
+details.compose[open] > summary { background: var(--wash); color: var(--ink); }
+details.compose[open] > summary + * { margin-top: .8rem; }
+details.compose[open] { background: var(--parch-light); border: 1px solid var(--line); border-radius: 12px; padding: .9rem 1rem 1rem; }
+.quests-make.compose { background: transparent; border: 0; padding: 0; }
+.quests-make.compose[open] { background: var(--parch-light); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.2rem; }
+
 /* ── Notices & code ──────────────────────────────────────────────────────── */
 .error { color: var(--red-deep); font-weight: 400; background: var(--red-soft); border-radius: 8px; padding: .55rem .8rem; }
 .sub { color: var(--stone); font-size: .85rem; }
@@ -458,6 +475,8 @@ pre {
 /* Board first (SQUIRE-T-0135): the list is what you came for; the form is a panel beside it. */
 .quests-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1.5rem; align-items: start; }
 .quests-make { order: 2; }
+/* Closed, the panel is just its button — give the board the width back. */
+.quests-grid:has(.quests-make:not([open])) { grid-template-columns: minmax(0, 1fr) auto; }
 .quests-board { order: 1; }
 .quests-make {
   background: var(--parch-light); border: 1px solid var(--line);

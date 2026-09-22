@@ -4,6 +4,13 @@ import * as fs from "fs";
 const SCREENS = "screens";
 fs.mkdirSync(SCREENS, { recursive: true });
 
+/** Open a tab and, if it has an authoring form behind a "New …" toggle, open that too. */
+async function openTab(page: Page, tab: string) {
+  await page.locator(`#tabs .tab[data-tab=${tab}]`).click();
+  const compose = page.locator(`section[id^="${{items: "items"}[tab] ?? tab}"] details.compose`).first();
+  if (await compose.count()) await compose.evaluate((d) => { (d as HTMLDetailsElement).open = true; });
+}
+
 async function login(page: Page) {
   await page.goto("/");
   await page.fill("#login-form input[name=user]", "1");
@@ -11,6 +18,8 @@ async function login(page: Page) {
   await page.click("#login-form button[type=submit]");
   await page.locator("#tabs .tab.active").waitFor();
   await page.locator("#tabs .tab[data-tab=achievements]").click();
+  // The form sits behind a "New …" toggle; open it so tests can fill it directly.
+  await page.locator("section[id^=achievements] details.compose").first().evaluate((d) => { (d as HTMLDetailsElement).open = true; });
 }
 
 test("create a Points-earned achievement", async ({ page }) => {
@@ -81,13 +90,13 @@ test("an empty category scope is rejected with an inline error", async ({ page }
 
 test("a newly added quest appears in the achievement scope dropdown (T-0071)", async ({ page }) => {
   await login(page); // lands on Achievements; go author a quest first
-  await page.locator("#tabs .tab[data-tab=quests]").click();
+  await openTab(page, "quests");
   await page.fill("#quest-form input[name=title]", "Brand New Chore");
   await page.click("#quest-form button[type=submit]");
   await expect(page.locator("#quest-list")).toContainText("Brand New Chore");
 
   // The achievement composer's Quest-scope dropdown must now include it.
-  await page.locator("#tabs .tab[data-tab=achievements]").click();
+  await openTab(page, "achievements");
   await page.selectOption("#ach-criterion", "TotalCompletions");
   await page.selectOption("#ach-scope", "Quest");
   await expect(page.locator("#ach-scope-quest")).toContainText("Brand New Chore");
@@ -103,6 +112,6 @@ test("import from the achievement library and gate a reward (F5)", async ({ page
   await page.screenshot({ path: `${SCREENS}/ach-04-library.png`, fullPage: true });
 
   // The imported achievement becomes selectable as a reward gate.
-  await page.locator("#tabs .tab[data-tab=rewards]").click();
+  await openTab(page, "rewards");
   await expect(page.locator("#item-gate")).toContainText("Century Club");
 });

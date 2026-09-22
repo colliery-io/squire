@@ -35,6 +35,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -78,6 +84,7 @@ internal fun MemberAdminScreen(
     androidx.activity.compose.BackHandler { onBack() }
     val scope = rememberCoroutineScope()
 
+    var composing by remember { mutableStateOf(false) } // the add form is open (list-first)
     var members by remember { mutableStateOf(initialMembers ?: emptyList()) }
     var listError by remember { mutableStateOf<String?>(null) }
     var tick by remember { mutableStateOf(0) }
@@ -145,33 +152,15 @@ internal fun MemberAdminScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { SectionTitle("Add a member") }
+            // List FIRST (SQUIRE-T-0134 follow-up): what is on the board is what you came to see. The
+            // form opens on demand — "Add a member" — or when editing an existing one.
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
-                        Text("Role", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ChoiceChip("Squire (child)", role == "Squire") { role = "Squire" }
-                            ChoiceChip("Knight (parent)", role == "Knight") { role = "Knight" }
-                        }
-
-                        OutlinedTextField(value = secret, onValueChange = { secret = it }, label = { Text("Initial secret (fallback login)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
-                        formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                        Button(
-                            onClick = { submitAdd() },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
-                        ) { Text("Add member") }
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    SectionTitle("Household")
+                    Spacer(Modifier.weight(1f))
+                    if (!composing) FilledTonalButton(onClick = { composing = true }) { Text("Add a member") }
                 }
             }
-
-            item { SectionTitle("Household") }
             listError?.let { e -> item { Text(e, color = MaterialTheme.colorScheme.error) } }
             items(members) { m ->
                 Card(
@@ -189,18 +178,52 @@ internal fun MemberAdminScreen(
                             Text(m.displayName + if (m.user == selfUser) " (you)" else "", fontWeight = FontWeight.SemiBold)
                             Text(m.role.value + if (m.active) "" else " · inactive", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            if (m.active) {
-                                OutlinedButton(onClick = { pair(m) }) { Text("Pair") }
+                        // Rare actions behind a menu (SQUIRE-T-0134 follow-up): three outlined buttons per
+                        // member crushed the name column on a phone.
+                        var menuOpen by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { menuOpen = true }) {
+                                Text("⋮", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            // Rename in place (keeps id, role, pairing) — SQUIRE-T-0120/0126.
-                            OutlinedButton(onClick = { renaming = m; renameText = m.displayName }) { Text("Rename") }
-                            // Never offer to deactivate your own account (no self-lockout).
-                            if (m.user != selfUser) {
-                                OutlinedButton(onClick = { scope.launch { runCatching { adapter.setMemberActive(m.user, !m.active) }; tick++ } }) {
-                                    Text(if (m.active) "Deactivate" else "Reactivate")
+                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                if (m.active) DropdownMenuItem(text = { Text("Pair a phone") }, onClick = { menuOpen = false; pair(m) })
+                                // Rename in place (keeps id, role, pairing) — SQUIRE-T-0120/0126.
+                                DropdownMenuItem(text = { Text("Rename") }, onClick = { menuOpen = false; renaming = m; renameText = m.displayName })
+                                // Never offer to deactivate your own account (no self-lockout).
+                                if (m.user != selfUser) {
+                                    DropdownMenuItem(
+                                        text = { Text(if (m.active) "Deactivate" else "Reactivate") },
+                                        onClick = { menuOpen = false; scope.launch { runCatching { adapter.setMemberActive(m.user, !m.active) }; tick++ } },
+                                    )
                                 }
                             }
+                        }
+                    }
+                }
+            }
+            if (composing) {
+                item { SectionTitle("Add a member") }
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+                            Text("Role", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ChoiceChip("Squire (child)", role == "Squire") { role = "Squire" }
+                                ChoiceChip("Knight (parent)", role == "Knight") { role = "Knight" }
+                            }
+
+                            OutlinedTextField(value = secret, onValueChange = { secret = it }, label = { Text("Initial secret (fallback login)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+                            formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                            Button(
+                                onClick = { submitAdd() },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
+                            ) { Text("Add member") }
                         }
                     }
                 }

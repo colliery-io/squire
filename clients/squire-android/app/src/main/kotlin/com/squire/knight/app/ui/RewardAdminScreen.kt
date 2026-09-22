@@ -32,6 +32,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -112,11 +114,13 @@ internal fun RewardAdminScreen(
     var gate by remember { mutableStateOf<Long?>(null) }          // null = None
     var icon by remember { mutableStateOf("") }
     var formError by remember { mutableStateOf<String?>(null) }
+    var composing by remember { mutableStateOf(false) } // the form is open (list-first screens)
     var editingId by remember { mutableStateOf<Long?>(null) }     // non-null = editing (upsert) — SQUIRE-T-0120
 
     fun resetForm() {
         name = ""; description = ""; cost = "10"; availability = "Repeatable"; gate = null; icon = ""; formError = null
         editingId = null
+        composing = false
     }
 
     // Prefill the form from an existing reward and enter edit mode (SQUIRE-T-0120/0126).
@@ -128,6 +132,7 @@ internal fun RewardAdminScreen(
         gate = r.gate
         icon = r.icon ?: ""
         editingId = r.id
+        composing = true
         formError = null
     }
 
@@ -177,76 +182,18 @@ internal fun RewardAdminScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { SectionTitle("New reward") }
+            // List FIRST (SQUIRE-T-0134 follow-up): what is on the board is what you came to see. The
+            // form opens on demand — "New reward" — or when editing an existing one.
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = cost, onValueChange = { cost = it.filter(Char::isDigit) }, label = { Text("Cost (points)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
-                        Text("Availability", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ChoiceChip("Repeatable", availability == "Repeatable") { availability = "Repeatable" }
-                            ChoiceChip("Once", availability == "Once") { availability = "Once" }
-                        }
-
-                        Text("Requires achievement (gate)", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ChoiceChip("None", gate == null) { gate = null }
-                            for ((id, label) in gates) {
-                                ChoiceChip(label, gate == id) { gate = id }
-                            }
-                        }
-
-                        OutlinedTextField(value = icon, onValueChange = { icon = it }, label = { Text("Icon (emoji, optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
-                        formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Button(
-                                onClick = { submitForm() },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
-                            ) { Text(if (editingId == null) "Add reward" else "Save changes") }
-                            if (editingId != null) {
-                                OutlinedButton(onClick = { resetForm() }) { Text("Cancel") }
-                            }
-                        }
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    SectionTitle("Current rewards")
+                    Spacer(Modifier.weight(1f))
+                    if (!composing) FilledTonalButton(onClick = { composing = true }) { Text("New reward") }
                 }
             }
-
-            if (library.isNotEmpty()) {
-                item { SectionTitle("Add from the starter library") }
-                items(library) { r ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Medallion(null, r.name, reward = true)
-                            Column(Modifier.weight(1f)) {
-                                Text(r.name, fontWeight = FontWeight.SemiBold)
-                                Text(libSummary(r), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            GoldPill(r.cost.toInt())
-                            OutlinedButton(onClick = { create(libToReq(r)) }) { Text("Import") }
-                        }
-                    }
-                }
-            }
-
-            item { SectionTitle("Current rewards") }
             listError?.let { e -> item { Text(e, color = MaterialTheme.colorScheme.error) } }
             if (items.isEmpty() && listError == null) {
-                item { Text("None yet — create one above or import from the library.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { Text("None yet — tap “New reward” or import from the library.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             items(items) { r ->
                 Card(
@@ -254,6 +201,7 @@ internal fun RewardAdminScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
+                  Column {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -265,9 +213,79 @@ internal fun RewardAdminScreen(
                             Text(r.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         GoldPill(r.cost.toInt())
-                        if (r.active) {
-                            OutlinedButton(onClick = { startEdit(r) }) { Text("Edit") }
-                            OutlinedButton(onClick = { scope.launch { runCatching { adapter.archiveItem(r.id) }; tick++ } }) { Text("Archive") }
+                    }
+                    if (r.active) {
+                        Row(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { startEdit(r) }) { Text("Edit") }
+                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { scope.launch { runCatching { adapter.archiveItem(r.id) }; tick++ } }) { Text("Archive") }
+                        }
+                    }
+                }
+                }
+            }
+            if (composing) {
+                item { SectionTitle(if (editingId == null) "New reward" else "Edit reward") }
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = cost, onValueChange = { cost = it.filter(Char::isDigit) }, label = { Text("Cost (points)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+                            Text("Availability", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ChoiceChip("Repeatable", availability == "Repeatable") { availability = "Repeatable" }
+                                ChoiceChip("Once", availability == "Once") { availability = "Once" }
+                            }
+
+                            Text("Requires achievement (gate)", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ChoiceChip("None", gate == null) { gate = null }
+                                for ((id, label) in gates) {
+                                    ChoiceChip(label, gate == id) { gate = id }
+                                }
+                            }
+
+                            OutlinedTextField(value = icon, onValueChange = { icon = it }, label = { Text("Icon (emoji, optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+                            formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Button(
+                                    onClick = { submitForm() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
+                                ) { Text(if (editingId == null) "Add reward" else "Save changes") }
+                                if (editingId != null) {
+                                    OutlinedButton(onClick = { resetForm() }) { Text("Cancel") }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (library.isNotEmpty()) {
+                    item { SectionTitle("Add from the starter library") }
+                    items(library) { r ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Medallion(null, r.name, reward = true)
+                                Column(Modifier.weight(1f)) {
+                                    Text(r.name, fontWeight = FontWeight.SemiBold)
+                                    Text(libSummary(r), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                GoldPill(r.cost.toInt())
+                                OutlinedButton(onClick = { create(libToReq(r)) }) { Text("Import") }
+                            }
                         }
                     }
                 }

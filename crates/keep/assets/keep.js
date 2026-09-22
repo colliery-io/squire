@@ -31,6 +31,9 @@
     return new Date(on * 86400000).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
   }
 
+  // Reveal a form that lives behind a "New …" toggle (SQUIRE-T-0135 follow-up); no-op if already open.
+  function openCompose(details) { if (details && !details.open) details.open = true; }
+
   const QUEST_EMOJI = [
     [/bed|wake|morning/i, "🛏"], [/tidy|room|clean|vacuum|dust/i, "🧹"],
     [/dog|walk|pet|biscuit|cat|feed/i, "🐕"], [/piano|music|practice|guitar|violin/i, "🎹"],
@@ -238,6 +241,7 @@
       rowEl.appendChild(medallion(pickEmoji(c.quest_title, QUEST_EMOJI, "📜")));
       const who = squiresById[c.squire] || ("Squire #" + c.squire);
       rowEl.appendChild(cardBody(c.quest_title, [who, whenLabel(c.on, r.today)]));
+      if (c.reward > 0) rowEl.appendChild(coinPill(c.reward));
       li.appendChild(rowEl);
       const actions = el("div", "card-actions");
       const ok = el("button", "approve", "Seal it");
@@ -691,6 +695,7 @@
   // Prefill the quest form from a raw quest object and enter edit mode (SQUIRE-T-0120). The Keep's
   // GET /api/quests returns the full domain quest, so every field round-trips.
   function fillQuestForm(q) {
+    openCompose(document.getElementById("quest-form").closest("details.compose"));
     if (!questForm) return;
     const set = (name, val) => { const e = questForm.querySelector(`[name="${name}"]`); if (e) e.value = val; };
     set("title", q.title || "");
@@ -971,6 +976,7 @@
 
   // Prefill the reward form from a raw item and enter edit mode (SQUIRE-T-0120).
   function fillItemForm(it) {
+    openCompose(document.getElementById("item-form").closest("details.compose"));
     if (!itemForm) return;
     const set = (name, val) => { const e = itemForm.querySelector(`[name="${name}"]`); if (e) e.value = val; };
     set("name", it.name || "");
@@ -1135,6 +1141,7 @@
   // Prefill the achievement form from a raw achievement and enter edit mode (SQUIRE-T-0120/0126),
   // round-tripping the criterion (PointsEarned | TotalCompletions | Streak) and its scope.
   function fillAchForm(a) {
+    openCompose(document.getElementById("achievement-form").closest("details.compose"));
     if (!achForm) return;
     const set = (name, val) => { const e = achForm.querySelector(`[name="${name}"]`); if (e != null) e.value = val; };
     set("name", a.name || "");

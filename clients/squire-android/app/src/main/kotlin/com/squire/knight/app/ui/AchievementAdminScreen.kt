@@ -32,6 +32,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -116,6 +118,7 @@ internal fun AchievementAdminScreen(
     var total by remember { mutableStateOf("100") }
     var bonus by remember { mutableStateOf("10") }
     var formError by remember { mutableStateOf<String?>(null) }
+    var composing by remember { mutableStateOf(false) } // the form is open (list-first screens)
     var editingId by remember { mutableStateOf<Long?>(null) } // non-null = editing (upsert) — SQUIRE-T-0120
 
     // Quests to pick from when scoping an achievement/streak to one specific quest (SQUIRE-T-0094 #4).
@@ -129,6 +132,7 @@ internal fun AchievementAdminScreen(
         name = ""; criterion = "Streak"; achScope = "Any"; category = ""; scopeQuestId = null
         length = "7"; basis = "CalendarDays"; count = "10"; total = "100"; bonus = "10"; formError = null
         editingId = null
+        composing = false
     }
 
     // Prefill the form from an existing achievement and enter edit mode (SQUIRE-T-0120/0126).
@@ -152,6 +156,7 @@ internal fun AchievementAdminScreen(
         total = (a.total ?: 100).toString()
         bonus = a.bonus.toString()
         editingId = a.id
+        composing = true
         formError = null
     }
 
@@ -207,101 +212,18 @@ internal fun AchievementAdminScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { SectionTitle("New achievement") }
+            // List FIRST (SQUIRE-T-0134 follow-up): what is on the board is what you came to see. The
+            // form opens on demand — "New achievement" — or when editing an existing one.
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
-                        Text("Earn it by", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ChoiceChip("A streak", criterion == "Streak") { criterion = "Streak" }
-                            ChoiceChip("Completing N", criterion == "TotalCompletions") { criterion = "TotalCompletions" }
-                            ChoiceChip("Earning points", criterion == "PointsEarned") { criterion = "PointsEarned" }
-                        }
-
-                        if (criterion != "PointsEarned") {
-                            Text("Across", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ChoiceChip("Any chore", achScope == "Any") { achScope = "Any" }
-                                ChoiceChip("A category", achScope == "Category") { achScope = "Category" }
-                                ChoiceChip("A specific quest", achScope == "Quest") { achScope = "Quest" }
-                            }
-                            if (achScope == "Category") {
-                                OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category (e.g. Bedroom)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            }
-                            if (achScope == "Quest") {
-                                if (quests.isEmpty()) {
-                                    Text("No quests yet — create a quest first, then scope to it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                } else {
-                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        quests.forEach { (id, title) ->
-                                            ChoiceChip(title, scopeQuestId == id) { scopeQuestId = id }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        when (criterion) {
-                            "PointsEarned" -> OutlinedTextField(value = total, onValueChange = { total = it.filter(Char::isDigit) }, label = { Text("Points to earn") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            "TotalCompletions" -> OutlinedTextField(value = count, onValueChange = { count = it.filter(Char::isDigit) }, label = { Text("How many completions") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            else -> {
-                                OutlinedTextField(value = length, onValueChange = { length = it.filter(Char::isDigit) }, label = { Text("Streak length (days)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                                Text("Counted by", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    ChoiceChip("Calendar days", basis == "CalendarDays") { basis = "CalendarDays" }
-                                    ChoiceChip("Scheduled days", basis == "ScheduledOccurrences") { basis = "ScheduledOccurrences" }
-                                }
-                            }
-                        }
-
-                        OutlinedTextField(value = bonus, onValueChange = { bonus = it.filter(Char::isDigit) }, label = { Text("Bonus coins (0 = unlock only)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
-                        formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Button(
-                                onClick = { submitForm() },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
-                            ) { Text(if (editingId == null) "Add achievement" else "Save changes") }
-                            if (editingId != null) {
-                                OutlinedButton(onClick = { resetForm() }) { Text("Cancel") }
-                            }
-                        }
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    SectionTitle("Current achievements")
+                    Spacer(Modifier.weight(1f))
+                    if (!composing) FilledTonalButton(onClick = { composing = true }) { Text("New achievement") }
                 }
             }
-
-            if (library.isNotEmpty()) {
-                item { SectionTitle("Add from the starter library") }
-                items(library) { a ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(a.name, fontWeight = FontWeight.SemiBold)
-                                Text(libSummary(a), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            OutlinedButton(onClick = { create(libToReq(a)) }) { Text("Import") }
-                        }
-                    }
-                }
-            }
-
-            item { SectionTitle("Current achievements") }
             listError?.let { e -> item { Text(e, color = MaterialTheme.colorScheme.error) } }
             if (achievements.isEmpty() && listError == null) {
-                item { Text("None yet — create one above or import from the library.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { Text("None yet — tap “New achievement” or import from the library.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             items(achievements) { a ->
                 Card(
@@ -309,6 +231,7 @@ internal fun AchievementAdminScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
+                  Column {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -320,9 +243,104 @@ internal fun AchievementAdminScreen(
                             Text(a.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (a.bonus > 0) GoldPill(a.bonus.toInt())
-                        if (a.active) {
-                            OutlinedButton(onClick = { startEdit(a) }) { Text("Edit") }
-                            OutlinedButton(onClick = { scope.launch { runCatching { adapter.archiveAchievement(a.id) }; tick++ } }) { Text("Archive") }
+                    }
+                    if (a.active) {
+                        Row(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { startEdit(a) }) { Text("Edit") }
+                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { scope.launch { runCatching { adapter.archiveAchievement(a.id) }; tick++ } }) { Text("Archive") }
+                        }
+                    }
+                }
+                }
+            }
+            if (composing) {
+                item { SectionTitle(if (editingId == null) "New achievement" else "Edit achievement") }
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+                            Text("Earn it by", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ChoiceChip("A streak", criterion == "Streak") { criterion = "Streak" }
+                                ChoiceChip("Completing N", criterion == "TotalCompletions") { criterion = "TotalCompletions" }
+                                ChoiceChip("Earning points", criterion == "PointsEarned") { criterion = "PointsEarned" }
+                            }
+
+                            if (criterion != "PointsEarned") {
+                                Text("Across", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ChoiceChip("Any chore", achScope == "Any") { achScope = "Any" }
+                                    ChoiceChip("A category", achScope == "Category") { achScope = "Category" }
+                                    ChoiceChip("A specific quest", achScope == "Quest") { achScope = "Quest" }
+                                }
+                                if (achScope == "Category") {
+                                    OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category (e.g. Bedroom)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                }
+                                if (achScope == "Quest") {
+                                    if (quests.isEmpty()) {
+                                        Text("No quests yet — create a quest first, then scope to it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    } else {
+                                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            quests.forEach { (id, title) ->
+                                                ChoiceChip(title, scopeQuestId == id) { scopeQuestId = id }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            when (criterion) {
+                                "PointsEarned" -> OutlinedTextField(value = total, onValueChange = { total = it.filter(Char::isDigit) }, label = { Text("Points to earn") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                "TotalCompletions" -> OutlinedTextField(value = count, onValueChange = { count = it.filter(Char::isDigit) }, label = { Text("How many completions") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                else -> {
+                                    OutlinedTextField(value = length, onValueChange = { length = it.filter(Char::isDigit) }, label = { Text("Streak length (days)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                    Text("Counted by", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        ChoiceChip("Calendar days", basis == "CalendarDays") { basis = "CalendarDays" }
+                                        ChoiceChip("Scheduled days", basis == "ScheduledOccurrences") { basis = "ScheduledOccurrences" }
+                                    }
+                                }
+                            }
+
+                            OutlinedTextField(value = bonus, onValueChange = { bonus = it.filter(Char::isDigit) }, label = { Text("Bonus coins (0 = unlock only)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+                            formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Button(
+                                    onClick = { submitForm() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
+                                ) { Text(if (editingId == null) "Add achievement" else "Save changes") }
+                                if (editingId != null) {
+                                    OutlinedButton(onClick = { resetForm() }) { Text("Cancel") }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (library.isNotEmpty()) {
+                    item { SectionTitle("Add from the starter library") }
+                    items(library) { a ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(a.name, fontWeight = FontWeight.SemiBold)
+                                    Text(libSummary(a), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                OutlinedButton(onClick = { create(libToReq(a)) }) { Text("Import") }
+                            }
                         }
                     }
                 }

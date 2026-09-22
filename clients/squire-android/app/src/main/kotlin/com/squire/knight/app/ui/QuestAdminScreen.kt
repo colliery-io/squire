@@ -38,6 +38,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -124,6 +126,7 @@ internal fun QuestAdminScreen(
     var dueLabel by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var formError by remember { mutableStateOf<String?>(null) }
+    var composing by remember { mutableStateOf(false) } // the form is open (list-first screens)
     var editingId by remember { mutableStateOf<Long?>(null) } // non-null = editing (upsert) — SQUIRE-T-0120
 
     fun resetForm() {
@@ -132,6 +135,7 @@ internal fun QuestAdminScreen(
         chosenSquires.clear(); repeatDay = false; autoApprove = false
         due = null; dueLabel = null; formError = null
         editingId = null
+        composing = false
     }
 
     // Prefill the form from an existing quest and enter edit mode (SQUIRE-T-0120/0126).
@@ -155,6 +159,7 @@ internal fun QuestAdminScreen(
         due = q.due
         dueLabel = q.due?.let { "day $it" }
         editingId = q.id
+        composing = true
         formError = null
     }
 
@@ -215,133 +220,18 @@ internal fun QuestAdminScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // ── New quest ──
-            item { SectionTitle("New quest") }
+            // List FIRST (SQUIRE-T-0134 follow-up): what is on the board is what you came to see. The
+            // form opens on demand — "New quest" — or when editing an existing one.
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description (optional)") }, modifier = Modifier.fillMaxWidth())
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            OutlinedTextField(value = reward, onValueChange = { reward = it.filter(Char::isDigit) }, label = { Text("Reward coins") }, singleLine = true, modifier = Modifier.weight(1f))
-                            OutlinedTextField(value = cash, onValueChange = { cash = it.filter(Char::isDigit) }, label = { Text("Cash $") }, singleLine = true, modifier = Modifier.weight(1f))
-                            OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category") }, singleLine = true, modifier = Modifier.weight(2f))
-                        }
-
-                        Text("How often", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ChoiceChip("Every day", cadence == "Daily") { cadence = "Daily" }
-                            ChoiceChip("Weekly", cadence == "Weekly") { cadence = "Weekly" }
-                            ChoiceChip("One-time", cadence == "OneOff") { cadence = "OneOff" }
-                        }
-                        if (cadence == "Weekly") {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                WEEKDAYS.forEach { d ->
-                                    ChoiceChip(d, weekdays.contains(d)) {
-                                        if (weekdays.contains(d)) weekdays.remove(d) else weekdays.add(d)
-                                    }
-                                }
-                            }
-                        }
-                        if (cadence == "OneOff") {
-                            OutlinedButton(onClick = { showDatePicker = true }) {
-                                Text(dueLabel?.let { "Due: $it" } ?: "Set due date (optional)")
-                            }
-                        }
-
-                        Text("Completion", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ChoiceChip("Each does their own", completion == "EachAssignee") { completion = "EachAssignee" }
-                            ChoiceChip("First to finish wins", completion == "Race") { completion = "Race" }
-                        }
-
-                        Text("Assign to", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ChoiceChip("All squires", assignAll) { assignAll = true }
-                            ChoiceChip("Specific", !assignAll) { assignAll = false }
-                        }
-                        if (!assignAll) {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                squires.forEach { (id, name) ->
-                                    ChoiceChip(name, chosenSquires.contains(id)) {
-                                        if (chosenSquires.contains(id)) chosenSquires.remove(id) else chosenSquires.add(id)
-                                    }
-                                }
-                            }
-                        }
-
-                        ToggleRow("Can be earned multiple times per day", repeatDay) { repeatDay = it }
-                        ToggleRow("Auto-approve (skip review)", autoApprove) { autoApprove = it }
-
-                        formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Button(
-                                onClick = { submitForm() },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
-                            ) { Text(if (editingId == null) "Add quest" else "Save changes") }
-                            if (editingId != null) {
-                                OutlinedButton(onClick = { resetForm() }) { Text("Cancel") }
-                            }
-                        }
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    SectionTitle("Current quests")
+                    Spacer(Modifier.weight(1f))
+                    if (!composing) FilledTonalButton(onClick = { composing = true }) { Text("New quest") }
                 }
             }
-
-            // ── Library ──
-            if (library.isNotEmpty()) {
-                item { SectionTitle("Add from the starter library") }
-                items(library) { lib ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Medallion(null, lib.title)
-                            Column(Modifier.weight(1f)) {
-                                Text(lib.title, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    "${lib.category} · ${if (lib.cadence == "weekly") lib.days.joinToString("/") else "Daily"}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            GoldPill(lib.reward.toInt())
-                            OutlinedButton(onClick = {
-                                create(
-                                    CreateQuestReq(
-                                        assignAll = true,
-                                        autoApprove = false,
-                                        cadence = if (lib.cadence == "weekly") CadenceKind.Weekly else CadenceKind.Daily,
-                                        completion = CompletionDto.EachAssignee,
-                                        repeatableWithinDay = false,
-                                        reward = lib.reward,
-                                        title = lib.title,
-                                        category = lib.category,
-                                        due = null,
-                                        id = null,
-                                        squires = null,
-                                        weekdays = if (lib.cadence == "weekly") lib.days.map { WeekdayDto.valueOf(it) } else null,
-                                    ),
-                                )
-                            }) { Text("Import") }
-                        }
-                    }
-                }
-            }
-
-            // ── Existing quests ──
-            item { SectionTitle("Current quests") }
             listError?.let { e -> item { Text(e, color = MaterialTheme.colorScheme.error) } }
             if (quests.isEmpty() && listError == null) {
-                item { Text("No quests yet — create one above or import from the library.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { Text("No quests yet — tap “New quest” or import from the library.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             items(quests) { q ->
                 Card(
@@ -349,6 +239,7 @@ internal fun QuestAdminScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
+                  Column {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -364,14 +255,142 @@ internal fun QuestAdminScreen(
                             )
                         }
                         GoldPill(q.reward.toInt())
-                        if (q.active) {
-                            OutlinedButton(onClick = { startEdit(q) }) { Text("Edit") }
-                            OutlinedButton(onClick = { scope.launch { runCatching { adapter.archiveQuest(q.id) }; tick++ } }) {
-                                Text("Archive")
+                    }
+                    if (q.active) {
+                        Row(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { startEdit(q) }) { Text("Edit") }
+                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { scope.launch { runCatching { adapter.archiveQuest(q.id) }; tick++ } }) {
+                                    Text("Archive")
+                                }
+                        }
+                    }
+                }
+                }
+            }
+            if (composing) {
+                // ── New quest ──
+                item { SectionTitle(if (editingId == null) "New quest" else "Edit quest") }
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description (optional)") }, modifier = Modifier.fillMaxWidth())
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                OutlinedTextField(value = reward, onValueChange = { reward = it.filter(Char::isDigit) }, label = { Text("Reward coins") }, singleLine = true, modifier = Modifier.weight(1f))
+                                OutlinedTextField(value = cash, onValueChange = { cash = it.filter(Char::isDigit) }, label = { Text("Cash $") }, singleLine = true, modifier = Modifier.weight(1f))
+                                OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category") }, singleLine = true, modifier = Modifier.weight(2f))
+                            }
+
+                            Text("How often", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ChoiceChip("Every day", cadence == "Daily") { cadence = "Daily" }
+                                ChoiceChip("Weekly", cadence == "Weekly") { cadence = "Weekly" }
+                                ChoiceChip("One-time", cadence == "OneOff") { cadence = "OneOff" }
+                            }
+                            if (cadence == "Weekly") {
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    WEEKDAYS.forEach { d ->
+                                        ChoiceChip(d, weekdays.contains(d)) {
+                                            if (weekdays.contains(d)) weekdays.remove(d) else weekdays.add(d)
+                                        }
+                                    }
+                                }
+                            }
+                            if (cadence == "OneOff") {
+                                OutlinedButton(onClick = { showDatePicker = true }) {
+                                    Text(dueLabel?.let { "Due: $it" } ?: "Set due date (optional)")
+                                }
+                            }
+
+                            Text("Completion", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ChoiceChip("Each does their own", completion == "EachAssignee") { completion = "EachAssignee" }
+                                ChoiceChip("First to finish wins", completion == "Race") { completion = "Race" }
+                            }
+
+                            Text("Assign to", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ChoiceChip("All squires", assignAll) { assignAll = true }
+                                ChoiceChip("Specific", !assignAll) { assignAll = false }
+                            }
+                            if (!assignAll) {
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    squires.forEach { (id, name) ->
+                                        ChoiceChip(name, chosenSquires.contains(id)) {
+                                            if (chosenSquires.contains(id)) chosenSquires.remove(id) else chosenSquires.add(id)
+                                        }
+                                    }
+                                }
+                            }
+
+                            ToggleRow("Can be earned multiple times per day", repeatDay) { repeatDay = it }
+                            ToggleRow("Auto-approve (skip review)", autoApprove) { autoApprove = it }
+
+                            formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Button(
+                                    onClick = { submitForm() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
+                                ) { Text(if (editingId == null) "Add quest" else "Save changes") }
+                                if (editingId != null) {
+                                    OutlinedButton(onClick = { resetForm() }) { Text("Cancel") }
+                                }
                             }
                         }
                     }
                 }
+
+                // ── Library ──
+                if (library.isNotEmpty()) {
+                    item { SectionTitle("Add from the starter library") }
+                    items(library) { lib ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Medallion(null, lib.title)
+                                Column(Modifier.weight(1f)) {
+                                    Text(lib.title, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "${lib.category} · ${if (lib.cadence == "weekly") lib.days.joinToString("/") else "Daily"}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                GoldPill(lib.reward.toInt())
+                                OutlinedButton(onClick = {
+                                    create(
+                                        CreateQuestReq(
+                                            assignAll = true,
+                                            autoApprove = false,
+                                            cadence = if (lib.cadence == "weekly") CadenceKind.Weekly else CadenceKind.Daily,
+                                            completion = CompletionDto.EachAssignee,
+                                            repeatableWithinDay = false,
+                                            reward = lib.reward,
+                                            title = lib.title,
+                                            category = lib.category,
+                                            due = null,
+                                            id = null,
+                                            squires = null,
+                                            weekdays = if (lib.cadence == "weekly") lib.days.map { WeekdayDto.valueOf(it) } else null,
+                                        ),
+                                    )
+                                }) { Text("Import") }
+                            }
+                        }
+                    }
+                }
+
+                // ── Existing quests ──
             }
         }
     }

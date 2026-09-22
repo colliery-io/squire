@@ -595,12 +595,13 @@ fn pending_claims(snap: &Snapshot) -> Vec<PendingClaim> {
                     .quests
                     .iter()
                     .find(|q| q.id == *quest_id)
-                    .map(|q| q.title.clone())
+                    .map(|q| (q.title.clone(), q.reward))
                     .unwrap_or_default();
                 Some(PendingClaim {
                     claim_id: *claim_id,
                     squire: *squire,
-                    quest_title,
+                    quest_title: quest_title.0,
+                    reward: quest_title.1,
                     on: *on,
                 })
             }
