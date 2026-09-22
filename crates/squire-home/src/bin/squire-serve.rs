@@ -13,6 +13,7 @@
 //! * `SQUIRE_HOUSEHOLD`  — tenant handle (default `home`).
 //! * `SQUIRE_ADMIN_NAME` / `SQUIRE_ADMIN_SECRET` — first-run admin (optional; else create it in the Keep).
 //! * `API_PORT` (8080) / `KEEP_PORT` (4920) — listeners.
+//! * `KEEP_BIND` — interface the Keep binds (default `127.0.0.1`; the container stack rebinds it).
 //! * `SQUIRE_APK_DIR` — OTA app-update dir (default: `<data_dir>/updates`, created on start).
 //! * `SQUIRE_SIGNING_KEY` — override the persisted key; `SQUIRE_MDNS=off` — disable mDNS;
 //!   `SQUIRE_SELF_UPDATE=off` — disable self-update.

@@ -1,0 +1,21 @@
+# Build context for the squire-serve image (SQUIRE-T-0129): only the Rust workspace is needed.
+target/
+# The Android client + generated SDK — hundreds of MB of Gradle output after an APK build, and the
+# server image never needs them.
+clients/
+e2e/
+docs/
+dist/
+tools/
+deploy/
+squire-assets-skeleton/
+.git/
+.github/
+.metis/
+.angreal/
+.claude/
+**/.DS_Store
+*.md
+# Never let a deployment's secrets into a build context.
+.env
+.env.*

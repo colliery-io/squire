@@ -1,0 +1,146 @@
+# The Squire home server as a compose stack (SQUIRE-T-0129): `squire-serve` in a container, plus an
+# opt-in Tailscale node so paired phones reach it away from home Wi-Fi.
+#
+#   cp .env.example .env && $EDITOR .env      # SQUIRE_PAIR_HOST is required
+#   angreal deploy up --build                 # or: docker compose up -d --build
+#
+# Exposure, by design:
+#   * phone API  — LAN (published on the host) + the tailnet (when the `tailscale` profile is on)
+#   * the Keep   — THIS MACHINE ONLY (host loopback). Not the LAN, not the tailnet. See KEEP_BIND.
+#
+# SAFETY: never `down -v` — the `squire-data` volume is the household (database + the signing key
+# every paired phone's token was minted with).
+
+# Pinned, and deliberately NOT `squire`: the repo-root docker-compose.yml (the test Postgres) has no
+# `name:`, so it takes its directory's name — `squire`. Two stacks sharing a project name see each
+# other's containers as orphans, and one `--remove-orphans` would take the household down.
+name: squire-home
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # The network namespace HOLDER — the "pod sandbox". It does nothing except own the namespace, the
+  # published ports and the hostname; the server and the Tailscale node both JOIN it.
+  #
+  # Why it exists: Docker binds `network_mode: service:<x>` when the joining container is created,
+  # so a container that joins ANOTHER WORKING container is orphaned whenever that one restarts.
+  # The first version of this stack had tailscale join the server — and the first real
+  # `reset-secret` (a stop/start) silently took the tailnet path down while LAN + loopback stayed
+  # green; a crash-restart would have done the same with nobody watching. A holder that never
+  # restarts on its own removes the coupling in both directions: the server can be redeployed,
+  # crash, or be stopped for a secret reset, and Tailscale can be recreated, independently.
+  #
+  # The image is the Kubernetes `pause` container: 500 kB, built for exactly this job, and — the
+  # part that matters — PINNED. The holder must never be recreated casually: a TARGETED recreate of
+  # `net` alone strands the server in the old namespace while the new one owns the ports (tested:
+  # everything goes dark). A plain `up -d` heals that — compose notices and recreates the joiners
+  # — but the way to stay out of trouble is an image whose ID never changes under us. (The first
+  # draft reused `squire-serve:latest`, which changes on every build.)
+  #   SAFE:      angreal deploy redeploy / up          (plain `up -d`)
+  #   DON'T:     docker compose up -d --force-recreate net
+  net:
+    logging: *default-logging
+    image: registry.k8s.io/pause:3.10
+    # Load-bearing, not cosmetic: Docker writes `<bridge IP> squire` into /etc/hosts (shared with
+    # everything that joins this namespace), and KEEP_BIND binds the Keep to that name — i.e. to
+    # the bridge interface. Keep this on ONE Docker network: attach a second and `squire` resolves
+    # to both addresses, making which interface the Keep lands on order-dependent. (tailscale0 is
+    # not a Docker network, so the Tailscale node does not count.)
+    hostname: squire
+    ports:
+      - "${SQUIRE_BIND:-0.0.0.0}:${SQUIRE_API_PORT:-8080}:${SQUIRE_API_PORT:-8080}"
+      # Host LOOPBACK only — this mapping is what keeps the Keep off the home LAN (cleartext HTTP;
+      # ADR SQUIRE-A-0008 as amended). Do not widen it.
+      - "127.0.0.1:${SQUIRE_KEEP_PORT:-4920}:4920"
+    restart: unless-stopped
+
+  squire:
+    logging: *default-logging
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: squire-serve:latest
+    network_mode: "service:net"
+    depends_on:
+      net:
+        condition: service_started
+    environment:
+      # ONE port number for both paths to the API. The LAN path is the host publish below; the
+      # tailnet path lands straight in this network namespace and never sees the publish. Keeping
+      # the in-container port equal to the published one means the pairing QR is right either way.
+      API_PORT: ${SQUIRE_API_PORT:-8080}
+      KEEP_PORT: "4920"
+      # The Keep binds the BRIDGE interface only (`squire` → bridge IP, see `hostname` on `net`). Docker's
+      # port mapping reaches it there, and the mapping below is host-loopback only. The Tailscale
+      # sidecar's `tailscale0` lives in this same namespace, and the Keep has no listener on it, so
+      # the admin UI is NOT on the tailnet. Set KEEP_BIND=0.0.0.0 in .env to put it there on purpose.
+      KEEP_BIND: ${KEEP_BIND:-squire}
+      # The host phones are told to reach (it is baked into the pairing QR). REQUIRED: in a
+      # container the server's LAN-IP autodetect finds the bridge IP, which no phone can route to.
+      SQUIRE_PAIR_HOST: ${SQUIRE_PAIR_HOST:?set SQUIRE_PAIR_HOST in deploy/.env — the address phones reach this server at (see .env.example)}
+      SQUIRE_HOUSEHOLD: ${SQUIRE_HOUSEHOLD:-home}
+      # First-run only, and only for a FRESH volume; all three are ignored when blank.
+      SQUIRE_TZ: ${SQUIRE_TZ:-}
+      SQUIRE_ADMIN_NAME: ${SQUIRE_ADMIN_NAME:-}
+      SQUIRE_ADMIN_SECRET: ${SQUIRE_ADMIN_SECRET:-}
+      # Lifts the GitHub API rate limit for the phone-APK sync (SQUIRE-T-0117). Optional.
+      SQUIRE_UPDATE_TOKEN: ${SQUIRE_UPDATE_TOKEN:-}
+      RUST_LOG: ${RUST_LOG:-info}
+    # (ports + hostname live on `net`, which owns the namespace.)
+    volumes:
+      - squire-data:/data
+    healthcheck:
+      # `$$` defers to the container's shell, so this follows API_PORT.
+      test: ["CMD-SHELL", "curl -fsS -m 4 -o /dev/null http://127.0.0.1:$${API_PORT}/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  # Remote access: a Tailscale node in the SAME namespace as the server (both join `net`), so the API is
+  # reachable at this node's tailnet address from any device on the tailnet — a phone on cellular —
+  # with WireGuard doing the encryption and NAT traversal (direct where it can punch, DERP relay
+  # where it cannot). The same shape skadi runs (SKADI-T-0599).
+  # Opt-in: only started with the `tailscale` compose profile (`COMPOSE_PROFILES=tailscale` in
+  # .env) and a TAILSCALE_AUTHKEY. State persists in the volume, so the auth key is used once and
+  # can be single-use; disable key expiry for the node in the admin console.
+  tailscale:
+    logging: *default-logging
+    image: tailscale/tailscale:latest
+    profiles: ["tailscale"]
+    network_mode: "service:net"
+    depends_on:
+      net:
+        condition: service_started
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      TS_AUTHKEY: ${TAILSCALE_AUTHKEY:-}
+      TS_HOSTNAME: ${TAILSCALE_HOSTNAME:-squire}
+      TS_STATE_DIR: /var/lib/tailscale
+      # Kernel (tun) mode is what keeps the Keep OFF the tailnet: tailnet traffic arrives on
+      # `tailscale0` addressed to the tailnet IP, and only `0.0.0.0` listeners (the API) answer.
+      # Userspace mode instead proxies inbound connections to 127.0.0.1 and would defeat
+      # interface-scoped binds — do not switch it on.
+      TS_USERSPACE: "false"
+      TS_EXTRA_ARGS: ${TAILSCALE_EXTRA_ARGS:-}
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+    restart: unless-stopped
+
+volumes:
+  # THE HOUSEHOLD: <handle>.sqlite, signing.key, and the OTA updates dir. A named volume rather
+  # than a bind mount on purpose — SQLite's WAL/shared-memory files over Docker Desktop's host file
+  # sharing is a known way to corrupt a database. Move an existing install in with
+  # `angreal deploy import-data`.
+  squire-data:
+  # Tailscale node identity + state; keeps the node across recreates so the auth key is only
+  # needed the first time.
+  tailscale-state:

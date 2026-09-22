@@ -19,6 +19,7 @@
 ## For self-hosters
 
 - [Run the home server](how-to/run-server.md)
+- [Run it in Docker, reachable over Tailscale](how-to/docker-tailscale.md)
 - [Expose it over the internet](how-to/cloudflare-tunnel.md)
 - [Back up & restore](how-to/backup-restore.md)
 

@@ -86,7 +86,7 @@ pub async fn run_home_server() -> Result<(), BoxErr> {
     let api_port = env_u16("API_PORT", 8080);
     let keep_port = env_u16("KEEP_PORT", 4920);
     let handle =
-        HouseholdHandle(std::env::var("SQUIRE_HOUSEHOLD").unwrap_or_else(|_| "home".to_string()));
+        HouseholdHandle(env_nonempty("SQUIRE_HOUSEHOLD").unwrap_or_else(|| "home".to_string()));
 
     // Stable signing key (generated + persisted on first run) — paired tokens survive restarts.
     let key = signing_key(&data_dir)?;
@@ -102,10 +102,11 @@ pub async fn run_home_server() -> Result<(), BoxErr> {
     // browser via the Keep's first-run register form (SQUIRE-T-0091).
     let first_run = !has_admin(&store);
     if first_run {
-        match std::env::var("SQUIRE_ADMIN_SECRET") {
-            Ok(admin_secret) => {
+        // `env_nonempty`: a blank secret is "not set", never a Knight with an empty password.
+        match env_nonempty("SQUIRE_ADMIN_SECRET") {
+            Some(admin_secret) => {
                 let admin_name =
-                    std::env::var("SQUIRE_ADMIN_NAME").unwrap_or_else(|_| "Admin".to_string());
+                    env_nonempty("SQUIRE_ADMIN_NAME").unwrap_or_else(|| "Admin".to_string());
                 let resp = identity
                     .register(RegisterHouseholdReq {
                         household_name: handle.0.clone(),
@@ -120,7 +121,7 @@ pub async fn run_home_server() -> Result<(), BoxErr> {
                     "bootstrapped household with first admin Knight",
                 );
             }
-            Err(_) => {
+            None => {
                 tracing::info!(
                     "first run — no admin yet; open the Keep and use \"First run? Create the \
                      admin Knight\" to set up your account",
@@ -130,7 +131,7 @@ pub async fn run_home_server() -> Result<(), BoxErr> {
     }
 
     // Advertise the real LAN IP in the pairing QR (the Keep reads `SQUIRE_PAIR_HOST`).
-    let lan_host = std::env::var("SQUIRE_PAIR_HOST").ok().or_else(|| {
+    let lan_host = env_nonempty("SQUIRE_PAIR_HOST").or_else(|| {
         let detected = local_lan_ip().map(|ip| ip.to_string());
         if let Some(ip) = &detected {
             std::env::set_var("SQUIRE_PAIR_HOST", ip);
@@ -159,7 +160,17 @@ pub async fn run_home_server() -> Result<(), BoxErr> {
             PathBuf::from(apk).display()
         );
     }
-    println!("  Keep (parent, loopback): http://127.0.0.1:{keep_port}");
+    // `KEEP_BIND` (SQUIRE-T-0129) moves the Keep off loopback for a container's port mapping.
+    match std::env::var("KEEP_BIND")
+        .ok()
+        .filter(|b| !b.trim().is_empty())
+    {
+        None => println!("  Keep (parent, loopback): http://127.0.0.1:{keep_port}"),
+        Some(bind) => println!(
+            "  Keep (parent):           bound to {}:{keep_port} (KEEP_BIND)",
+            bind.trim()
+        ),
+    }
     match &lan_host {
         Some(h) => println!(
             "  LAN api (phones):        http://{h}:{api_port}   ← phones pair here (QR + mDNS)"
@@ -243,8 +254,9 @@ pub fn has_admin(store: &SharedStore) -> bool {
 }
 
 /// Serve **both surfaces** over the one shared store/identity: the LAN api on `0.0.0.0:api_port`
-/// (phones) and the loopback Keep on `keep_port` (the parent's admin UI), plus a best-effort mDNS
-/// advert. Returns only if a listener fails.
+/// (phones) and the loopback Keep on `keep_port` (the parent's admin UI — `KEEP_BIND` rebinds it for
+/// a container, see `keep::bind_target`), plus a best-effort mDNS advert. Returns only if a listener
+/// fails.
 pub async fn serve(
     store: SharedStore,
     identity: Arc<dyn Identity>,
@@ -271,6 +283,16 @@ pub async fn serve(
         keep::serve(keep_state, keep_port),
     )?;
     Ok(())
+}
+
+/// Env `key`, trimmed — with **blank treated as unset**. A compose file or launchd plist that passes
+/// `KEY=${KEY:-}` through hands the process an empty string, not an absent variable; for a value
+/// like `SQUIRE_ADMIN_SECRET` the difference is an admin account with no password (SQUIRE-T-0129).
+pub fn env_nonempty(key: &str) -> Option<String> {
+    std::env::var(key)
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
 }
 
 /// Parse a `u16` from env `key`, falling back to `default`.

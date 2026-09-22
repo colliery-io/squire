@@ -20,3 +20,6 @@ clients/squire-android/.kotlin/
 # Release signing material — never commit the keystore or its credentials.
 clients/squire-android/keystore/
 clients/squire-android/keystore.properties
+
+# Container stack config (SQUIRE-T-0129) — holds the Tailscale auth key. Commit .env.example only.
+deploy/.env
