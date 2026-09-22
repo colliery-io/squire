@@ -49,6 +49,11 @@ test("rename a member in place — same row, role + id kept (SQUIRE-T-0120)", as
   await expect(galahad).toBeVisible();
   await expect(galahad.locator(".badge-squire")).toHaveText("Squire");
   await expect(page.locator("#member-list li", { hasText: "Gawain" })).toHaveCount(0);
+
+  // Rename back: every spec file shares the one demo server, and later files look for "Gawain".
+  page.once("dialog", (d) => d.accept("Gawain"));
+  await galahad.getByRole("button", { name: "Rename" }).click();
+  await expect(page.locator("#member-list li", { hasText: "Gawain" })).toBeVisible();
 });
 
 test("Pair tab renders a framed hand-off card with a QR (A2)", async ({ page }) => {

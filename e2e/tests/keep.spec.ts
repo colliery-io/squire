@@ -102,11 +102,10 @@ test("change the household timezone in Settings (applied live)", async ({ page }
   await expect(page.locator("#settings-status")).toContainText("America/Chicago");
   await page.screenshot({ path: `${SCREENS}/05-settings-timezone.png`, fullPage: true });
 
-  // Reloading + revisiting Settings shows the persisted choice (proves the write stuck).
+  // Reloading + revisiting Settings shows the persisted choice (proves the write stuck). The Keep
+  // restores the session from its cookie on load (SQUIRE-T-0130), so no second sign-in.
   await page.reload();
-  await page.fill("#login-form input[name=user]", "1");
-  await page.fill("#login-form input[name=secret]", "demo");
-  await page.click("#login-form button[type=submit]");
+  await expect(page.locator("#shell")).toBeVisible();
   await page.locator("#tabs .tab[data-tab=settings]").click();
   await expect(page.locator("#settings-tz")).toHaveValue("America/Chicago");
 });
