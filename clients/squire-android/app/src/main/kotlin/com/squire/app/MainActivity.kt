@@ -30,6 +30,7 @@ import com.squire.app.bg.UpdateCheckWorker
 import com.squire.app.data.SquireApiAdapter
 import com.squire.knight.app.ui.KnightTab
 import com.squire.app.ui.SquireTab
+import com.squire.app.bg.KnightNotifyWorker
 import com.squire.app.bg.Notifier
 import com.squire.app.data.db.SquireDb
 import com.squire.app.ui.PlayerHomeScreen
@@ -63,6 +64,29 @@ private const val RELOCATE_INTERVAL_MS = 15_000L
 private const val ROLE_KNIGHT = "Knight"
 
 /**
+ * Start the background watchers this device needs, by the role it is paired as (SQUIRE-T-0139): a
+ * Knight's phone watches the review queue, a squire's watches for verdicts and coins. Scheduling
+ * both would have each device polling an endpoint its token cannot reach.
+ */
+private fun scheduleWatchers(ctx: android.content.Context, session: Session) {
+    UpdateCheckWorker.schedule(ctx)
+    if (session.role == ROLE_KNIGHT) {
+        KnightNotifyWorker.schedule(ctx)
+        SquireNotifyWorker.cancel(ctx) // in case this device was a squire before
+    } else {
+        SquireNotifyWorker.schedule(ctx)
+        KnightNotifyWorker.cancel(ctx)
+    }
+}
+
+private fun cancelWatchers(ctx: android.content.Context) {
+    UpdateCheckWorker.cancel(ctx)
+    SquireNotifyWorker.cancel(ctx)
+    KnightNotifyWorker.cancel(ctx)
+    Notifier.clear(ctx)
+}
+
+/**
  * The single household app (SQUIRE-T-0054). It is **session-gated** then **role-routed**: on first
  * run it pairs (ADR SQUIRE-A-0010); once a [Session] is stored, its **role** decides the UI — a
  * Knight session gets the parent review home, anyone else the child player home. There is no
@@ -82,10 +106,7 @@ class MainActivity : ComponentActivity() {
 
         // Background app-update checks (SQUIRE-T-0090) + coin-balance notifications (SQUIRE-T-0094):
         // run while paired, even when backgrounded.
-        if (sessionStore.load() != null) {
-            UpdateCheckWorker.schedule(appCtx)
-            SquireNotifyWorker.schedule(appCtx)
-        }
+        sessionStore.load()?.let { scheduleWatchers(appCtx, it) }
         maybeRequestNotificationPermission()
 
         setContent {
@@ -95,9 +116,9 @@ class MainActivity : ComponentActivity() {
                 var session by remember { mutableStateOf(sessionStore.load()) }
                 val current = session
                 val onSessionChanged: (Session) -> Unit =
-                    { s -> sessionStore.save(s); session = s; UpdateCheckWorker.schedule(appCtx); SquireNotifyWorker.schedule(appCtx) }
+                    { s -> sessionStore.save(s); session = s; scheduleWatchers(appCtx, s) }
                 val onForget: () -> Unit =
-                    { sessionStore.clear(); session = null; UpdateCheckWorker.cancel(appCtx); SquireNotifyWorker.cancel(appCtx) }
+                    { sessionStore.clear(); session = null; cancelWatchers(appCtx) }
 
                 when {
                     current == null -> PairingScreen(

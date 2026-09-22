@@ -382,7 +382,11 @@ async fn quiet_hours_round_trip_and_reject_an_inverted_window() {
     .await;
     assert_eq!(st, StatusCode::BAD_REQUEST);
     let (_, cfg) = send(&state, "GET", "/api/config", Some(&token), None).await;
-    assert_eq!(cfg["notify_wake_from"], json!(400), "the refused write left it alone");
+    assert_eq!(
+        cfg["notify_wake_from"],
+        json!(400),
+        "the refused write left it alone"
+    );
 
     // Omitting the pair leaves the window as it is, so an older client cannot wipe it.
     let (st, cfg) = send(
@@ -397,4 +401,3 @@ async fn quiet_hours_round_trip_and_reject_an_inverted_window() {
     assert_eq!(cfg["notify_wake_from"], json!(400));
     assert_eq!(cfg["notify_wake_to"], json!(1260));
 }
-

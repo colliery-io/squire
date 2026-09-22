@@ -114,6 +114,9 @@ object Notifier {
      */
     private fun hasSpoken(ctx: Context, key: String) = key in ledger(ctx)
 
+    /** Everything this device has already said — for callers that decide in bulk (SQUIRE-T-0139). */
+    fun spoken(ctx: Context): Set<String> = ledger(ctx).toSet()
+
     fun remember(ctx: Context, key: String) {
         val kept = (ledger(ctx) + key).takeLast(LEDGER_CAP)
         prefs(ctx).edit().putString(KEY_LEDGER, kept.joinToString("\n")).apply()
