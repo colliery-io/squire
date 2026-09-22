@@ -15,6 +15,14 @@ on:
   push:
     tags:
       - "v*"
+  # Re-run the APK build for an existing tag (e.g. after a CI-only fix) without cutting a new
+  # release. Mirrors release-server.yml. The workflow file comes from the default branch; the
+  # app code is checked out at the tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build + attach the APK to (e.g. v0.7.17)"
+        required: true
 
 permissions:
   contents: read
@@ -26,14 +34,26 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
+      # Explicit package list: the action's default includes the long-retired `tools` package,
+      # and on current runner images sdkmanager now fails on it ("Failed to find package 'tools'"),
+      # which broke the v0.7.17 build before a single line of app code ran.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-34 build-tools;34.0.0"
 
       - name: Materialize signing config from secrets
         working-directory: clients/squire-android
@@ -82,7 +102,7 @@ jobs:
       - name: Publish to the public dist repo
         env:
           GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
           VC: ${{ steps.stage.outputs.vc }}
           VN: ${{ steps.stage.outputs.vn }}
         run: |
