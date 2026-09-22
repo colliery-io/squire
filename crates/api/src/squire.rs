@@ -18,8 +18,8 @@ use domain_core::contract::{
     Quest, QuestStatus, Scope, Snapshot, Timestamp, UserId,
 };
 use domain_core::contract::{
-    AdjustmentView, CashOutStatus, ClaimState, ClaimStatus, GoalView, QuestCard, RedemptionState,
-    RedemptionStatus, RequestCashOutReq, RequestCashOutResp, RequestRedemptionReq,
+    AdjustmentView, CashOutStatus, ClaimState, ClaimStatus, GoalView, NotifySettings, QuestCard,
+    RedemptionState, RedemptionStatus, RequestCashOutReq, RequestCashOutResp, RequestRedemptionReq,
     RequestRedemptionResp, RewardCard, StateView, StreakView, SubmitClaimReq, SubmitClaimResp,
 };
 use domain_core::contract::{Clock, Engine, Projections, Repository};
@@ -30,6 +30,17 @@ use crate::state::AppState;
 
 /// `GET /state` (RequireSquire) — assemble the authenticated Squire's full [`StateView`] from a
 /// single snapshot. Returns 200 JSON; the Squire is always `principal.user` (token-derived).
+/// The household's notification frame (SQUIRE-T-0138): the zone and waking window a squire's phone
+/// schedules and silences itself by.
+pub(crate) fn notify_settings(store: &store::Store<store::SystemClock>) -> NotifySettings {
+    let cfg = store.load_config();
+    NotifySettings {
+        timezone: cfg.timezone,
+        wake_from_minutes: cfg.notify_wake_from,
+        wake_to_minutes: cfg.notify_wake_to,
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/state",
@@ -49,14 +60,19 @@ pub async fn get_state(
     RequireSquire(principal): RequireSquire,
 ) -> Json<StateView> {
     let squire = principal.user;
-    let (snap, tincture) = {
+    let (snap, tincture, notify) = {
         let store = state.store.lock().expect("store mutex poisoned");
-        (store.snapshot(), crate::tincture::of(&store, squire))
+        (
+            store.snapshot(),
+            crate::tincture::of(&store, squire),
+            notify_settings(&store),
+        )
     };
     let today = state.clock.today();
     let now = state.clock.now();
     let mut view = assemble_state(&snap, squire, today, now);
     view.tincture = tincture;
+    view.notify = Some(notify);
     Json(view)
 }
 
@@ -270,8 +286,9 @@ pub(crate) fn assemble_state(
     StateView {
         squire,
         generated_at: now,
-        // Lives in the config table, not the snapshot: the handler fills it in.
+        // Both live in the config table, not the snapshot: the handler fills them in.
         tincture: String::new(),
+        notify: None,
         balance,
         balances,
         quests_today,

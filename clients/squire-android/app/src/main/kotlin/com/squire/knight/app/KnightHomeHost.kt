@@ -24,6 +24,7 @@ import com.squire.knight.app.data.RoomPrivilegedOutbox
 import com.squire.knight.app.data.RoomReviewCache
 import com.squire.knight.app.data.db.KnightDb
 import com.squire.knight.app.ui.KnightHomeScreen
+import com.squire.knight.app.ui.KnightTab
 import com.squire.knight.core.KnightStore
 import com.squire.knight.core.KnightSyncEngine
 import com.squire.knight.core.KnightUiState
@@ -59,6 +60,7 @@ internal fun KnightHomeHost(
     discovery: NsdDiscovery,
     onSessionChanged: (Session) -> Unit,
     onForget: () -> Unit,
+    initialTab: KnightTab = KnightTab.Review,
 ) {
     val context = LocalContext.current
     val json = remember { Json { ignoreUnknownKeys = true } }
@@ -230,6 +232,7 @@ internal fun KnightHomeHost(
         Box(modifier = Modifier.weight(1f)) {
             KnightHomeScreen(
                 state = state,
+                initialTab = initialTab,
                 name = session.displayName, // "Hi, <name>!" header (blank -> "Your Family")
                 onRefresh = { viewModel.refresh() },
                 onApproveClaim = { viewModel.approveClaim(it) },

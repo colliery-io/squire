@@ -339,3 +339,62 @@ fn admin_surface_binds_loopback_only() {
     assert!(addr.ip().is_loopback());
     assert!(!addr.ip().is_unspecified());
 }
+
+// ─── quiet hours (SQUIRE-T-0138) ─────────────────────────────────────────────────────────────
+
+/// The waking window round-trips through the config KV, defaults sensibly, and refuses a window
+/// that would silence the whole day.
+#[tokio::test]
+async fn quiet_hours_round_trip_and_reject_an_inverted_window() {
+    let (state, _admin, token, _dir) = keep();
+
+    // Defaults before anyone sets anything: awake 07:00–20:00.
+    let (st, cfg) = send(&state, "GET", "/api/config", Some(&token), None).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(cfg["notify_wake_from"], json!(420));
+    assert_eq!(cfg["notify_wake_to"], json!(1200));
+
+    // A parent moves the window.
+    let (st, cfg) = send(
+        &state,
+        "PUT",
+        "/api/config",
+        Some(&token),
+        Some(json!({ "timezone": "America/Detroit", "notify_wake_from": 400, "notify_wake_to": 1260 })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(cfg["notify_wake_from"], json!(400));
+    assert_eq!(cfg["notify_wake_to"], json!(1260));
+
+    // It persists.
+    let (_, cfg) = send(&state, "GET", "/api/config", Some(&token), None).await;
+    assert_eq!(cfg["notify_wake_from"], json!(400));
+
+    // An inverted window would mean "quiet all day" — refused, and nothing changes.
+    let (st, _) = send(
+        &state,
+        "PUT",
+        "/api/config",
+        Some(&token),
+        Some(json!({ "timezone": "America/Detroit", "notify_wake_from": 1200, "notify_wake_to": 400 })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let (_, cfg) = send(&state, "GET", "/api/config", Some(&token), None).await;
+    assert_eq!(cfg["notify_wake_from"], json!(400), "the refused write left it alone");
+
+    // Omitting the pair leaves the window as it is, so an older client cannot wipe it.
+    let (st, cfg) = send(
+        &state,
+        "PUT",
+        "/api/config",
+        Some(&token),
+        Some(json!({ "timezone": "America/Detroit" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(cfg["notify_wake_from"], json!(400));
+    assert_eq!(cfg["notify_wake_to"], json!(1260));
+}
+

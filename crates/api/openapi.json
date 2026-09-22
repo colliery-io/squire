@@ -1820,7 +1820,6 @@
         "tags": [
           "squire"
         ],
-        "summary": "`GET /state` (RequireSquire) — assemble the authenticated Squire's full [`StateView`] from a\nsingle snapshot. Returns 200 JSON; the Squire is always `principal.user` (token-derived).",
         "operationId": "get_state",
         "parameters": [
           {
@@ -2811,6 +2810,17 @@
           "timezone"
         ],
         "properties": {
+          "notify_wake_from": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The household's **waking window** in minutes since local midnight (SQUIRE-T-0138): a squire's\nphone stays silent outside it. Defaults to 07:00–20:00. Applies to a squire's notifications\nonly — a Knight is an adult with their own do-not-disturb (see SQUIRE-I-0007).",
+            "minimum": 0
+          },
+          "notify_wake_to": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
           "timezone": {
             "type": "string",
             "description": "IANA timezone name (e.g. `\"America/Los_Angeles\"`). Sets the household's local-midnight day\nboundary for daily/weekly quests. Defaults to `\"UTC\"`."
@@ -3094,6 +3104,32 @@
           },
           "expires_at": {
             "$ref": "#/components/schemas/Timestamp"
+          }
+        }
+      },
+      "NotifySettings": {
+        "type": "object",
+        "description": "Everything a squire's phone needs to decide, on its own, *when* to speak (SQUIRE-T-0138 /\nADR SQUIRE-A-0017 — notifications are scheduled on the device, never pushed from a cloud).\nTimes are minutes since midnight **in `timezone`**, not the device's zone.",
+        "required": [
+          "timezone",
+          "wake_from_minutes",
+          "wake_to_minutes"
+        ],
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "description": "The household's IANA timezone — the frame for every time below."
+          },
+          "wake_from_minutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Waking window: outside it a squire's phone stays silent.",
+            "minimum": 0
+          },
+          "wake_to_minutes": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },
@@ -3815,6 +3851,17 @@
             "items": {
               "$ref": "#/components/schemas/RedemptionStatus"
             }
+          },
+          "notify": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NotifySettings",
+                "description": "What the phone needs to schedule and silence its own notifications (SQUIRE-T-0138). `None`\nfrom an older server; the app then falls back to its built-in defaults."
+              }
+            ]
           },
           "quests_today": {
             "type": "array",

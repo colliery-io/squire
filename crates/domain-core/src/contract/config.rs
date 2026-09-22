@@ -13,14 +13,35 @@ pub struct HouseholdConfig {
     /// IANA timezone name (e.g. `"America/Los_Angeles"`). Sets the household's local-midnight day
     /// boundary for daily/weekly quests. Defaults to `"UTC"`.
     pub timezone: String,
+    /// The household's **waking window** in minutes since local midnight (SQUIRE-T-0138): a squire's
+    /// phone stays silent outside it. Defaults to 07:00–20:00. Applies to a squire's notifications
+    /// only — a Knight is an adult with their own do-not-disturb (see SQUIRE-I-0007).
+    #[cfg_attr(feature = "serde", serde(default = "default_wake_from"))]
+    pub notify_wake_from: u16,
+    #[cfg_attr(feature = "serde", serde(default = "default_wake_to"))]
+    pub notify_wake_to: u16,
+}
+
+fn default_wake_from() -> u16 {
+    7 * 60
+}
+fn default_wake_to() -> u16 {
+    20 * 60
 }
 
 impl Default for HouseholdConfig {
     fn default() -> Self {
         Self {
             timezone: "UTC".to_string(),
+            notify_wake_from: default_wake_from(),
+            notify_wake_to: default_wake_to(),
         }
     }
+}
+
+/// A minute-of-day is `0..=1439`. Used to validate the waking window before it is persisted.
+pub fn valid_minute_of_day(m: u16) -> bool {
+    m < 24 * 60
 }
 
 /// The string keys under which settings are persisted in the KV `config` table. Keeping them in one
@@ -28,6 +49,9 @@ impl Default for HouseholdConfig {
 pub mod config_keys {
     /// IANA timezone name. See [`super::HouseholdConfig::timezone`].
     pub const TIMEZONE: &str = "timezone";
+    /// Waking window, minutes since local midnight (SQUIRE-T-0138).
+    pub const NOTIFY_WAKE_FROM: &str = "notify_wake_from";
+    pub const NOTIFY_WAKE_TO: &str = "notify_wake_to";
 
     /// A squire's chosen **tincture** — the colour their screens wear (SQUIRE-T-0136). One key per
     /// member, in the household config table, so no domain-model change: `tincture:<user id>`.

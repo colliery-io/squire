@@ -1322,6 +1322,20 @@
       sel.appendChild(opt);
     }
     document.getElementById("settings-tz-custom").value = "";
+    // Quiet hours (SQUIRE-T-0138): stored as minutes since midnight, shown as a clock time.
+    document.getElementById("settings-wake-from").value = hhmm(cfg.notify_wake_from);
+    document.getElementById("settings-wake-to").value = hhmm(cfg.notify_wake_to);
+  }
+
+  /** minutes-since-midnight → "07:00" for an <input type=time>. */
+  function hhmm(minutes) {
+    const m = Number.isFinite(minutes) ? minutes : 0;
+    return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+  }
+  /** "07:00" → minutes since midnight, or null when the field is empty. */
+  function minutesOfDay(value) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec((value || "").trim());
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
   }
 
   const settingsForm = document.getElementById("settings-form");
@@ -1334,10 +1348,17 @@
       error.hidden = true;
       const custom = document.getElementById("settings-tz-custom").value.trim();
       const timezone = custom || document.getElementById("settings-tz").value;
+      const wakeFrom = minutesOfDay(document.getElementById("settings-wake-from").value);
+      const wakeTo = minutesOfDay(document.getElementById("settings-wake-to").value);
+      if (wakeFrom !== null && wakeTo !== null && wakeFrom >= wakeTo) {
+        error.textContent = "Quiet-until must come before quiet-after.";
+        error.hidden = false;
+        return;
+      }
       const res = await fetch("/api/config", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ timezone }),
+        body: JSON.stringify({ timezone, notify_wake_from: wakeFrom, notify_wake_to: wakeTo }),
       });
       if (res.ok) {
         const cfg = await res.json();

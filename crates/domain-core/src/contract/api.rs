@@ -15,6 +15,10 @@ pub struct StateView {
     /// `contract::TINCTURES`); empty from an older server, which the app treats as the default.
     #[cfg_attr(feature = "serde", serde(default))]
     pub tincture: String,
+    /// What the phone needs to schedule and silence its own notifications (SQUIRE-T-0138). `None`
+    /// from an older server; the app then falls back to its built-in defaults.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub notify: Option<NotifySettings>,
     /// The Squire's **coin** balance (back-compat; equals the `Coins` entry of `balances`).
     pub balance: Points,
     /// Every currency the household uses, with this Squire's floored balance (SQUIRE-A-0013). Lets the
@@ -516,6 +520,20 @@ pub struct HouseholdReview {
     /// The server's "today" (date number) — the `on` a mark-done claim is filed against.
     pub today: Date,
 }
+/// Everything a squire's phone needs to decide, on its own, *when* to speak (SQUIRE-T-0138 /
+/// ADR SQUIRE-A-0017 — notifications are scheduled on the device, never pushed from a cloud).
+/// Times are minutes since midnight **in `timezone`**, not the device's zone.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NotifySettings {
+    /// The household's IANA timezone — the frame for every time below.
+    pub timezone: String,
+    /// Waking window: outside it a squire's phone stays silent.
+    pub wake_from_minutes: u16,
+    pub wake_to_minutes: u16,
+}
+
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Clone, Debug)]

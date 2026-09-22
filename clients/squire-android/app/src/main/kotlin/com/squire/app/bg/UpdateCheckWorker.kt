@@ -1,12 +1,6 @@
 package com.squire.app.bg
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import android.os.Build
-import androidx.core.app.NotificationCompat
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -15,7 +9,6 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.squire.app.BuildConfig
-import com.squire.app.MainActivity
 import com.squire.pairing.SessionStore
 import com.squire.pairing.UpdateChecker
 import java.util.concurrent.TimeUnit
@@ -43,32 +36,22 @@ class UpdateCheckWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
     }
 
     private fun notifyUpdateAvailable(ctx: Context, versionName: String) {
-        val mgr = ctx.getSystemService(NotificationManager::class.java) ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            mgr.createNotificationChannel(
-                NotificationChannel(CHANNEL, "App updates", NotificationManager.IMPORTANCE_DEFAULT),
-            )
-        }
-        val open = PendingIntent.getActivity(
-            ctx,
-            0,
-            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            PendingIntent.FLAG_IMMUTABLE,
+        // Through the one Notifier (SQUIRE-T-0138) so this shares the channel set, the
+        // POST_NOTIFICATIONS handling and the never-twice ledger. Keyed by version, so a build the
+        // household has already been told about is not re-announced every six hours — which the
+        // ad-hoc version did, because it re-posted the same notification id each run.
+        Notifier.post(
+            ctx = ctx,
+            channel = Notifier.Channel.Updates,
+            key = "update:$versionName",
+            title = "Squire update available",
+            text = "Tap to install v$versionName over your home Wi-Fi.",
+            // An app update is worth hearing whenever it lands; it is not a child's nag.
+            respectQuietHours = false,
         )
-        val notification = NotificationCompat.Builder(ctx, CHANNEL)
-            .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("Squire update available")
-            .setContentText("Tap to install v$versionName over your home Wi-Fi.")
-            .setAutoCancel(true)
-            .setContentIntent(open)
-            .build()
-        // POST_NOTIFICATIONS (API 33+): if the grant is missing the post is a silent no-op.
-        runCatching { mgr.notify(NOTIF_ID, notification) }
     }
 
     companion object {
-        private const val CHANNEL = "squire_updates"
-        private const val NOTIF_ID = 4920
         private const val WORK = "squire-update-check"
 
         /** Enqueue the periodic background check (idempotent — keeps any existing schedule). */

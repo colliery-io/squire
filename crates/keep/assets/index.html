@@ -350,6 +350,14 @@
         <label>Or type any IANA zone
           <input name="timezone_custom" id="settings-tz-custom" placeholder="e.g. America/Chicago" />
         </label>
+        <label>Quiet after
+          <input name="wake_to" id="settings-wake-to" type="time" step="60" />
+        </label>
+        <label>Quiet until
+          <input name="wake_from" id="settings-wake-from" type="time" step="60" />
+        </label>
+        <p class="sub">A squire's phone stays silent outside these hours. A Knight's phone is never
+        silenced here — that's what your own do-not-disturb is for.</p>
         <button type="submit">Save</button>
       </form>
       <p id="settings-status" class="sub" hidden></p>

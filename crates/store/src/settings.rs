@@ -156,6 +156,7 @@ mod tests {
     fn bad_zone_falls_back_to_utc() {
         let view = ConfigView::resolve(HouseholdConfig {
             timezone: "Not/AZone".into(),
+            ..Default::default()
         });
         assert_eq!(view.tz, jiff::tz::TimeZone::UTC);
     }

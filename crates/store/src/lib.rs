@@ -404,6 +404,19 @@ impl<C: Clock> Store<C> {
                 cfg.timezone = tz;
             }
         }
+        // An unparseable or out-of-range stored value falls back to the default, so the view never
+        // fails to assemble (ADR SQUIRE-A-0011).
+        let minute = |key: &str| {
+            self.get_setting(key)
+                .and_then(|v| v.trim().parse::<u16>().ok())
+                .filter(|m| domain_core::contract::valid_minute_of_day(*m))
+        };
+        if let Some(m) = minute(config_keys::NOTIFY_WAKE_FROM) {
+            cfg.notify_wake_from = m;
+        }
+        if let Some(m) = minute(config_keys::NOTIFY_WAKE_TO) {
+            cfg.notify_wake_to = m;
+        }
         cfg
     }
 }

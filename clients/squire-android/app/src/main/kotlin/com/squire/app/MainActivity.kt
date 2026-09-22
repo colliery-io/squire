@@ -25,9 +25,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.squire.app.data.RoomOutbox
 import com.squire.app.data.RoomStateCache
-import com.squire.app.bg.CoinNotifyWorker
+import com.squire.app.bg.SquireNotifyWorker
 import com.squire.app.bg.UpdateCheckWorker
 import com.squire.app.data.SquireApiAdapter
+import com.squire.knight.app.ui.KnightTab
+import com.squire.app.ui.SquireTab
+import com.squire.app.bg.Notifier
 import com.squire.app.data.db.SquireDb
 import com.squire.app.ui.PlayerHomeScreen
 import com.squire.app.ui.theme.SquireTheme
@@ -81,18 +84,20 @@ class MainActivity : ComponentActivity() {
         // run while paired, even when backgrounded.
         if (sessionStore.load() != null) {
             UpdateCheckWorker.schedule(appCtx)
-            CoinNotifyWorker.schedule(appCtx)
+            SquireNotifyWorker.schedule(appCtx)
         }
         maybeRequestNotificationPermission()
 
         setContent {
             SquireTheme {
+                // Which screen a notification asked for (SQUIRE-T-0138); null on a normal launch.
+                var tapTarget by remember { mutableStateOf(intent?.getStringExtra(Notifier.EXTRA_TAB)) }
                 var session by remember { mutableStateOf(sessionStore.load()) }
                 val current = session
                 val onSessionChanged: (Session) -> Unit =
-                    { s -> sessionStore.save(s); session = s; UpdateCheckWorker.schedule(appCtx); CoinNotifyWorker.schedule(appCtx) }
+                    { s -> sessionStore.save(s); session = s; UpdateCheckWorker.schedule(appCtx); SquireNotifyWorker.schedule(appCtx) }
                 val onForget: () -> Unit =
-                    { sessionStore.clear(); session = null; UpdateCheckWorker.cancel(appCtx); CoinNotifyWorker.cancel(appCtx) }
+                    { sessionStore.clear(); session = null; UpdateCheckWorker.cancel(appCtx); SquireNotifyWorker.cancel(appCtx) }
 
                 when {
                     current == null -> PairingScreen(
@@ -105,12 +110,14 @@ class MainActivity : ComponentActivity() {
                         discovery = discovery,
                         onSessionChanged = onSessionChanged,
                         onForget = onForget,
+                        initialTab = KnightTab.entries.firstOrNull { it.name == tapTarget } ?: KnightTab.Review,
                     )
                     else -> PlayerHomeHost(
                         session = current,
                         discovery = discovery,
                         onSessionChanged = onSessionChanged,
                         onForget = onForget,
+                        initialTab = SquireTab.entries.firstOrNull { it.name == tapTarget } ?: SquireTab.Quests,
                     )
                 }
             }
@@ -157,6 +164,7 @@ internal fun PlayerHomeHost(
     discovery: NsdDiscovery,
     onSessionChanged: (Session) -> Unit,
     onForget: () -> Unit,
+    initialTab: SquireTab = SquireTab.Quests,
 ) {
     val context = LocalContext.current
     val json = remember { Json { ignoreUnknownKeys = true } }
@@ -216,12 +224,10 @@ internal fun PlayerHomeHost(
         update = UpdateChecker.check(updateContext, session.baseUrl, "squire", BuildConfig.VERSION_CODE)
     }
 
-    // Keep the coin-notify baseline current: coins shown on screen are "seen", so the background
-    // watcher won't re-notify for them (SQUIRE-T-0094).
+    // Anything on screen counts as seen — coins and a grown-up's verdicts alike — so the background
+    // watcher never re-tells the child what they are already looking at (SQUIRE-T-0094 / T-0138).
     LaunchedEffect(state) {
-        (state as? PlayerUiState.Ready)?.view?.balance?.let {
-            CoinNotifyWorker.recordSeenBalance(updateContext, it)
-        }
+        (state as? PlayerUiState.Ready)?.view?.let { SquireNotifyWorker.recordSeen(updateContext, it) }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -253,6 +259,7 @@ internal fun PlayerHomeHost(
                 onForget = onForget,
                 onCheckUpdate = { checkNonce++ },
                 headerLabel = session.displayName.ifBlank { null }, // "Hi, <name>!" when paired with a name
+                initialTab = initialTab,
             )
             }
         }

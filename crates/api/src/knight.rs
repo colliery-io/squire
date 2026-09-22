@@ -516,7 +516,13 @@ pub async fn squire_state(
     if !is_squire {
         return Err(StatusCode::NOT_FOUND);
     }
-    Ok(Json(assemble_state(&snap, squire, today, now)))
+    let mut view = assemble_state(&snap, squire, today, now);
+    {
+        let store = state.store.lock().expect("store mutex poisoned");
+        view.tincture = crate::tincture::of(&store, squire);
+        view.notify = Some(crate::squire::notify_settings(&store));
+    }
+    Ok(Json(view))
 }
 
 /// Build the [`HouseholdReview`] from one snapshot — pure over `snap`; `now`/`today` from the clock.
