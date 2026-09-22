@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Squire crest (SQUIRE-T-0058): a heraldic shield in heraldic gold with a cream five-point star,
-  sitting in the adaptive-icon safe zone (108x108 canvas, content kept within the central ~72dp).
-  Pairs with the royal @color/ic_launcher_background.
+  Squire crest, Heraldic (SQUIRE-T-0137): a white shield bearing the gold five-point star the family
+  already knows, on the midnight @color/ic_launcher_background. Adaptive-icon safe zone: 108x108
+  canvas, content within the central ~72dp.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -10,15 +10,15 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Shield: gold face with a deeper-gold rim. -->
+    <!-- Shield: white face, a hairline of the ground showing as its rim. -->
     <path
-        android:pathData="M32,34 L76,34 L76,54 C76,70 66,80 54,86 C42,80 32,70 32,54 Z"
-        android:fillColor="#D7B43E"
-        android:strokeColor="#8A6D12"
-        android:strokeWidth="2.5" />
+        android:pathData="M32,33 L76,33 L76,54 C76,70 66,80 54,86 C42,80 32,70 32,54 Z"
+        android:fillColor="#FFFFFF" />
 
-    <!-- Five-point star, cream. -->
+    <!-- The star, in coin gold. -->
     <path
         android:pathData="M54,41 L57.06,49.79 L66.36,49.98 L58.95,55.61 L61.64,64.52 L54,59.2 L46.36,64.52 L49.05,55.61 L41.64,49.98 L50.94,49.79 Z"
-        android:fillColor="#FFFDF6" />
+        android:fillColor="#F6B93B"
+        android:strokeColor="#B8860B"
+        android:strokeWidth="1.2" />
 </vector>

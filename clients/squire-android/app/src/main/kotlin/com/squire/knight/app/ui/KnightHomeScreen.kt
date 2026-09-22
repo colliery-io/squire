@@ -48,6 +48,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.squire.app.ui.theme.SquireIcons
+import androidx.compose.material3.Icon
 import com.squire.app.ui.theme.SquireSeal
 import com.squire.app.ui.theme.SquireDisplay
 import androidx.compose.ui.unit.sp
@@ -86,10 +88,10 @@ import com.squire.sdk.model.SquireSummary
  * cards, royal serif headers, gold balance pills — kept scannable for a parent triaging the queue.
  */
 /** The Knight (parent) home's bottom-nav pages — mirrors the Squire's tabbed layout for consistency. */
-enum class KnightTab(val label: String, val icon: String) {
-    Review("Review", "📋"),
-    Manage("Manage", "🛠"),
-    History("History", "📜"),
+enum class KnightTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Review("Review", SquireIcons.Review),
+    Manage("Manage", SquireIcons.Manage),
+    History("History", SquireIcons.Journal),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,8 +134,9 @@ fun KnightHomeScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(color = MaterialTheme.colorScheme.secondary, shape = CircleShape) {
-                            Text("🛡", modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
+                        Surface(color = MaterialTheme.colorScheme.surface, shape = CircleShape) {
+                            // The Knight's mark: the drawn shield, not a phone-dependent emoji (SQUIRE-T-0137).
+                            Icon(SquireIcons.Me, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp).size(20.dp))
                         }
                         Spacer(Modifier.width(10.dp))
                         Text(
@@ -172,7 +175,7 @@ fun KnightHomeScreen(
                         NavigationBarItem(
                             selected = tab == t,
                             onClick = { tab = t },
-                            icon = { Text(t.icon, style = MaterialTheme.typography.titleLarge) },
+                            icon = { Icon(t.icon, contentDescription = null) },
                             label = { Text(t.label) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = MaterialTheme.colorScheme.onSurface,

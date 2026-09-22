@@ -53,6 +53,8 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.squire.app.ui.theme.SquireIcons
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.LaunchedEffect
 import com.squire.app.ui.components.Dot
@@ -103,11 +105,11 @@ import com.squire.sdk.model.StateView
 import com.squire.sdk.model.StreakView
 
 /** The four pages of the child home, shown one at a time via the bottom navigation bar. */
-enum class SquireTab(val label: String, val icon: String) {
-    Quests("Today", "⚔"),
-    Rewards("Rewards", "🛒"),
-    Me("Me", "🏅"),
-    Activity("Activity", "📜"),
+enum class SquireTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Quests("Today", SquireIcons.Today),
+    Rewards("Rewards", SquireIcons.Rewards),
+    Me("Me", SquireIcons.Me),
+    Activity("Activity", SquireIcons.Journal),
 }
 
 /**
@@ -167,7 +169,7 @@ fun PlayerHomeScreen(
                         NavigationBarItem(
                             selected = tab == t,
                             onClick = { tab = t },
-                            icon = { Text(t.icon, style = MaterialTheme.typography.titleLarge) },
+                            icon = { Icon(t.icon, contentDescription = null) },
                             label = { Text(t.label) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = MaterialTheme.colorScheme.onSurface,
