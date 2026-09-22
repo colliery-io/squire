@@ -147,7 +147,14 @@ internal fun MemberAdminScreen(
             )
         },
     ) { padding ->
+        // Opening the form scrolls it into view (SQUIRE-T-0143): it sits above the list, so a parent who
+        // has scrolled down and tapped Edit would otherwise see nothing happen — which is exactly the bug
+        // the list-first change shipped with.
+        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        LaunchedEffect(composing, renaming) { if (composing) listState.animateScrollToItem(0) }
+
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxWidth().padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -161,6 +168,34 @@ internal fun MemberAdminScreen(
                     if (!composing) FilledTonalButton(onClick = { composing = true }) { Text("Add a member") }
                 }
             }
+            if (composing) {
+                item { SectionTitle("Add a member") }
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+                            Text("Role", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ChoiceChip("Squire (child)", role == "Squire") { role = "Squire" }
+                                ChoiceChip("Knight (parent)", role == "Knight") { role = "Knight" }
+                            }
+
+                            OutlinedTextField(value = secret, onValueChange = { secret = it }, label = { Text("Initial secret (fallback login)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+                            formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                            Button(
+                                onClick = { submitAdd() },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
+                            ) { Text("Add member") }
+                        }
+                    }
+                }
+            }
+
             listError?.let { e -> item { Text(e, color = MaterialTheme.colorScheme.error) } }
             items(members) { m ->
                 Card(
@@ -200,35 +235,7 @@ internal fun MemberAdminScreen(
                         }
                     }
                 }
-            }
-            if (composing) {
-                item { SectionTitle("Add a member") }
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    ) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
-                            Text("Role", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ChoiceChip("Squire (child)", role == "Squire") { role = "Squire" }
-                                ChoiceChip("Knight (parent)", role == "Knight") { role = "Knight" }
-                            }
-
-                            OutlinedTextField(value = secret, onValueChange = { secret = it }, label = { Text("Initial secret (fallback login)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
-                            formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                            Button(
-                                onClick = { submitAdd() },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
-                            ) { Text("Add member") }
-                        }
-                    }
-                }
-            }
-        }
+            }        }
     }
 
     invite?.let { inv ->

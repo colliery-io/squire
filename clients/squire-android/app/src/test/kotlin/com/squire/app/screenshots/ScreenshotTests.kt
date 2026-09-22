@@ -502,6 +502,31 @@ class ScreenshotTests {
     }
 
     @Test
+    fun knightManageQuestsComposing() {
+        // The regression this pins (SQUIRE-T-0143): the list-first change put the form BELOW the
+        // list, so tapping Edit prefilled a form nobody could see and editing looked broken. The form
+        // must render above the board whenever it is open.
+        val adapter = KnightApiAdapter(baseUrl = "http://localhost", household = "demo", token = "t")
+        val quests = listOf(
+            QuestSummaryDto(id = 100, title = "Make your bed", reward = 5, category = "Bedroom",
+                cadenceLabel = "Daily", assignmentLabel = "All squires", completion = CompletionDto.EachAssignee,
+                repeatableWithinDay = false, autoApprove = true, active = true),
+        )
+        paparazzi.snapshot {
+            SquireTheme {
+                QuestAdminScreen(
+                    adapter = adapter,
+                    squires = listOf(2L to "Gawain"),
+                    onBack = {},
+                    initialQuests = quests,
+                    libraryOverride = emptyList(),
+                    initiallyComposing = true,
+                )
+            }
+        }
+    }
+
+    @Test
     fun knightEditCatalog() {
         // The "Current rewards" list with the in-place Edit affordance (SQUIRE-T-0120/0126) — library
         // omitted so the list (and its Edit/Archive buttons) renders in the captured viewport.

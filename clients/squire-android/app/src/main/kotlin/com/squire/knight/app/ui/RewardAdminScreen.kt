@@ -177,7 +177,14 @@ internal fun RewardAdminScreen(
             )
         },
     ) { padding ->
+        // Opening the form scrolls it into view (SQUIRE-T-0143): it sits above the list, so a parent who
+        // has scrolled down and tapped Edit would otherwise see nothing happen — which is exactly the bug
+        // the list-first change shipped with.
+        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        LaunchedEffect(composing, editingId) { if (composing) listState.animateScrollToItem(0) }
+
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxWidth().padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -189,38 +196,6 @@ internal fun RewardAdminScreen(
                     SectionTitle("Current rewards")
                     Spacer(Modifier.weight(1f))
                     if (!composing) FilledTonalButton(onClick = { composing = true }) { Text("New reward") }
-                }
-            }
-            listError?.let { e -> item { Text(e, color = MaterialTheme.colorScheme.error) } }
-            if (items.isEmpty() && listError == null) {
-                item { Text("None yet — tap “New reward” or import from the library.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-            items(items) { r ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                  Column {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Medallion(null, r.name, reward = true)
-                        Column(Modifier.weight(1f)) {
-                            Text(r.name + if (r.active) "" else " (archived)", fontWeight = FontWeight.SemiBold)
-                            Text(r.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        GoldPill(r.cost.toInt())
-                    }
-                    if (r.active) {
-                        Row(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { startEdit(r) }) { Text("Edit") }
-                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { scope.launch { runCatching { adapter.archiveItem(r.id) }; tick++ } }) { Text("Archive") }
-                        }
-                    }
-                }
                 }
             }
             if (composing) {
@@ -290,7 +265,39 @@ internal fun RewardAdminScreen(
                     }
                 }
             }
-        }
+
+            listError?.let { e -> item { Text(e, color = MaterialTheme.colorScheme.error) } }
+            if (items.isEmpty() && listError == null) {
+                item { Text("None yet — tap “New reward” or import from the library.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            items(items) { r ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                  Column {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Medallion(null, r.name, reward = true)
+                        Column(Modifier.weight(1f)) {
+                            Text(r.name + if (r.active) "" else " (archived)", fontWeight = FontWeight.SemiBold)
+                            Text(r.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        GoldPill(r.cost.toInt())
+                    }
+                    if (r.active) {
+                        Row(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { startEdit(r) }) { Text("Edit") }
+                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { scope.launch { runCatching { adapter.archiveItem(r.id) }; tick++ } }) { Text("Archive") }
+                        }
+                    }
+                }
+                }
+            }        }
     }
 }
 

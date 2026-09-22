@@ -37,6 +37,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.FilledTonalButton
@@ -86,6 +87,8 @@ internal fun QuestAdminScreen(
     // Screenshot/test seams (SQUIRE-T-0070); both null in production → live fetch + bundled library.
     initialQuests: List<QuestSummaryDto>? = null,
     libraryOverride: List<LibraryQuest>? = null,
+    /** Screenshot seam: start with the form open, as tapping "New quest" or "Edit" leaves it. */
+    initiallyComposing: Boolean = false,
 ) {
     androidx.activity.compose.BackHandler { onBack() }
     val scope = rememberCoroutineScope()
@@ -128,7 +131,7 @@ internal fun QuestAdminScreen(
     var dueLabel by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var formError by remember { mutableStateOf<String?>(null) }
-    var composing by remember { mutableStateOf(false) } // the form is open (list-first screens)
+    var composing by remember { mutableStateOf(initiallyComposing) } // the form is open (list-first screens)
     var editingId by remember { mutableStateOf<Long?>(null) } // non-null = editing (upsert) — SQUIRE-T-0120
 
     fun resetForm() {
@@ -219,7 +222,14 @@ internal fun QuestAdminScreen(
             )
         },
     ) { padding ->
+        // Opening the form scrolls it into view (SQUIRE-T-0143): it sits above the list, so a parent who
+        // has scrolled down and tapped Edit would otherwise see nothing happen — which is exactly the bug
+        // the list-first change shipped with.
+        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        LaunchedEffect(composing, editingId) { if (composing) listState.animateScrollToItem(0) }
+
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxWidth().padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -231,44 +241,6 @@ internal fun QuestAdminScreen(
                     SectionTitle("Current quests")
                     Spacer(Modifier.weight(1f))
                     if (!composing) FilledTonalButton(onClick = { composing = true }) { Text("New quest") }
-                }
-            }
-            listError?.let { e -> item { Text(e, color = MaterialTheme.colorScheme.error) } }
-            if (quests.isEmpty() && listError == null) {
-                item { Text("No quests yet — tap “New quest” or import from the library.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-            items(quests) { q ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                  Column {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Medallion(null, q.title)
-                        Column(Modifier.weight(1f)) {
-                            Text(q.title + if (q.active) "" else " (archived)", fontWeight = FontWeight.SemiBold)
-                            Text(
-                                "${q.cadenceLabel} · ${q.assignmentLabel}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        GoldPill(q.reward.toInt())
-                    }
-                    if (q.active) {
-                        Row(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { startEdit(q) }) { Text("Edit") }
-                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { scope.launch { runCatching { adapter.archiveQuest(q.id) }; tick++ } }) {
-                                    Text("Archive")
-                                }
-                        }
-                    }
-                }
                 }
             }
             if (composing) {
@@ -407,7 +379,45 @@ internal fun QuestAdminScreen(
 
                 // ── Existing quests ──
             }
-        }
+
+            listError?.let { e -> item { Text(e, color = MaterialTheme.colorScheme.error) } }
+            if (quests.isEmpty() && listError == null) {
+                item { Text("No quests yet — tap “New quest” or import from the library.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            items(quests) { q ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                  Column {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Medallion(null, q.title)
+                        Column(Modifier.weight(1f)) {
+                            Text(q.title + if (q.active) "" else " (archived)", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "${q.cadenceLabel} · ${q.assignmentLabel}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        GoldPill(q.reward.toInt())
+                    }
+                    if (q.active) {
+                        Row(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { startEdit(q) }) { Text("Edit") }
+                                OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), onClick = { scope.launch { runCatching { adapter.archiveQuest(q.id) }; tick++ } }) {
+                                    Text("Archive")
+                                }
+                        }
+                    }
+                }
+                }
+            }        }
     }
 
     if (showDatePicker) {
