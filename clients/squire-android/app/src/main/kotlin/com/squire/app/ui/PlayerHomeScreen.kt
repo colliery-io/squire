@@ -141,7 +141,7 @@ fun PlayerHomeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (state is PlayerUiState.Ready) {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.primary) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     SquireTab.entries.forEach { t ->
                         NavigationBarItem(
                             selected = tab == t,
@@ -149,11 +149,11 @@ fun PlayerHomeScreen(
                             icon = { Text(t.icon, style = MaterialTheme.typography.titleLarge) },
                             label = { Text(t.label) },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                                selectedTextColor = MaterialTheme.colorScheme.onPrimary,
-                                unselectedIconColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-                                unselectedTextColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-                                indicatorColor = MaterialTheme.colorScheme.secondary,
+                                selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurface,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
                             ),
                         )
                     }
@@ -242,7 +242,6 @@ fun PlayerHomeScreen(
                         }
                     },
                 )
-                HorizontalDivider(thickness = 3.dp, color = SquireGold)
             }
         },
     ) { padding ->
@@ -797,10 +796,10 @@ internal fun goalDetail(g: GoalView) = DetailContent(
     note = "Not unlocked yet — keep going!",
 )
 
-/** A parchment card wrapper for quests/rewards/streaks. */
+/** A plain card wrapper for quests/rewards/streaks. */
 @Composable
 private fun QuestCard(
-    accent: Color = MaterialTheme.colorScheme.outlineVariant,
+    @Suppress("UNUSED_PARAMETER") accent: Color = MaterialTheme.colorScheme.outlineVariant,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
@@ -810,10 +809,9 @@ private fun QuestCard(
         modifier = Modifier.fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
     ) {
-        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-            Box(Modifier.width(4.dp).fillMaxHeight().background(accent))
-            Column(modifier = Modifier.padding(14.dp)) { content() }
-        }
+        // The coloured left stripe is gone (SQUIRE-T-0132): it restated what the row's own button or
+        // chip already says. `accent` stays in the signature until SQUIRE-T-0133 rebuilds these rows.
+        Column(modifier = Modifier.padding(14.dp)) { content() }
     }
 }
 

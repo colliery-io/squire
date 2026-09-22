@@ -153,12 +153,11 @@ fun KnightHomeScreen(
                     }
                 },
             )
-            HorizontalDivider(thickness = 3.dp, color = SquireGold)
           }
         },
         bottomBar = {
             if (state is KnightUiState.Ready) {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.primary) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     KnightTab.entries.forEach { t ->
                         NavigationBarItem(
                             selected = tab == t,
@@ -166,11 +165,11 @@ fun KnightHomeScreen(
                             icon = { Text(t.icon, style = MaterialTheme.typography.titleLarge) },
                             label = { Text(t.label) },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                                selectedTextColor = MaterialTheme.colorScheme.onPrimary,
-                                unselectedIconColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-                                unselectedTextColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-                                indicatorColor = MaterialTheme.colorScheme.secondary,
+                                selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurface,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
                             ),
                         )
                     }
@@ -578,10 +577,14 @@ private fun SquireRow(
             // "cashing out" is modelled as a redemption (drawing down the owed-cash balance, parent-
             // approved), handled through the rewards/redemption flow, so the card never grows a
             // variable extra button.
+            // Tighter than Material's 24dp default: Lexend runs wider than Roboto, and at the default
+            // the third button wrapped — making every squire card a row taller and pushing the
+            // approval queue further down the screen.
+            val tight = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onMarkDone) { Text("Mark done") }
-                OutlinedButton(onClick = onRedeem) { Text("Redeem") }
-                OutlinedButton(onClick = onAddFunds) { Text("Add funds") }
+                OutlinedButton(onClick = onMarkDone, contentPadding = tight) { Text("Mark done") }
+                OutlinedButton(onClick = onRedeem, contentPadding = tight) { Text("Redeem") }
+                OutlinedButton(onClick = onAddFunds, contentPadding = tight) { Text("Add funds") }
             }
         }
     }

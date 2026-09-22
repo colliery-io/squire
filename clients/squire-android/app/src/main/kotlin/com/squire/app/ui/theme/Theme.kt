@@ -7,78 +7,111 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.squire.app.R
 
-// ── Squire brand palette (redesign 2026) — exact values from style-guide/color-palette.md,
-//    shared 1:1 with the Keep desktop CSS so phone + computer read as one product. ──
-private val ParchmentBg   = Color(0xFFF2E6C8) // app background
-private val ParchmentCard = Color(0xFFFFFEFA) // card surface
-private val Royal         = Color(0xFF5A3D8E) // primary — royal purple
-private val RoyalDeep     = Color(0xFF402A67)
-private val RoyalContainer = Color(0xFFE6E1F6)
-private val GoldText      = Color(0xFFA9781F) // legible gold for text/icons on parchment
-private val GoldContainer = Color(0xFFF3E3B3) // soft gold pill background
-private val GoldOnContainer = Color(0xFF5A4300)
-private val Herald        = Color(0xFF5D8A42) // success / "done" green
-private val HeraldDeep    = Color(0xFF42642E)
-private val GreenContainer = Color(0xFFE4EFD8)
-private val Ink           = Color(0xFF3C2D21) // body text
-private val Stone         = Color(0xFF6E6450) // secondary text
-private val Hearth        = Color(0xFFB55443) // warning / reject
-private val Line          = Color(0xFFE2D2AC)
+// ── Squire palette — the HERALDIC system (SQUIRE-I-0006 / SQUIRE-T-0132), shared 1:1 with the Keep's
+//    CSS so phone + computer read as one product. One rule, from heraldry's rule of tincture:
+//      · colour belongs to PEOPLE   (a squire's tincture marks what is theirs)
+//      · gold belongs to REWARD     (the Gold* values below are for coins and coin amounts ONLY)
+//      · everything else is quiet   (argent ground, white cards, midnight ink)
+//    Red is for real errors. Declining a claim is "not yet", never an error. ──
+private val Argent     = Color(0xFFEEF1F7) // app ground
+private val Card       = Color(0xFFFFFFFF)
+private val Wash       = Color(0xFFE6EBF5) // tinted disc behind content emoji; quiet fills
+private val Ink        = Color(0xFF16203F) // midnight: text, bars, primary actions
+private val Stone      = Color(0xFF5E6885) // secondary text
+private val Line       = Color(0xFFDCE1EC)
+private val Azure      = Color(0xFF2457C5) // interactive accent
+private val AzureSoft  = Color(0xFFDEE8FB)
+private val Vert       = Color(0xFF187A4F) // default squire tincture; "I did it" / earned
+private val VertDeep   = Color(0xFF0F5C3A)
+private val VertSoft   = Color(0xFFDCF0E6)
+private val ErrorRed   = Color(0xFFB3261E)
 
-// ── Public brand accents, for the redesigned components (medallion, coin pill, accents). ──
-val SquireGold        = GoldText
-val SquireGoldLight   = Color(0xFFF1C15C)
-val SquireGoldOn      = GoldOnContainer
-val SquireRoyal       = Royal
-val SquireRoyalDeep   = RoyalDeep
-val SquireGreen       = Herald
-val SquireEpic        = Color(0xFFE08B2D) // high-value / streak heat
-val SquireParchmentEdge = Color(0xFFDCC9A0)
-val SquireParchmentTile = Color(0xFFFBF1D8)
+// ── Public accents for hand-built components. Names predate the Heraldic palette and are kept so
+//    call sites don't churn; the VALUES are what changed. ──
+val SquireGold        = Color(0xFFB8860B) // coin rim / gold line-work
+val SquireGoldLight   = Color(0xFFFFD978) // coin highlight
+val SquireGoldFace    = Color(0xFFF6B93B) // coin face
+val SquireGoldOn      = Color(0xFF7A4E00) // legible coin amount on a light ground
+val SquireGoldSoft    = Color(0xFFFFF3D1) // coin-pill ground
+val SquireRoyal       = Ink               // was royal purple: now the midnight ink
+val SquireRoyalDeep   = Ink
+val SquireGreen       = Vert
+val SquireEpic        = Azure             // "streak heat" no longer borrows an orange
+val SquireParchmentEdge = Line
+val SquireParchmentTile = Wash
+val SquireWash        = Wash
+val SquireInk         = Ink
+val SquireSeal        = Color(0xFFC8102E) // the Knight's wax seal — the MARK, not a button colour
+val SquireCash        = Color(0xFF0B7A55)
+val SquireCashSoft    = Color(0xFFDDF3EA)
 
 private val SquireColors = lightColorScheme(
-    primary = Royal,
+    primary = Ink,
     onPrimary = Color.White,
-    primaryContainer = RoyalContainer,
-    onPrimaryContainer = RoyalDeep,
-    secondary = GoldText,
+    primaryContainer = Wash,
+    onPrimaryContainer = Ink,
+    // NOT gold: `secondary*` feeds every tonal button, chip and nav indicator in Material 3, which
+    // is how gold used to leak onto things that are not coins.
+    secondary = Azure,
     onSecondary = Color.White,
-    secondaryContainer = GoldContainer,
-    onSecondaryContainer = GoldOnContainer,
-    tertiary = Herald,
+    secondaryContainer = AzureSoft,
+    onSecondaryContainer = Ink,
+    tertiary = Vert,
     onTertiary = Color.White,
-    tertiaryContainer = GreenContainer,
-    onTertiaryContainer = HeraldDeep,
-    background = ParchmentBg,
+    tertiaryContainer = VertSoft,
+    onTertiaryContainer = VertDeep,
+    background = Argent,
     onBackground = Ink,
-    surface = ParchmentCard,
+    surface = Card,
     onSurface = Ink,
-    surfaceVariant = Color(0xFFEADFC4),
+    surfaceVariant = Wash,
     onSurfaceVariant = Stone,
-    error = Hearth,
+    error = ErrorRed,
     onError = Color.White,
-    errorContainer = Color(0xFFF3DED9),
-    onErrorContainer = Color(0xFF8A3E32),
-    outline = Color(0xFFC7B998),
+    errorContainer = Color(0xFFFCE8E6),
+    onErrorContainer = Color(0xFF8C1D18),
+    outline = Color(0xFFB9C0D0),
     outlineVariant = Line,
 )
 
-// Display headers use a serif for the adventure-journal feel; body stays sans.
-// To match the mockups exactly, drop a Bitter font resource into res/font/ and set:
-//   private val Display = FontFamily(Font(R.font.bitter_bold, FontWeight.Bold), …)
-private val Display = FontFamily.Serif
+// Two bundled typefaces (SIL OFL 1.1; licences in assets/licenses), cut as static weights so they
+// render identically on every API level and in Paparazzi:
+//   · Grenze — a roman/blackletter hybrid: names, screen titles and every coin amount.
+//   · Lexend — drawn to aid reading fluency (our readers are children): everything else.
+val SquireDisplay = FontFamily(
+    Font(R.font.grenze_semibold, FontWeight.SemiBold),
+    Font(R.font.grenze_bold, FontWeight.Bold),
+    Font(R.font.grenze_extrabold, FontWeight.ExtraBold),
+)
+val SquireBody = FontFamily(
+    Font(R.font.lexend_light, FontWeight.Light),
+    Font(R.font.lexend_regular, FontWeight.Normal),
+    Font(R.font.lexend_medium, FontWeight.Medium),
+    Font(R.font.lexend_semibold, FontWeight.SemiBold),
+)
 
 private val SquireType = Typography().run {
+    fun TextStyle.body() = copy(fontFamily = SquireBody)
     copy(
-        headlineMedium = headlineMedium.copy(fontFamily = Display, fontWeight = FontWeight.Bold),
-        headlineSmall = headlineSmall.copy(fontFamily = Display, fontWeight = FontWeight.Bold),
-        titleLarge = titleLarge.copy(fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 22.sp),
-        titleMedium = titleMedium.copy(fontFamily = Display, fontWeight = FontWeight.SemiBold),
+        displayLarge = displayLarge.body(), displayMedium = displayMedium.body(), displaySmall = displaySmall.body(),
+        headlineLarge = headlineLarge.copy(fontFamily = SquireDisplay, fontWeight = FontWeight.ExtraBold),
+        headlineMedium = headlineMedium.copy(fontFamily = SquireDisplay, fontWeight = FontWeight.Bold),
+        headlineSmall = headlineSmall.copy(fontFamily = SquireDisplay, fontWeight = FontWeight.Bold),
+        titleLarge = titleLarge.copy(fontFamily = SquireDisplay, fontWeight = FontWeight.Bold, fontSize = 24.sp),
+        // Below ~18sp Grenze's blackletter detail stops helping: smaller titles are Lexend.
+        titleMedium = titleMedium.copy(fontFamily = SquireBody, fontWeight = FontWeight.Medium),
+        titleSmall = titleSmall.copy(fontFamily = SquireBody, fontWeight = FontWeight.Medium),
+        bodyLarge = bodyLarge.body(), bodyMedium = bodyMedium.body(), bodySmall = bodySmall.body(),
+        labelLarge = labelLarge.copy(fontFamily = SquireBody, fontWeight = FontWeight.Medium),
+        labelMedium = labelMedium.body(), labelSmall = labelSmall.body(),
     )
 }
 

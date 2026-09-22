@@ -22,7 +22,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.squire.app.ui.theme.SquireCash
+import com.squire.app.ui.theme.SquireCashSoft
+import com.squire.app.ui.theme.SquireDisplay
 import com.squire.app.ui.theme.SquireGold
+import com.squire.app.ui.theme.SquireGoldFace
+import com.squire.app.ui.theme.SquireGoldSoft
+import com.squire.app.ui.theme.SquireWash
 import com.squire.app.ui.theme.SquireGoldLight
 import com.squire.app.ui.theme.SquireGoldOn
 import com.squire.app.ui.theme.SquireParchmentEdge
@@ -36,8 +42,7 @@ import com.squire.app.ui.theme.SquireParchmentTile
 fun GoldPill(amount: Int, large: Boolean = false) {
     Surface(
         shape = RoundedCornerShape(50),
-        color = Color(0xFFF3E3B3),
-        border = BorderStroke(1.dp, SquireGold.copy(alpha = .55f)),
+        color = SquireGoldSoft,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -49,8 +54,8 @@ fun GoldPill(amount: Int, large: Boolean = false) {
                 "$amount",
                 color = SquireGoldOn,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Serif,
-                fontSize = if (large) 20.sp else 15.sp,
+                fontFamily = SquireDisplay,
+                fontSize = if (large) 22.sp else 17.sp,
             )
         }
     }
@@ -62,15 +67,14 @@ fun GoldPill(amount: Int, large: Boolean = false) {
 fun CashPill(amount: Long, large: Boolean = true) {
     Surface(
         shape = RoundedCornerShape(50),
-        color = Color(0xFFCDEFD6),
-        border = BorderStroke(1.dp, Color(0xFF2E7D4F).copy(alpha = .55f)),
+        color = SquireCashSoft,
     ) {
         Text(
             "$$amount",
-            color = Color(0xFF1B5E33),
+            color = SquireCash,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Serif,
-            fontSize = if (large) 20.sp else 15.sp,
+            fontFamily = SquireDisplay,
+            fontSize = if (large) 22.sp else 17.sp,
             modifier = Modifier.padding(horizontal = if (large) 14.dp else 9.dp, vertical = if (large) 7.dp else 5.dp),
         )
     }
@@ -84,21 +88,21 @@ private fun Coin(size: androidx.compose.ui.unit.Dp) {
         modifier = Modifier
             .size(size)
             .clip(CircleShape)
-            .background(Brush.radialGradient(listOf(SquireGoldLight, SquireGold)))
-            .border(1.5.dp, Color(0xFFA9781F), CircleShape),
+            .background(Brush.radialGradient(listOf(SquireGoldLight, SquireGoldFace)))
+            .border(1.5.dp, SquireGold, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .size(size * 0.6f)
                 .clip(CircleShape)
-                .border(1.dp, Color(0xFFA9781F).copy(alpha = 0.55f), CircleShape),
+                .border(1.dp, SquireGold.copy(alpha = 0.45f), CircleShape),
         )
     }
 }
 
 /**
- * A **medallion** — the rounded parchment tile that frames a quest/reward icon. Pass the stored
+ * A **medallion** — the plain tinted disc behind a quest/reward's own emoji (content, not chrome). Pass the stored
  * [icon] (emoji) or let it infer one from [label]; set [reward] to use the treasure icon table.
  */
 @Composable
@@ -107,9 +111,8 @@ fun Medallion(icon: String?, label: String = "", reward: Boolean = false, modifi
     androidx.compose.foundation.layout.Box(
         modifier = modifier
             .size(44.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Brush.radialGradient(listOf(SquireParchmentTile, Color(0xFFEAD9AE))))
-            .border(1.5.dp, SquireParchmentEdge, RoundedCornerShape(12.dp)),
+            .clip(CircleShape)
+            .background(SquireWash),
         contentAlignment = Alignment.Center,
     ) {
         Text(glyph, fontSize = 22.sp)
@@ -187,7 +190,7 @@ private fun Dot(filled: Boolean) {
         modifier = Modifier
             .size(11.dp)
             .clip(CircleShape)
-            .background(if (filled) SquireGold else MaterialTheme.colorScheme.outlineVariant),
+            .background(if (filled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant),
     )
 }
 

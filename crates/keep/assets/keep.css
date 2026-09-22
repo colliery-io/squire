@@ -1,47 +1,70 @@
 /* ============================================================================
-   The Keep — Squire household admin theme  (redesign 2026)
-   Adventure-journal system: Royal Purple · Adventure Gold · Parchment Cream.
-   Local-only & offline-safe: uses system fonts (no network web-font fetch).
-   To upgrade the type, self-host Bitter + Nunito Sans — see README.
+   The Keep — Squire household admin theme. Heraldic system (SQUIRE-I-0006 / T-0132).
+
+   One rule, borrowed from heraldry's rule of tincture — colour on metal, metal on colour:
+     · COLOUR BELONGS TO PEOPLE   a squire's tincture marks what is theirs
+     · GOLD BELONGS TO REWARD     --gold appears on coins and coin amounts, nowhere else
+     · EVERYTHING ELSE IS QUIET   argent ground, white cards, midnight ink
+   The SEAL colour is the Knight's approval ("seal it"). Red is reserved for real errors —
+   a "not yet" is not an error, so rejecting is neutral.
+
+   Offline-safe: both typefaces are served from this binary (/static/fonts), SIL OFL 1.1 —
+   licences alongside. No network font fetch, ever (the Keep runs on LANs and tailnets).
    ============================================================================ */
 
+@font-face {
+  font-family: "Grenze"; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url("/static/fonts/grenze.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Lexend"; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url("/static/fonts/lexend.woff2") format("woff2");
+}
+
 :root {
-  /* ── Brand ── */
-  --royal: #5A3D8E;        /* primary */
-  --royal-light: #7A5FB5;
-  --royal-deep: #402A67;
-  --gold: #D8A13A;         /* currency / progression */
-  --gold-light: #F1C15C;
-  --gold-deep: #A97822;
-  --gold-on: #5A4300;      /* legible gold-on-light text */
-  --epic: #E08B2D;         /* high-value / streak heat */
-
-  /* ── Surfaces ── */
-  --parch: #F2E6C8;        /* app background */
-  --parch-light: #FAF4E6;
-  --parch-deep: #DCC9A0;
-  --cream: #FBF5E7;        /* panel */
-  --card: #FFFEFA;         /* card */
-
-  /* ── Semantic ── */
-  --green: #5D8A42;  --green-deep: #42642E;  --green-soft: #E4EFD8;
-  --blue:  #4E79A7;  --blue-soft:  #DEEAF3;
-  --red:   #B55443;  --red-deep:   #8A3E32;  --red-soft:   #F3DED9;
-
-  /* ── Neutrals ── */
-  --ink: #3C2D21;          /* primary text */
-  --stone: #8C857B;        /* secondary text */
-  --mist: #D8D5D0;         /* disabled */
-  --line: #E2D2AC;         /* hairline */
-  --line-soft: #EADFC4;
+  /* ── Field & ink (the quiet part) ── */
+  --argent: #EEF1F7;       /* app ground */
+  --card: #FFFFFF;
+  --wash: #E6EBF5;         /* tinted disc behind content emoji, hover fills */
+  --ink: #16203F;          /* midnight: text, bars, primary actions */
+  --ink-2: #2B3763;        /* hover on ink */
+  --stone: #5E6885;        /* secondary text */
+  --mist: #C9D0E0;         /* disabled */
+  --line: #DCE1EC;         /* hairline */
+  --line-soft: #E8ECF4;
   --field: #FFFFFF;
 
-  /* ── Type ── */
-  --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
-  --font-ui: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  /* ── Metal: gold is for coins only ── */
+  --gold: #F6B93B;
+  --gold-light: #FFD978;
+  --gold-deep: #B8860B;    /* coin rim */
+  --gold-on: #7A4E00;      /* legible amount on a light ground */
+  --gold-soft: #FFF3D1;    /* coin pill ground */
 
-  --shadow-card: 0 1px 2px rgba(46,38,87,.05);
-  --shadow-pop: 0 8px 18px rgba(46,38,87,.12);
+  /* ── Tinctures ── */
+  --azure: #2457C5;        /* interactive accent: links, focus, active nav */
+  --azure-soft: #DEE8FB;
+  --seal: #C8102E;         /* the Knight's seal — approve / grant */
+  --seal-deep: #9E0C24;
+  --vert: #187A4F;  --vert-soft: #DCF0E6;   /* default squire tincture; also "earned/active" */
+  --cash: #0B7A55;  --cash-soft: #DDF3EA;
+
+  /* ── Errors only (never "not yet") ── */
+  --red: #B3261E;  --red-deep: #8C1D18;  --red-soft: #FCE8E6;
+
+  /* ── Legacy aliases — selectors/JS written against the old names keep working ── */
+  --royal: var(--ink); --royal-light: var(--stone); --royal-deep: var(--ink);
+  --parch: var(--argent); --parch-light: #F6F8FC; --parch-deep: var(--line); --cream: var(--card);
+  --green: var(--vert); --green-deep: #0F5C3A; --green-soft: var(--vert-soft);
+  --blue: var(--azure); --blue-soft: var(--azure-soft); --epic: var(--azure);
+
+  /* ── Type ── */
+  --font-display: "Grenze", "Iowan Old Style", Georgia, serif;
+  --font-ui: "Lexend", system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+
+  --shadow-card: 0 1px 0 var(--line);
+  --shadow-pop: 0 10px 24px rgba(22,32,63,.14);
+  --focus: 0 0 0 3px rgba(36,87,197,.28);
 }
 
 * { box-sizing: border-box; }
@@ -49,51 +72,42 @@
 
 body {
   margin: 0;
-  font: 15px/1.55 var(--font-ui);
+  font: 300 15px/1.55 var(--font-ui);
   color: var(--ink);
-  background-color: var(--parch);
-  background-image:
-    radial-gradient(circle at 16% 0%, rgba(255,255,255,.5), transparent 48%),
-    radial-gradient(circle at 92% 100%, rgba(90,61,142,.05), transparent 50%);
-  background-attachment: fixed;
+  background: var(--argent);
 }
 
 /* ── Banner header ───────────────────────────────────────────────────────── */
 header {
   position: relative;
-  padding: 18px 28px;
-  background: linear-gradient(120deg, #5A3D8E 0%, #4A3179 60%, #402A67 100%);
+  padding: 16px 28px;
+  background: var(--ink);
   color: #fff;
-  border-bottom: 3px solid var(--gold);
   display: flex;
   align-items: center;
   gap: 14px;
 }
 header .emblem {
-  width: 44px; height: 44px; flex: none;
-  border-radius: 12px;
+  width: 40px; height: 40px; flex: none;
+  border-radius: 10px;
   background: rgba(255,255,255,.10);
-  border: 1.5px solid rgba(241,193,92,.7);
   display: grid; place-items: center;
 }
 header h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.5rem;
-  letter-spacing: .3px;
-  line-height: 1.1;
+  font-weight: 800;
+  font-size: 1.75rem;
+  line-height: 1;
 }
-header .sub { margin: 2px 0 0; color: #CDC2EC; font-size: .82rem; }
+header .sub { margin: 3px 0 0; color: #AEB8D6; font-size: .8rem; }
 
 main { max-width: 64rem; margin: 1.4rem auto 3rem; padding: 0 1.4rem; }
 
 /* ── Panels / sections ───────────────────────────────────────────────────── */
 section {
-  background: var(--cream);
-  background-image: radial-gradient(circle at 10% 0%, rgba(255,255,255,.5), transparent 42%);
-  border: 1px solid var(--line);
-  border-radius: 16px;
+  background: var(--card);
+  border-radius: 12px;
   padding: 1.3rem 1.5rem;
   margin-bottom: 1.25rem;
   box-shadow: var(--shadow-card);
@@ -107,106 +121,105 @@ section {
 }
 .who-chip {
   display: inline-flex; align-items: center; gap: 9px;
-  background: #EFE7FB; border: 1px solid #D8C7E8;
+  background: var(--wash);
   border-radius: 999px; padding: 5px 6px 5px 13px;
-  font-size: .85rem; color: var(--royal-deep); font-weight: 700;
+  font-size: .85rem; color: var(--ink); font-weight: 500;
 }
 .who-chip .avatar {
   width: 28px; height: 28px; border-radius: 50%;
-  background: linear-gradient(150deg, var(--gold-light), #C98F23);
+  background: var(--ink);
   display: grid; place-items: center;
-  font-family: var(--font-display); font-weight: 700; font-size: 13px;
-  color: var(--royal-deep); border: 1.5px solid var(--gold-light);
+  font-family: var(--font-display); font-weight: 700; font-size: 14px;
+  color: #fff;
 }
 
 h2 {
   margin: 0 0 .25rem;
-  display: flex; align-items: center; gap: 9px;
+  display: flex; align-items: center; gap: 10px;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.28rem;
-  color: var(--royal-deep);
+  font-size: 1.7rem;
+  line-height: 1.1;
+  color: var(--ink);
 }
-h2 .ico { width: 30px; height: 30px; flex: none; border-radius: 8px; background: #EFE7FB; display: grid; place-items: center; }
-h2 + .sub { margin-top: -.1rem; margin-bottom: 1rem; }
+h2 .ico { width: 30px; height: 30px; flex: none; border-radius: 8px; background: var(--wash); display: grid; place-items: center; }
+h2 .ico svg [stroke] { stroke: var(--ink); }
+h2 + .sub { margin-top: 0; margin-bottom: 1rem; }
 
+/* Sub-headings: sentence case, no tracking — a label, not a shout. */
 h3 {
   display: flex; align-items: center; gap: 8px;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: .82rem;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--royal-light);
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: .95rem;
+  color: var(--stone);
   margin: 1.3rem 0 .6rem;
 }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
 .tabs {
-  display: flex; flex-wrap: wrap; gap: 4px;
+  display: flex; flex-wrap: wrap; gap: 2px;
   margin-top: .9rem;
-  border-bottom: 2px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .tabs .tab {
   display: inline-flex; align-items: center; gap: 7px;
-  color: var(--royal); font-weight: 700; font-size: .88rem;
+  color: var(--stone); font-weight: 400; font-size: .88rem;
   text-decoration: none;
-  padding: .5rem .85rem;
-  border-radius: 10px 10px 0 0;
-  border: 1px solid transparent; border-bottom: none;
-  margin-bottom: -2px;
-  transition: background .12s ease, color .12s ease;
+  padding: .55rem .8rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color .12s ease, border-color .12s ease;
 }
-.tabs .tab svg { opacity: .85; }
-.tabs .tab:hover { background: #EFE7FB; }
-.tabs .tab.active {
-  color: var(--royal); background: var(--cream);
-  border-color: var(--line); border-bottom-color: var(--cream);
-  box-shadow: 0 -2px 8px rgba(0,0,0,.05);
-}
+.tabs .tab svg { opacity: .8; }
+.tabs .tab svg [stroke] { stroke: currentColor; }
+.tabs .tab:hover { color: var(--ink); }
+.tabs .tab:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 6px; }
+.tabs .tab.active { color: var(--ink); font-weight: 500; border-bottom-color: var(--azure); }
+/* What is waiting for the Knight's seal — so it wears the seal, not gold. */
 .tabs .tab .count {
-  background: var(--gold); color: #3a2a06;
-  font-weight: 800; font-size: .68rem;
+  background: var(--seal); color: #fff;
+  font-weight: 600; font-size: .68rem;
   min-width: 18px; height: 18px; padding: 0 5px;
   border-radius: 9px; display: inline-grid; place-items: center;
 }
 
 /* ── Forms ───────────────────────────────────────────────────────────────── */
-label { display: block; margin: .55rem 0; font-size: .8rem; font-weight: 700; color: #6E6450; }
+label { display: block; margin: .55rem 0; font-size: .8rem; font-weight: 500; color: var(--stone); }
 input, select {
   width: 100%; margin-top: .3rem;
   padding: .58rem .65rem;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1.5px solid var(--line);
   background: var(--field);
   color: var(--ink);
-  font: inherit;
+  font: inherit; font-weight: 400;
   transition: border-color .12s ease, box-shadow .12s ease;
 }
-input::placeholder { color: #B7AC95; }
+input::placeholder { color: #9AA3BA; }
 /* Reset the base input padding/border so native check/radio controls aren't inflated into big
    padded boxes — an oversized hit area means a centre click lands on padding and never toggles. */
-input[type="checkbox"], input[type="radio"] { width: auto; margin: 0 .45rem 0 0; padding: 0; border: none; accent-color: var(--royal); }
+input[type="checkbox"], input[type="radio"] { width: auto; margin: 0 .45rem 0 0; padding: 0; border: none; accent-color: var(--azure); }
 input:focus, select:focus {
   outline: none;
-  border-color: var(--royal);
-  box-shadow: 0 0 0 3px rgba(90,61,142,.15);
+  border-color: var(--azure);
+  box-shadow: var(--focus);
 }
 
 fieldset {
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   margin: .7rem 0;
   padding: .5rem .9rem .9rem;
   background: var(--parch-light);
 }
-legend { color: var(--stone); font-size: .78rem; font-weight: 700; padding: 0 .4rem; text-transform: uppercase; letter-spacing: .04em; }
-fieldset > label { display: block; margin: .4rem 0; color: var(--ink); font-weight: 600; }
+legend { color: var(--stone); font-size: .8rem; font-weight: 500; padding: 0 .4rem; }
+fieldset > label { display: block; margin: .4rem 0; color: var(--ink); font-weight: 400; }
 
 #quest-weekly-fields label,
 .checks label {
   display: inline-flex; align-items: center; gap: .3rem;
-  margin: .25rem .9rem .25rem 0; color: var(--ink); font-weight: 600;
+  margin: .25rem .9rem .25rem 0; color: var(--ink); font-weight: 400;
 }
 .checks { margin-top: .45rem; }
 
@@ -214,135 +227,133 @@ fieldset > label { display: block; margin: .4rem 0; color: var(--ink); font-weig
 button {
   margin-top: .85rem;
   padding: .62rem 1.25rem;
-  border: 0; border-radius: 11px;
-  background: linear-gradient(180deg, #6B4D9E, var(--royal));
+  border: 0; border-radius: 999px;
+  background: var(--ink);
   color: #fff;
-  font-family: var(--font-ui); font-weight: 800; font-size: .9rem;
+  font-family: var(--font-ui); font-weight: 500; font-size: .9rem;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(90,61,142,.28), inset 0 1px 0 rgba(255,255,255,.2);
-  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+  transition: background .12s ease;
 }
-button:hover { transform: translateY(-1px); box-shadow: 0 8px 16px rgba(90,61,142,.36), inset 0 1px 0 rgba(255,255,255,.2); }
-button:active { transform: translateY(0); }
-button:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+button:hover { background: var(--ink-2); }
+button:focus-visible { outline: none; box-shadow: var(--focus); }
+button:disabled { opacity: .45; cursor: not-allowed; }
 
-/* Approve / positive actions go green; reject / destructive go hearth-red. */
-button.approve, .apply-adjust + *, button.btn-approve {
-  background: linear-gradient(180deg, #6FA050, var(--green));
-  box-shadow: 0 4px 12px rgba(66,100,46,.28), inset 0 1px 0 rgba(255,255,255,.22);
+/* Approving is sealing — but the BUTTON stays the quiet primary (ink) and only carries a small
+   wax-seal dot. A solid seal-red button was tried and was wrong: at any size red reads as
+   destructive on the web, and full-width it shouted. The seal colour is for the MARK that lands
+   on the squire's screen, not for the adult's control. Declining is "not yet": neutral, never red. */
+button.approve, button.btn-approve { display: inline-flex; align-items: center; gap: 8px; }
+button.approve::before, button.btn-approve::before {
+  content: ""; width: 11px; height: 11px; border-radius: 50%; flex: none;
+  background: var(--seal); box-shadow: 0 0 0 2px rgba(255,255,255,.22);
 }
-button.approve:hover { box-shadow: 0 8px 16px rgba(66,100,46,.36), inset 0 1px 0 rgba(255,255,255,.22); }
 button.reject, .confirm-reject {
-  background: var(--field); color: var(--red-deep);
-  border: 1.5px solid var(--line); box-shadow: none;
+  background: var(--field); color: var(--ink);
+  border: 1.5px solid var(--line);
 }
-button.reject:hover { background: var(--red-soft); border-color: var(--red); transform: translateY(-1px); }
-.confirm-reject { background: var(--red); color: #fff; border: 0; }
+button.reject:hover { background: var(--wash); }
+.confirm-reject { background: var(--ink); color: #fff; border: 0; }
+.confirm-reject:hover { background: var(--ink-2); }
 
 /* Small / ghost buttons for inline list actions. */
-.btn-sm { margin-top: 0; padding: .4rem .85rem; font-size: .8rem; border-radius: 9px; }
+.btn-sm { margin-top: 0; padding: .4rem .85rem; font-size: .8rem; }
 .btn-ghost {
-  background: var(--field); color: var(--royal);
-  border: 1.5px solid var(--line); box-shadow: none;
+  background: var(--field); color: var(--ink);
+  border: 1.5px solid var(--line);
 }
-.btn-ghost:hover { background: #EFE7FB; border-color: #D8C7E8; }
+.btn-ghost:hover { background: var(--wash); }
 button.archive {
-  margin-top: 0; padding: .4rem .8rem; font-size: .78rem; border-radius: 9px;
-  background: var(--field); color: var(--stone); border: 1.5px solid var(--line); box-shadow: none;
+  margin-top: 0; padding: .4rem .8rem; font-size: .78rem;
+  background: var(--field); color: var(--stone); border: 1.5px solid var(--line);
 }
-button.archive:hover { background: var(--red-soft); border-color: var(--red); color: var(--red-deep); transform: none; }
+button.archive:hover { background: var(--wash); color: var(--ink); }
 /* Edit-in-place affordances (SQUIRE-T-0120): a neutral row "Edit" + the form's "Cancel". */
 button.edit-row {
-  margin-top: 0; margin-right: .4rem; padding: .4rem .8rem; font-size: .78rem; border-radius: 9px;
-  background: var(--field); color: var(--stone); border: 1.5px solid var(--line); box-shadow: none;
+  margin-top: 0; margin-right: .4rem; padding: .4rem .8rem; font-size: .78rem;
+  background: var(--field); color: var(--stone); border: 1.5px solid var(--line);
 }
-button.edit-row:hover { background: #EFE7FB; border-color: #D8C7E8; transform: none; }
-button.cancel-edit { margin-left: .5rem; background: var(--field); color: var(--stone); border: 1.5px solid var(--line); box-shadow: none; }
+button.edit-row:hover { background: var(--wash); color: var(--ink); }
+button.cancel-edit { margin-left: .5rem; background: var(--field); color: var(--stone); border: 1.5px solid var(--line); }
+button.cancel-edit:hover { background: var(--wash); color: var(--ink); }
 
 details summary {
-  cursor: pointer; color: var(--royal); font-weight: 700;
+  cursor: pointer; color: var(--azure); font-weight: 500;
   margin-top: .8rem; list-style: none; user-select: none;
 }
 details summary::-webkit-details-marker { display: none; }
-details summary::before { content: "▸ "; color: var(--gold-deep); }
+details summary::before { content: "▸ "; color: var(--stone); }
 details[open] summary::before { content: "▾ "; }
 
-/* ── Generic list cards (quests, rewards, achievements, review, members) ──── */
+/* ── Generic list rows (quests, rewards, achievements, review, members) ──── */
 ul { list-style: none; padding: 0; margin: .8rem 0 0; }
 li {
   background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   padding: .8rem .95rem;
-  margin-bottom: .6rem;
+  margin-bottom: .5rem;
 }
 
-/* Rich card row: medallion · body · coin · action. */
+/* Rich row: medallion · body · coin · action. The old coloured left stripes are gone — they
+   encoded nothing the row's own chip didn't already say. */
 .card-row { display: flex; align-items: center; gap: 14px; }
-.card-row.accent-green  { border-left: 4px solid var(--green); }
-.card-row.accent-royal  { border-left: 4px solid var(--royal); }
-.card-row.accent-blue   { border-left: 4px solid var(--blue); }
-.card-row.accent-epic   { border-left: 4px solid var(--epic); }
-.card-row.accent-gold   { border-left: 4px solid var(--gold); }
-.card-row.is-archived { opacity: .55; }
+.card-row.is-archived { opacity: .5; }
 .card-row .grow { flex: 1; min-width: 0; }
 
+/* Content emoji sit on a plain tinted disc. */
 .medallion {
   width: 44px; height: 44px; flex: none;
-  border-radius: 12px;
-  background: radial-gradient(circle at 35% 28%, #FBF1D8, #EAD9AE);
-  border: 1.5px solid var(--parch-deep);
+  border-radius: 50%;
+  background: var(--wash);
   display: grid; place-items: center;
   font-size: 22px; line-height: 1;
-  box-shadow: inset 0 1px 2px rgba(255,255,255,.7);
 }
+/* A member's initial wears the squire tincture. */
 .medallion.avatar-green {
-  background: linear-gradient(150deg, #7DAE5C, var(--green));
-  border-color: var(--green-soft);
-  font-family: var(--font-display); font-weight: 700; font-size: 16px; color: #fff;
+  background: var(--vert);
+  font-family: var(--font-display); font-weight: 700; font-size: 18px; color: #fff;
 }
 
-.card-title { font-family: var(--font-display); font-weight: 700; font-size: 1rem; color: var(--royal-deep); }
-.card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 3px; font-size: .78rem; color: var(--stone); font-weight: 600; }
-.card-meta .lead { color: var(--royal); }
-.card-meta .sep { color: var(--parch-deep); }
-.card-meta .afford { color: var(--green-deep); font-weight: 800; }
+.card-title { font-family: var(--font-ui); font-weight: 500; font-size: 1rem; color: var(--ink); }
+.card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; font-size: .78rem; color: var(--stone); font-weight: 300; }
+.card-meta .lead { color: var(--ink); font-weight: 400; }
+.card-meta .sep { color: var(--mist); }
+.card-meta .afford { color: var(--green-deep); font-weight: 500; }
 
-/* Gold coin pill — the currency token. */
+/* The coin — the ONLY place gold appears. */
 .coin {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 12px 5px 9px;
+  padding: 4px 12px 4px 7px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #F6E8C8, #EBD79E);
-  border: 1px solid var(--gold);
+  background: var(--gold-soft);
   white-space: nowrap;
 }
 .coin .disc {
-  width: 16px; height: 16px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold));
+  width: 18px; height: 18px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 62%);
   box-shadow: inset 0 0 0 1.5px var(--gold-deep);
-  display: grid; place-items: center; font-size: 9px; color: #7a5a12;
+  display: grid; place-items: center; font-size: 0; color: transparent;
 }
-.coin .amt { font-family: var(--font-display); font-weight: 700; font-size: .9rem; color: var(--gold-on); }
+.coin .amt { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; line-height: 1; color: var(--gold-on); font-variant-numeric: tabular-nums; }
 
 /* Status chips. */
 .chip {
   display: inline-flex; align-items: center; gap: 5px;
-  padding: 5px 11px; border-radius: 999px;
-  font-size: .74rem; font-weight: 800; letter-spacing: .01em; white-space: nowrap;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: .74rem; font-weight: 500; white-space: nowrap;
 }
-.chip-auto    { background: var(--green-soft); color: var(--green-deep); text-transform: uppercase; font-size: .66rem; letter-spacing: .04em; padding: 3px 8px; }
-.chip-pending { background: #EFE7FB; color: var(--royal); border: 1px solid #D8C7E8; }
-.chip-done    { background: var(--green); color: #fff; }
-.chip-locked  { background: #EAE2CF; color: #8A7B5E; border: 1px solid var(--parch-deep); }
-.chip-stock   { background: #EAE2CF; color: #8A7B5E; }
+.chip-auto    { background: var(--vert-soft); color: var(--green-deep); }
+.chip-pending { background: var(--wash); color: var(--ink); }
+.chip-done    { background: var(--vert); color: #fff; }
+.chip-locked  { background: var(--line-soft); color: var(--stone); }
+.chip-stock   { background: var(--line-soft); color: var(--stone); }
 
-/* Action cluster (approve + reject) under review cards. */
+/* Action cluster (approve + reject) under review rows. */
 .card-actions { display: flex; gap: 8px; margin-top: .7rem; }
 .card-actions button { margin-top: 0; flex: 0 0 auto; }
-.card-actions .approve, .card-actions .btn-approve { flex: 1; }
+/* Sized to their labels — a full-width slab made approving look like the dangerous choice. */
 
-/* The review card stacks its action row beneath the content. */
+/* The review row stacks its action row beneath the content. */
 .review-card { display: block; }
 .review-card .card-row { display: flex; }
 
@@ -353,7 +364,7 @@ li {
 }
 .inline-editor input {
   margin-top: 0; padding: .4rem .55rem;
-  border: 1.5px solid var(--line); border-radius: 9px;
+  border: 1.5px solid var(--line); border-radius: 8px;
 }
 .inline-editor input.reject-reason, .inline-editor input.adjust-reason { min-width: 15rem; flex: 1; }
 .inline-editor input.adjust-amount { width: 6rem; }
@@ -362,64 +373,63 @@ li {
 /* ── Badges (role / status) ──────────────────────────────────────────────── */
 .list-row { display: flex; align-items: center; gap: .75rem; }
 .list-row .grow { flex: 1; min-width: 0; }
-.list-row.inactive { opacity: .55; }
+.list-row.inactive { opacity: .5; }
 .list-row button { margin-top: 0; }
 
 .badge {
   display: inline-block; padding: .14rem .6rem; border-radius: 999px;
-  font-size: .68rem; font-weight: 800; letter-spacing: .03em; vertical-align: middle;
+  font-size: .7rem; font-weight: 500; vertical-align: middle;
 }
-.badge-knight { background: #E6E1F6; color: var(--royal-deep); }
-.badge-squire { background: var(--green-soft); color: var(--green-deep); }
-.badge-muted  { background: #EADFC4; color: var(--stone); }
+.badge-knight { background: var(--wash); color: var(--ink); }
+.badge-squire { background: var(--vert-soft); color: var(--green-deep); }
+.badge-muted  { background: var(--line-soft); color: var(--stone); }
 
 /* ── Notices & code ──────────────────────────────────────────────────────── */
-.error { color: var(--red-deep); font-weight: 700; background: var(--red-soft); border: 1px solid #E6BDB5; border-radius: 10px; padding: .55rem .8rem; }
-.sub { color: var(--stone); font-size: .82rem; }
-strong { color: var(--royal-deep); }
+.error { color: var(--red-deep); font-weight: 400; background: var(--red-soft); border-radius: 8px; padding: .55rem .8rem; }
+.sub { color: var(--stone); font-size: .85rem; }
+strong { color: var(--ink); font-weight: 500; }
 
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: #F1DEA6; color: var(--royal-deep);
+  background: var(--wash); color: var(--ink);
   padding: .15rem .45rem; border-radius: 6px;
 }
 pre {
-  background: #FBF6E8; border: 1px solid var(--line);
-  border-radius: 12px; padding: 1rem; overflow: auto; color: var(--ink);
+  background: var(--parch-light); border: 1px solid var(--line);
+  border-radius: 10px; padding: 1rem; overflow: auto; color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem;
 }
 
 .notice {
   margin-top: .8rem; padding: .8rem 1rem;
-  border-radius: 12px; border: 1px solid var(--line); background: #FBF6E8;
+  border-radius: 10px; border: 1px solid var(--line); background: var(--parch-light);
 }
-.notice-success { border-color: var(--green); background: var(--green-soft); }
+.notice-success { border-color: var(--vert); background: var(--vert-soft); }
 .notice .tok { display: block; margin-top: .4rem; word-break: break-all; font-family: ui-monospace, monospace; }
 
-/* ── Pairing hand-off card ───────────────────────────────────────────────── */
+/* ── Pairing hand-off ────────────────────────────────────────────────────── */
 .pair-card {
   margin-top: 1rem; padding: 1.25rem;
-  border: 1px solid var(--line); border-radius: 18px;
+  border: 1px solid var(--line); border-radius: 12px;
   background: var(--card); text-align: center; max-width: 22rem;
-  box-shadow: var(--shadow-card);
 }
 .pair-card svg { width: 220px; height: 220px; }
 .pair-card .pair-code {
   font-size: 1.1rem; padding: .3rem .7rem;
-  letter-spacing: .08em; font-weight: 700;
+  letter-spacing: .08em; font-weight: 600;
 }
 
 /* ── Two-column Quests layout (form ⋮ board) ─────────────────────────────── */
 .quests-grid { display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; align-items: start; }
 .quests-make {
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: 16px; padding: 1.1rem 1.2rem;
+  background: var(--parch-light); border: 1px solid var(--line);
+  border-radius: 12px; padding: 1.1rem 1.2rem;
 }
 .quests-board .board-head {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: .25rem;
 }
-.quests-board .board-head .count { color: var(--stone); font-weight: 600; font-size: .9rem; }
+.quests-board .board-head .count { color: var(--stone); font-weight: 400; font-size: .9rem; }
 @media (max-width: 760px) { .quests-grid { grid-template-columns: 1fr; } }
 
 /* Empty-state hint — opportunity, never failure. */
@@ -428,4 +438,6 @@ pre {
   font-size: .92rem;
 }
 .empty .glyph { font-size: 1.8rem; display: block; margin-bottom: .4rem; opacity: .8; }
-.empty strong { color: var(--royal); }
+.empty strong { color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
