@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Status-bar crest (SQUIRE-T-0144). Was `android.R.drawable.btn_star_big_on` — a stock Android star
+  that read as some other app's notification, and which heads-up banners made much more visible.
+
+  The path is `ic_launcher_monochrome`'s verbatim: one shield with the star punched out (evenOdd).
+  Android alpha-masks a small icon — every opaque pixel becomes white, the hole stays a hole — so the
+  fill colour is a placeholder and only the silhouette matters.
+
+  Copied rather than reused because the two need different framing: a themed launcher icon keeps the
+  adaptive-icon safe zone (content in the middle ~48%), which in a 24dp status bar would render a
+  crest half the size of every icon beside it. The group scales the same path to fill the canvas to
+  the ~8% padding a status-bar icon expects, so nothing is redrawn and the shapes cannot drift apart.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="60"
+        android:scaleX="1.75"
+        android:scaleY="1.75"
+        android:translateY="-6">
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M32,34 L76,34 L76,54 C76,70 66,80 54,86 C42,80 32,70 32,54 Z M54,41 L57.06,49.79 L66.36,49.98 L58.95,55.61 L61.64,64.52 L54,59.2 L46.36,64.52 L49.05,55.61 L41.64,49.98 L50.94,49.79 Z" />
+    </group>
+</vector>

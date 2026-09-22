@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.squire.app.MainActivity
+import com.squire.app.R
 import com.squire.core.NotifyPolicy
 import com.squire.sdk.model.NotifySettings
 import java.time.ZoneId
@@ -91,7 +92,11 @@ object Notifier {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val notification = NotificationCompat.Builder(ctx, channel.id)
-            .setSmallIcon(android.R.drawable.btn_star_big_on)
+            .setSmallIcon(R.drawable.ic_notification)
+            // Tints the crest and the app name in the shade. Azure, the interactive accent — not
+            // gold, which the palette reserves for coins, and not the seal red, which means error.
+            .setColor(0xFF2457C5.toInt())
+            .setColorized(false)
             .setPriority(
                 if (channel.importance >= NotificationManager.IMPORTANCE_HIGH) NotificationCompat.PRIORITY_HIGH
                 else NotificationCompat.PRIORITY_DEFAULT,
