@@ -5,9 +5,11 @@ import com.squire.sdk.model.ClaimStateKind
 import com.squire.sdk.model.ClaimStatus
 import com.squire.sdk.model.QuestCard
 import com.squire.sdk.model.QuestStatus
+import com.squire.sdk.model.StreakView
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -176,5 +178,40 @@ class NotifyPolicyTest {
             "already gone today, so tomorrow",
         )
         assertEquals(24 * 60, NotifyPolicy.minutesUntilNext(minuteOfDay = 600, nowMinuteOfDay = 600), "never zero")
+    }
+
+    // ── streak at risk (SQUIRE-T-0141) ─────────────────────────────────────────────────────────
+
+    private fun streak(name: String, current: Int, alive: Boolean = true, covered: Boolean? = false) =
+        StreakView(alive = alive, best = 9, current = current, name = name, coveredToday = covered)
+
+    @Test
+    fun `only a live streak with something to lose is warned about`() {
+        assertEquals("Room Master", NotifyPolicy.streakAtRisk(listOf(streak("Room Master", 5)))?.name)
+        assertNull(NotifyPolicy.streakAtRisk(listOf(streak("Room Master", 1))), "one day is not yet a streak")
+        assertNull(NotifyPolicy.streakAtRisk(listOf(streak("Room Master", 5, alive = false))), "already broken")
+        assertNull(NotifyPolicy.streakAtRisk(emptyList()))
+    }
+
+    @Test
+    fun `a chore already done or awaiting a seal is not at risk`() {
+        assertNull(
+            NotifyPolicy.streakAtRisk(listOf(streak("Room Master", 5, covered = true))),
+            "the child has acted; whether it is sealed in time is a parent's business",
+        )
+    }
+
+    @Test
+    fun `an older server that cannot say is treated as at risk`() {
+        // coveredToday = null means "this server does not know"; warning is the safer error.
+        assertEquals("Room Master", NotifyPolicy.streakAtRisk(listOf(streak("Room Master", 5, covered = null)))?.name)
+    }
+
+    @Test
+    fun `of several at risk the longest is chosen`() {
+        val pick = NotifyPolicy.streakAtRisk(
+            listOf(streak("Early Bird", 3), streak("Room Master", 7), streak("Piano", 2)),
+        )
+        assertEquals("Room Master", pick?.name)
     }
 }

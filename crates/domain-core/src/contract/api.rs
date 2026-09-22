@@ -202,6 +202,12 @@ pub struct StreakView {
     pub best: u32,
     pub alive: bool,                 // false once an occurrence has lapsed
     pub next_milestone: Option<u32>, // next achievement length in this scope
+    /// Has the squire already done their part today for this streak — a completion in scope either
+    /// **approved** or **awaiting a seal** (SQUIRE-T-0141)? Pending counts: a child who has turned
+    /// the chore in has nothing left to act on, and warning them their streak is ending would be
+    /// both useless and unfair. `#[serde(default)]` for back-compat with older servers.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub covered_today: bool,
 }
 
 /// An achievement the Squire has already **earned** (an `AchievementUnlocked` event exists), shown

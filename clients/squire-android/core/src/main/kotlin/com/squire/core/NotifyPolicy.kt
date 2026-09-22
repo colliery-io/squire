@@ -6,6 +6,7 @@ import com.squire.sdk.model.ClaimStatus
 import com.squire.sdk.model.NotifySettings
 import com.squire.sdk.model.QuestCard
 import com.squire.sdk.model.QuestStatus
+import com.squire.sdk.model.StreakView
 
 /**
  * **Whether to speak, and what to say** — the pure half of notifications (SQUIRE-T-0138, ADR
@@ -146,6 +147,23 @@ object NotifyPolicy {
         val delta = minuteOfDay - nowMinuteOfDay
         return if (delta > 0) delta else delta + 24 * 60
     }
+
+    /**
+     * The streak worth warning about tonight, or `null` for silence (SQUIRE-T-0141).
+     *
+     * Deliberately conservative — a warning that cries wolf is worse than none:
+     *  * the streak must be **alive** and at least [STREAK_WARN_FLOOR] days long, so a child is not
+     *    told they are about to lose a one-day "streak";
+     *  * nothing in its scope may be done or awaiting a seal today ([StreakView.coveredToday]);
+     *  * of several at risk, the longest — the one with most to lose.
+     */
+    fun streakAtRisk(streaks: List<StreakView>): StreakView? =
+        streaks
+            .filter { it.alive && it.current >= STREAK_WARN_FLOOR && it.coveredToday != true }
+            .maxByOrNull { it.current }
+
+    /** Below this a "streak" is not yet a thing worth defending. */
+    const val STREAK_WARN_FLOOR = 2
 
     /** Keys not yet spoken on this device. */
     fun unspoken(keys: List<String>, alreadySpoken: Set<String>): List<String> =

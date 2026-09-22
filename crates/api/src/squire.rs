@@ -674,6 +674,46 @@ fn streaks(snap: &Snapshot, squire: UserId, today: Date) -> Vec<StreakView> {
         .collect()
 }
 
+/// Has this squire already done their part today for a streak in `scope` (SQUIRE-T-0141)?
+///
+/// True for an **approved** completion in scope today, and also for one still **awaiting a seal**:
+/// the child has acted, and whether the streak survives is now a parent's business, not something to
+/// nudge a child about.
+fn covered_today(snap: &Snapshot, squire: UserId, scope: &Scope, today: Date) -> bool {
+    let approved = snap.events.iter().any(|e| match e {
+        Event::CompletionApproved {
+            claim_id,
+            squire: s,
+            ..
+        } if *s == squire => domain_core::claim_meta(snap, *claim_id)
+            .is_some_and(|(_, q, d)| d == today && domain_core::quest_in_scope(snap, q, scope)),
+        _ => false,
+    });
+    if approved {
+        return true;
+    }
+    // Claimed today, in scope, and no verdict yet.
+    snap.events.iter().any(|e| match e {
+        Event::CompletionClaimed {
+            claim_id,
+            squire: s,
+            quest_id,
+            on,
+            ..
+        } if *s == squire
+            && *on == today
+            && domain_core::quest_in_scope(snap, *quest_id, scope) =>
+        {
+            !snap.events.iter().any(|d| match d {
+                Event::CompletionApproved { claim_id: c, .. }
+                | Event::CompletionRejected { claim_id: c, .. } => c == claim_id,
+                _ => false,
+            })
+        }
+        _ => false,
+    })
+}
+
 /// Build a [`StreakView`] for one achievement iff its criterion is a `Streak`.
 fn streak_view_for(
     snap: &Snapshot,
@@ -687,6 +727,7 @@ fn streak_view_for(
                 streak_view(snap, squire, scope, *basis, today);
             Some(StreakView {
                 name: ach.name.clone(),
+                covered_today: covered_today(snap, squire, scope, today),
                 current,
                 best,
                 alive,

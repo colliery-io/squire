@@ -3932,6 +3932,10 @@
             "format": "int32",
             "minimum": 0
           },
+          "covered_today": {
+            "type": "boolean",
+            "description": "Has the squire already done their part today for this streak — a completion in scope either\n**approved** or **awaiting a seal** (SQUIRE-T-0141)? Pending counts: a child who has turned\nthe chore in has nothing left to act on, and warning them their streak is ending would be\nboth useless and unfair. `#[serde(default)]` for back-compat with older servers."
+          },
           "current": {
             "type": "integer",
             "format": "int32",

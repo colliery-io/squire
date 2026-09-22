@@ -62,18 +62,41 @@ class ChoreReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
 
         /** Post the nudge for [slot], unless there is nothing left (the rule that keeps it worth reading). */
         internal fun announce(ctx: Context, state: StateView, slot: Int) {
-            val (title, text) = NotifyPolicy.choreReminder(state.questsToday) ?: return
             val zone = zoneOf(state.notify?.timezone)
+            val today = LocalDate.now(zone)
+            if (slot == SLOT_STREAK) {
+                announceStreak(ctx, state, today)
+                return
+            }
+            val (title, text) = NotifyPolicy.choreReminder(state.questsToday) ?: return
             Notifier.post(
                 ctx = ctx,
                 channel = Notifier.Channel.Reminders,
                 // One per slot per day: a re-arm or a reboot cannot say the same thing twice.
-                key = "reminder:${LocalDate.now(zone)}:$slot",
+                key = "reminder:$today:$slot",
                 title = title,
                 text = text,
                 tab = SquireNotifyWorker.TAB_TODAY,
                 settings = state.notify,
                 notificationId = NOTIF_BASE + slot,
+            )
+        }
+
+        /**
+         * The evening streak warning (SQUIRE-T-0141) — at most one a night, and only for a streak
+         * genuinely in danger. [NotifyPolicy.streakAtRisk] holds the judgement.
+         */
+        private fun announceStreak(ctx: Context, state: StateView, today: LocalDate) {
+            val streak = NotifyPolicy.streakAtRisk(state.streaks) ?: return
+            Notifier.post(
+                ctx = ctx,
+                channel = Notifier.Channel.Reminders,
+                key = "streak:$today",
+                title = "Your ${streak.current}-day ${streak.name} streak ends at midnight",
+                text = "One chore saves it.",
+                tab = SquireNotifyWorker.TAB_TODAY,
+                settings = state.notify,
+                notificationId = NOTIF_BASE + SLOT_STREAK,
             )
         }
 
@@ -86,9 +109,9 @@ class ChoreReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             val zone = zoneOf(timezone)
             // Cancel every slot first: a parent dropping from two times to one must not leave the
             // second armed forever.
-            for (slot in 0 until MAX_SLOTS) wm.cancelUniqueWork(WORK_PREFIX + slot)
+            for (slot in ALL_SLOTS) wm.cancelUniqueWork(WORK_PREFIX + slot)
 
-            choreTimes.take(MAX_SLOTS).forEachIndexed { slot, minutes ->
+            fun arm(slot: Int, minutes: Int) {
                 val delay = untilNext(minutes, zone)
                 val request = OneTimeWorkRequestBuilder<ChoreReminderWorker>()
                     .setInitialDelay(delay.toMinutes().coerceAtLeast(1), TimeUnit.MINUTES)
@@ -96,12 +119,17 @@ class ChoreReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                     .build()
                 wm.enqueueUniqueWork(WORK_PREFIX + slot, ExistingWorkPolicy.REPLACE, request)
             }
+            choreTimes.take(MAX_CHORE_SLOTS).forEachIndexed { slot, minutes -> arm(slot, minutes) }
+            // The streak check is not a household setting: two hours before the household's midnight,
+            // late enough to be a real last call and early enough to still do a chore. It is armed
+            // whether or not chore times are set — the streak is the child's, not the schedule's.
+            arm(SLOT_STREAK, STREAK_CHECK_MINUTE)
         }
 
         /** Stop every reminder (unpair, or a Knight device). */
         fun cancel(ctx: Context) {
             val wm = WorkManager.getInstance(ctx)
-            for (slot in 0 until MAX_SLOTS) wm.cancelUniqueWork(WORK_PREFIX + slot)
+            for (slot in ALL_SLOTS) wm.cancelUniqueWork(WORK_PREFIX + slot)
         }
 
         /** How long until [minuteOfDay] next comes round in [zone] — tomorrow if it has passed today. */
@@ -116,7 +144,12 @@ class ChoreReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             timezone?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
 
         /** Matches `domain_core::contract::MAX_CHORE_TIMES`. */
-        private const val MAX_SLOTS = 2
+        private const val MAX_CHORE_SLOTS = 2
+
+        /** The evening streak check, scheduled like a chore time but never configured as one. */
+        private const val SLOT_STREAK = 9
+        private const val STREAK_CHECK_MINUTE = 22 * 60 // 22:00 household time — two hours to midnight
+        private val ALL_SLOTS = (0 until MAX_CHORE_SLOTS) + SLOT_STREAK
         private const val NOTIF_BASE = 4930
     }
 }

@@ -26,7 +26,7 @@ mod claims;
 pub(crate) mod common;
 mod redemption;
 
-pub use common::{claim_meta, points_earned, total_completions};
+pub use common::{claim_meta, points_earned, quest_in_scope, total_completions};
 pub use contract::*;
 pub use engine::{child_originable, DomainEngine};
 pub use projections::{quest_status, reward_view, streak_view, Proj};
