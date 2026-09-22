@@ -231,8 +231,9 @@ class ScreenshotTests {
 
     @Test
     fun squireSubmitFeedback() {
-        // Usage feedback #5: a repeatable quest stays "Available" after a tap, so without a cue the
-        // child sees nothing happen and re-taps (spams). Tapping "Done" pops this "Sent!" snackbar.
+        // A turn-in used to pop a "Sent!" snackbar. Now the row itself answers (SQUIRE-T-0133): the
+        // tapped quest shows ghost coins and an empty seal slot until the next view arrives — even
+        // offline, where the store is not optimistic and the server status is still Available.
         val view = StateView(
             balance = 12, generatedAt = 0L, squire = 1L,
             questsToday = listOf(
@@ -244,19 +245,12 @@ class ScreenshotTests {
         )
         paparazzi.snapshot {
             SquireTheme {
-                Box(Modifier.fillMaxSize()) {
-                    PlayerHomeScreen(
-                        state = PlayerUiState.Ready(view, fromCache = false),
-                        onRefresh = {}, onMarkDone = {}, onRedeem = {},
-                        headerLabel = "Matrim",
-                    )
-                    // The exact snackbar cheer() shows on a turn-in, placed where the host renders it
-                    // (above the bottom nav). Composed explicitly because Paparazzi can't run the
-                    // suspending showSnackbar().
-                    Snackbar(modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 96.dp)) {
-                        Text("Sent! ⏳ A grown-up will check it")
-                    }
-                }
+                PlayerHomeScreen(
+                    state = PlayerUiState.Ready(view, fromCache = true), // offline: the last saved view
+                    onRefresh = {}, onMarkDone = {}, onRedeem = {},
+                    headerLabel = "Matrim",
+                    tappedQuestIds = setOf(1L), // seam: "Practice piano" was just tapped
+                )
             }
         }
     }
@@ -336,12 +330,18 @@ class ScreenshotTests {
             questsToday = listOf(
                 QuestCard(on = 1, questId = 1L, reward = 5, status = QuestStatus.Available, title = "Make your bed", icon = "🛏"),
                 QuestCard(on = 1, questId = 2L, reward = 10, status = QuestStatus.Pending, title = "Tidy your room", icon = "🧹"),
+                QuestCard(on = 1, questId = 3L, reward = 3, status = QuestStatus.CompletedToday, title = "Feed the dog", icon = "🐶"),
+                QuestCard(on = 1, questId = 4L, reward = 4, status = QuestStatus.Available, title = "Practice piano", icon = "🎹"),
             ),
             rewards = listOf(
                 RewardCard(affordable = true, cost = 3, itemId = 1L, name = "Ice cream", icon = "🍦"),
                 RewardCard(affordable = false, cost = 15, itemId = 2L, name = "Movie night", icon = "🎬"),
             ),
-            myClaims = emptyList(),
+            // A "not yet" on today's piano turn-in (SQUIRE-T-0133): the reason shows on the card.
+            myClaims = listOf(
+                ClaimStatus(claimId = 9L, on = 1, questTitle = "Practice piano",
+                    state = ClaimState(state = ClaimStateKind.Rejected, reason = "Play the whole piece through once more")),
+            ),
             myRequests = emptyList(),
             streaks = listOf(StreakView(name = "Room Master", current = 3, best = 5, alive = true, nextMilestone = 7)),
             badges = emptyList(),

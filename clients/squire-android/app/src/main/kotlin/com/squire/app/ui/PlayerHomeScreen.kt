@@ -53,6 +53,18 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.LaunchedEffect
+import com.squire.app.ui.components.Dot
+import androidx.compose.ui.unit.sp
+import com.squire.app.ui.theme.SquireGoldOn
+import com.squire.app.ui.theme.SquireGoldFace
+import com.squire.app.ui.theme.SquireDisplay
+import com.squire.app.ui.components.WaxSeal
+import com.squire.app.ui.components.SealSlot
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.clip
@@ -92,7 +104,7 @@ import com.squire.sdk.model.StreakView
 
 /** The four pages of the child home, shown one at a time via the bottom navigation bar. */
 enum class SquireTab(val label: String, val icon: String) {
-    Quests("Quests", "⚔"),
+    Quests("Today", "⚔"),
     Rewards("Rewards", "🛒"),
     Me("Me", "🏅"),
     Activity("Activity", "📜"),
@@ -123,6 +135,7 @@ fun PlayerHomeScreen(
     headerLabel: String? = null,
     onBack: (() -> Unit)? = null,
     initialTab: SquireTab = SquireTab.Quests,
+    tappedQuestIds: Set<Long> = emptySet(), // screenshot seam: quests to render as just turned in
 ) {
     var tab by remember { mutableStateOf(initialTab) }
     val balance = (state as? PlayerUiState.Ready)?.view?.balance
@@ -192,7 +205,11 @@ fun PlayerHomeScreen(
                             // Flex + ellipsize the name so a long "Hi, <name>!" yields space to the
                             // balance pills on the right rather than pushing them off-screen (clipped $).
                             Text(
-                                if (name == "Squire") "Your Quests" else "Hi, $firstName!",
+                                when {
+                                    tab != SquireTab.Quests -> tab.label
+                                    name == "Squire" -> "Today"
+                                    else -> "Hi, $firstName!"
+                                },
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -272,10 +289,13 @@ fun PlayerHomeScreen(
                 view = state.view,
                 fromCache = state.fromCache,
                 tab = tab,
-                onMarkDone = { qid -> cheer("Sent! ⏳ A grown-up will check it"); onMarkDone(qid) },
+                // No snackbar on a turn-in (SQUIRE-T-0133): the row itself moves to "waiting", coins
+                // go ghost and the seal slot appears — the feedback IS the state change.
+                onMarkDone = onMarkDone,
                 onRedeem = { iid -> cheer("Sent! 🎁 Asked a grown-up"); onRedeem(iid) },
                 onCashOut = { amt -> cheer("Sent! 💵 Asked a grown-up to pay you"); onCashOut(amt) },
                 onPickTincture = onPickTincture,
+                tappedQuestIds = tappedQuestIds,
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
         }
@@ -292,6 +312,7 @@ private fun ReadyContent(
     onCashOut: (amount: Long) -> Unit,
     onPickTincture: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
+    tappedQuestIds: Set<Long> = emptySet(),
 ) {
     // Owed real money + whether a cash-out is already awaiting a grown-up (SQUIRE-T-0118).
     val cashOwed = view.balances.orEmpty()
@@ -300,6 +321,12 @@ private fun ReadyContent(
         .any { it.state.state == com.squire.sdk.model.RedemptionStateKind.Pending }
     // Tap any quest / reward / streak / badge card to see its full details (SQUIRE-T-0094 #8).
     var detail by remember { mutableStateOf<DetailContent?>(null) }
+    // Turn-ins the child has tapped since this view arrived (SQUIRE-T-0133). The store is not
+    // optimistic — enqueue → sync → refresh — so until the next view lands (which may be a while,
+    // offline) the tapped row shows "waiting" itself. A repeatable quest comes back Available with
+    // the next view, which is right: it can be done again.
+    val sent = remember { mutableStateMapOf<Long, Long>().also { m -> tappedQuestIds.forEach { id -> m[id] = view.generatedAt } } }
+    fun tappedSince(view: StateView, questId: Long) = sent[questId] == view.generatedAt
     Box(modifier) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -309,10 +336,11 @@ private fun ReadyContent(
             // The offline banner rides on the Quests page (the landing page).
             if (fromCache && tab == SquireTab.Quests) {
                 item {
+                    // Offline is a state, not an error: quiet, not red (SQUIRE-T-0133).
                     Banner(
-                        text = "⚠  Offline — showing your last saved quests",
-                        container = MaterialTheme.colorScheme.errorContainer,
-                        content = MaterialTheme.colorScheme.onErrorContainer,
+                        text = "Offline — showing your last saved quests",
+                        container = MaterialTheme.colorScheme.surfaceVariant,
+                        content = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -320,11 +348,41 @@ private fun ReadyContent(
             // numerically equal an ItemId — an un-namespaced key would collide (SQUIRE-T-0070).
             when (tab) {
                 SquireTab.Quests -> {
-                    item { SectionTitle("Today's Quests") }
+                    // What today is FOR (SQUIRE-T-0133): the nearest reward not yet affordable, with
+                    // how far along the purse is. The strongest motivator in the app, so it leads.
+                    savingFor(view)?.let { goal ->
+                        item(key = "saving") { SavingForCard(goal, view.balance, onClick = { detail = rewardDetail(goal) }) }
+                    }
+                    // A live streak is worth a line; the pips are the same ones the Me tab draws.
+                    view.streaks.filter { it.alive && it.current > 0 }.maxByOrNull { it.current }?.let { streak ->
+                        item(key = "streak") { StreakLine(streak) }
+                    }
+                    item(key = "today-title") {
+                        val sealed = view.questsToday.count { it.status == QuestStatus.CompletedToday }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            SectionTitle("Today")
+                            Spacer(Modifier.weight(1f))
+                            if (view.questsToday.isNotEmpty()) {
+                                Text(
+                                    "$sealed of ${view.questsToday.size} sealed",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
                     if (view.questsToday.isEmpty()) {
                         item { EmptyHint("No quests today — well done, brave Squire! 🎉") }
                     } else {
-                        items(view.questsToday, key = { "q" + it.questId }) { QuestCardRow(it, onMarkDone, onClick = { detail = questDetail(it) }) }
+                        items(view.questsToday, key = { "q" + it.questId }) { q ->
+                            QuestCardRow(
+                                q,
+                                notYet = notYetReason(view, q),
+                                sending = tappedSince(view, q.questId),
+                                onMarkDone = { id -> sent[id] = view.generatedAt; onMarkDone(id) },
+                                onClick = { detail = questDetail(q) },
+                            )
+                        }
                     }
                 }
                 SquireTab.Rewards -> {
@@ -396,43 +454,131 @@ private fun ReadyContent(
     }
 }
 
+/** The reward this Squire is closest to affording: the cheapest one they can't yet have. `null`
+ *  when everything is affordable (or there are no rewards) — then there is nothing to save for. */
+private fun savingFor(view: StateView): RewardCard? =
+    view.rewards.filter { !it.affordable && it.lock == null && it.cost > view.balance }.minByOrNull { it.cost }
+
+/** A grown-up said "not yet" to today's turn-in of this quest: the reason they gave, if any. Matched
+ *  by title + day because a claim carries no quest id. */
+private fun notYetReason(view: StateView, quest: QuestCard): String? {
+    if (quest.status != QuestStatus.Available) return null
+    val rejected = view.myClaims.lastOrNull {
+        it.questTitle == quest.title && it.on == quest.on && it.state.state == ClaimStateKind.Rejected
+    } ?: return null
+    return rejected.state.reason?.takeIf { it.isNotBlank() } ?: "Have another go and try again."
+}
+
 @Composable
-private fun QuestCardRow(quest: QuestCard, onMarkDone: (Long) -> Unit, onClick: () -> Unit) {
-    QuestCard(
-        accent = when (quest.status) {
-            QuestStatus.CompletedToday -> MaterialTheme.colorScheme.tertiary  // green
-            QuestStatus.Pending        -> MaterialTheme.colorScheme.primary   // royal
-            else                       -> MaterialTheme.colorScheme.secondary // gold
-        },
-        onClick = onClick,
-    ) {
+private fun SavingForCard(reward: RewardCard, balance: Int, onClick: () -> Unit) {
+    val short = reward.cost - balance
+    QuestCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Saving for", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.weight(1f))
+            Text(
+                "$balance / ${reward.cost}",
+                fontFamily = SquireDisplay, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                color = SquireGoldOn,
+            )
+        }
+        Spacer(Modifier.height(2.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(reward.icon ?: "🎁", fontSize = 20.sp)
+            Text(reward.name, style = MaterialTheme.typography.titleLarge, maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(10.dp))
+        // Gold, because it is coins. The only bar in the app that is.
+        LinearProgressIndicator(
+            progress = { (balance.toFloat() / reward.cost).coerceIn(0f, 1f) },
+            color = SquireGoldFace,
+            trackColor = MaterialTheme.colorScheme.outlineVariant,
+            strokeCap = StrokeCap.Round,
+            gapSize = 0.dp,
+            drawStopIndicator = {},
+            modifier = Modifier.fillMaxWidth().height(12.dp).clip(CircleShape),
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (short == 1) "1 more coin." else "$short more coins.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun StreakLine(streak: StreakView) {
+    val target = streak.nextMilestone ?: streak.current
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(horizontal = 2.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            repeat(target.coerceAtMost(10)) { i -> Dot(filled = i < streak.current) }
+        }
+        Text(
+            "${streak.current} ${if (streak.current == 1) "day" else "days"} running · ${streak.name}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** A quest today, in one of three states the child can read at a glance (SQUIRE-T-0133):
+ *  to do (an "I did it" button), waiting (ghost coins + an empty seal slot), sealed (the wax seal). */
+@Composable
+private fun QuestCardRow(quest: QuestCard, notYet: String?, sending: Boolean, onMarkDone: (Long) -> Unit, onClick: () -> Unit) {
+    val sealed = quest.status == QuestStatus.CompletedToday
+    val waiting = quest.status == QuestStatus.Pending || (sending && quest.status == QuestStatus.Available)
+    // Did this row just go from waiting to sealed under our eyes? Then the seal stamps down.
+    val lastStatus = remember { mutableStateOf(quest.status) }
+    val justSealed = sealed && lastStatus.value == QuestStatus.Pending
+    LaunchedEffect(quest.status) { lastStatus.value = quest.status }
+    QuestCard(onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Medallion(quest.icon, quest.title)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(quest.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    quest.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (sealed || waiting) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                    textDecoration = if (sealed) TextDecoration.LineThrough else null,
+                )
                 Spacer(Modifier.height(4.dp))
-                GoldPill(quest.reward)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    GoldPill(quest.reward, ghost = waiting)
+                    Text(
+                        when {
+                            sealed -> "earned"
+                            waiting -> "waiting for a grown-up's seal"
+                            else -> ""
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (notYet != null && !waiting) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Not yet — $notYet",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
-            when (quest.status) {
-                QuestStatus.Available -> Button(
+            Spacer(Modifier.width(8.dp))
+            when {
+                waiting && !sealed -> SealSlot()
+                quest.status == QuestStatus.Available -> Button(
                     onClick = { onMarkDone(quest.questId) },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.tertiary,
                         contentColor = MaterialTheme.colorScheme.onTertiary,
                     ),
-                ) { Text("Done", fontWeight = FontWeight.Bold) }
-                QuestStatus.Pending -> StatusChip(
-                    "⏳ Pending",
-                    MaterialTheme.colorScheme.secondaryContainer,
-                    MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-                QuestStatus.CompletedToday -> StatusChip(
-                    "✓ Done",
-                    MaterialTheme.colorScheme.tertiaryContainer,
-                    MaterialTheme.colorScheme.onTertiaryContainer,
-                )
-                QuestStatus.TakenByOther -> StatusChip(
+                ) { Text(if (notYet != null) "Try again" else "I did it", fontWeight = FontWeight.Bold) }
+                sealed -> WaxSeal(stamp = justSealed)
+                else -> StatusChip(
                     "Taken",
                     MaterialTheme.colorScheme.surfaceVariant,
                     MaterialTheme.colorScheme.onSurfaceVariant,

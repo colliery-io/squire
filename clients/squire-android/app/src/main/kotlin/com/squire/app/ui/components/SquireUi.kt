@@ -15,6 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.squire.app.ui.theme.SquireSeal
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -39,20 +43,22 @@ import com.squire.app.ui.theme.SquireParchmentTile
  * balance in the app bar. Signature is unchanged from the original `GoldPill(amount, large)`.
  */
 @Composable
-fun GoldPill(amount: Int, large: Boolean = false) {
+fun GoldPill(amount: Int, large: Boolean = false, ghost: Boolean = false) {
+    // `ghost` (SQUIRE-T-0133): coins that are CLAIMED but not yet sealed — the same pill, drained of
+    // gold, so the child sees exactly what a grown-up's seal will turn to gold.
     Surface(
         shape = RoundedCornerShape(50),
-        color = SquireGoldSoft,
+        color = if (ghost) MaterialTheme.colorScheme.surfaceVariant else SquireGoldSoft,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (large) 7.dp else 5.dp),
             modifier = Modifier.padding(horizontal = if (large) 14.dp else 9.dp, vertical = if (large) 7.dp else 5.dp),
         ) {
-            Coin(size = if (large) 20.dp else 16.dp)
+            Coin(size = if (large) 20.dp else 16.dp, ghost = ghost)
             Text(
                 "$amount",
-                color = SquireGoldOn,
+                color = if (ghost) MaterialTheme.colorScheme.onSurfaceVariant else SquireGoldOn,
                 fontWeight = FontWeight.Bold,
                 fontFamily = SquireDisplay,
                 fontSize = if (large) 22.sp else 17.sp,
@@ -83,20 +89,70 @@ fun CashPill(amount: Long, large: Boolean = true) {
 /** The minted gold coin used inside coin pills and medallions — a plain disc with an inner ring
  *  (no star), so the single in-app currency reads unambiguously as "coins" (SQUIRE-T-0094). */
 @Composable
-private fun Coin(size: androidx.compose.ui.unit.Dp) {
+private fun Coin(size: androidx.compose.ui.unit.Dp, ghost: Boolean = false) {
+    val rim = if (ghost) MaterialTheme.colorScheme.outline else SquireGold
     androidx.compose.foundation.layout.Box(
         modifier = Modifier
             .size(size)
             .clip(CircleShape)
-            .background(Brush.radialGradient(listOf(SquireGoldLight, SquireGoldFace)))
-            .border(1.5.dp, SquireGold, CircleShape),
+            .then(
+                if (ghost) Modifier.background(MaterialTheme.colorScheme.surface)
+                else Modifier.background(Brush.radialGradient(listOf(SquireGoldLight, SquireGoldFace))),
+            )
+            .border(1.5.dp, rim, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .size(size * 0.6f)
                 .clip(CircleShape)
-                .border(1.dp, SquireGold.copy(alpha = 0.45f), CircleShape),
+                .border(1.dp, rim.copy(alpha = 0.45f), CircleShape),
+        )
+    }
+}
+
+/** The Knight's wax seal (SQUIRE-T-0133): the mark that lands on a quest when a grown-up approves
+ *  it. Seal-red, tilted, with a Grenze check — the one place the seal colour appears on the child's
+ *  screen. Scales in when it first appears so approval is a moment, not a state change. */
+@Composable
+fun WaxSeal(size: androidx.compose.ui.unit.Dp = 40.dp, stamp: Boolean = false) {
+    // `stamp`: play the landing animation. Only when an approval ARRIVES while the child is looking
+    // (the caller saw this quest waiting a moment ago) — a quest that was already sealed when the
+    // screen opened just sits there, sealed.
+    val scale = remember { androidx.compose.animation.core.Animatable(if (stamp) 2.2f else 1f) }
+    LaunchedEffect(stamp) {
+        if (stamp) scale.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 900f))
+    }
+    androidx.compose.foundation.layout.Box(
+        modifier = Modifier
+            .size(size)
+            .graphicsLayer { scaleX = scale.value; scaleY = scale.value; rotationZ = -9f }
+            .clip(CircleShape)
+            .background(SquireSeal)
+            .border(3.dp, SquireSeal.copy(alpha = 0.45f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            "✓",
+            color = Color.White,
+            fontFamily = SquireDisplay,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = (size.value * 0.5f).sp,
+        )
+    }
+}
+
+/** Where the seal will land: an empty dashed ring, so "waiting" has a shape (SQUIRE-T-0133). */
+@Composable
+fun SealSlot(size: androidx.compose.ui.unit.Dp = 40.dp) {
+    val ring = MaterialTheme.colorScheme.outlineVariant
+    androidx.compose.foundation.Canvas(modifier = Modifier.size(size)) {
+        drawCircle(
+            color = ring,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = 2.dp.toPx(),
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
+            ),
         )
     }
 }
@@ -185,7 +241,7 @@ fun ProgressDots(current: Int, target: Int) {
 }
 
 @Composable
-private fun Dot(filled: Boolean) {
+fun Dot(filled: Boolean) {
     androidx.compose.foundation.layout.Box(
         modifier = Modifier
             .size(11.dp)
