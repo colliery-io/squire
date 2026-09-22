@@ -26,11 +26,11 @@ class BootReceiver : BroadcastReceiver() {
         val session = SessionStore(context).load() ?: return
         // The watchers re-read the household's settings on their next run and re-arm the reminders
         // from them; all we need here is for the watchers themselves to be running.
-        if (session.role == "Knight") {
-            KnightNotifyWorker.schedule(context)
-        } else {
-            SquireNotifyWorker.schedule(context)
-        }
+        val knight = session.role == "Knight"
+        if (knight) KnightNotifyWorker.schedule(context) else SquireNotifyWorker.schedule(context)
+        // A reboot ends the one-shot chain outright (SQUIRE-T-0144), so start it again here rather
+        // than waiting up to fifteen minutes for the periodic backstop to notice.
+        FastPoll.arm(context, knight = knight)
         UpdateCheckWorker.schedule(context)
     }
 }

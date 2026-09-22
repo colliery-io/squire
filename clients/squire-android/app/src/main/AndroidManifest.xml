@@ -9,6 +9,8 @@
     <!-- Background update-available notification (SQUIRE-T-0090); runtime-requested on Android 13+. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Normal permission: granted at install with no prompt; required for a channel to vibrate. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:icon="@mipmap/ic_launcher"

@@ -31,6 +31,7 @@ import com.squire.app.data.SquireApiAdapter
 import com.squire.knight.app.ui.KnightTab
 import com.squire.app.ui.SquireTab
 import com.squire.app.bg.ChoreReminderWorker
+import com.squire.app.bg.FastPoll
 import com.squire.app.bg.KnightNotifyWorker
 import com.squire.app.bg.Notifier
 import com.squire.app.data.db.SquireDb
@@ -75,9 +76,11 @@ private fun scheduleWatchers(ctx: android.content.Context, session: Session) {
         KnightNotifyWorker.schedule(ctx)
         SquireNotifyWorker.cancel(ctx) // in case this device was a squire before
         ChoreReminderWorker.cancel(ctx) // chore nudges are a squire's, not a Knight's
+        FastPoll.arm(ctx, knight = true)
     } else {
         SquireNotifyWorker.schedule(ctx)
         KnightNotifyWorker.cancel(ctx)
+        FastPoll.arm(ctx, knight = false)
     }
 }
 
@@ -86,6 +89,7 @@ private fun cancelWatchers(ctx: android.content.Context) {
     SquireNotifyWorker.cancel(ctx)
     KnightNotifyWorker.cancel(ctx)
     ChoreReminderWorker.cancel(ctx)
+    FastPoll.cancel(ctx)
     Notifier.clear(ctx)
 }
 

@@ -31,13 +31,23 @@ import java.util.concurrent.TimeUnit
 class SquireNotifyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
     override suspend fun doWork(): Result {
-        val session = SessionStore(applicationContext).load() ?: return Result.success()
-        val state = try {
-            SquireApiAdapter(session.baseUrl, session.household, session.token).fetchState()
-        } catch (_: Exception) {
-            return Result.success() // offline / unreachable — try next period
+        // The chain must continue whatever happened — an offline blip that skipped the re-arm would
+        // kill it until the 15-minute backstop noticed (SQUIRE-T-0144).
+        try {
+            val session = SessionStore(applicationContext).load() ?: return Result.success()
+            val state = try {
+                SquireApiAdapter(session.baseUrl, session.household, session.token).fetchState()
+            } catch (_: Exception) {
+                return Result.success() // offline / unreachable — try again next tick
+            }
+            announce(applicationContext, state)
+        } finally {
+            // Not after an unpair: `cancel` clears the session, and re-arming would resurrect a
+            // chain that should be dead.
+            if (SessionStore(applicationContext).load() != null) {
+                FastPoll.rearm(applicationContext, knight = false)
+            }
         }
-        announce(applicationContext, state)
         return Result.success()
     }
 

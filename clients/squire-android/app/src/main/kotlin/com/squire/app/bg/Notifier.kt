@@ -24,16 +24,25 @@ import java.time.ZonedDateTime
  */
 object Notifier {
 
-    /** The categories a household can silence independently in Android's own settings. */
-    enum class Channel(val id: String, val label: String) {
-        /** A grown-up's verdict, and coins landing. */
-        Seals("squire_seals", "Seals & coins"),
+    /**
+     * The categories a household can silence independently in Android's own settings.
+     *
+     * **The `_v2` ids are deliberate.** A channel's importance is fixed when it is first created —
+     * Android hands it to the user from then on, and a later code change is ignored. The first
+     * release created these at DEFAULT importance, which makes a sound but shows no heads-up banner,
+     * so a parent glancing at their phone would not see "something is waiting". A new id is the only
+     * way to raise it. Anyone who had already tuned the old channels keeps those settings on the
+     * old, now-unused ones; that is the price, paid once.
+     */
+    enum class Channel(val id: String, val label: String, val importance: Int) {
+        /** A grown-up's verdict, and coins landing — the moment the whole app exists for. */
+        Seals("squire_seals_v2", "Seals & coins", NotificationManager.IMPORTANCE_HIGH),
 
-        /** Timed nudges: chore time, a streak about to lapse. */
-        Reminders("squire_reminders", "Reminders"),
+        /** Timed nudges: chore time, a streak about to lapse. A reminder nobody sees is not one. */
+        Reminders("squire_reminders_v2", "Reminders", NotificationManager.IMPORTANCE_HIGH),
 
-        /** A new app build is ready to install. */
-        Updates("squire_updates", "App updates"),
+        /** A new app build is ready. Not urgent: no banner, no interruption. */
+        Updates("squire_updates_v2", "App updates", NotificationManager.IMPORTANCE_LOW),
     }
 
     /** Which screen a tap should open. Read by `MainActivity`. */
@@ -64,7 +73,11 @@ object Notifier {
         val mgr = ctx.getSystemService(NotificationManager::class.java) ?: return false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             mgr.createNotificationChannel(
-                NotificationChannel(channel.id, channel.label, NotificationManager.IMPORTANCE_DEFAULT),
+                NotificationChannel(channel.id, channel.label, channel.importance).apply {
+                    // Explicit rather than left to the device default, so a phone that creates new
+                    // channels without vibration still buzzes for a seal.
+                    enableVibration(channel.importance >= NotificationManager.IMPORTANCE_DEFAULT)
+                },
             )
         }
         val intent = Intent(ctx, MainActivity::class.java)
@@ -79,6 +92,11 @@ object Notifier {
         )
         val notification = NotificationCompat.Builder(ctx, channel.id)
             .setSmallIcon(android.R.drawable.btn_star_big_on)
+            .setPriority(
+                if (channel.importance >= NotificationManager.IMPORTANCE_HIGH) NotificationCompat.PRIORITY_HIGH
+                else NotificationCompat.PRIORITY_DEFAULT,
+            )
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))

@@ -29,13 +29,21 @@ import java.util.concurrent.TimeUnit
 class KnightNotifyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
     override suspend fun doWork(): Result {
-        val session = SessionStore(applicationContext).load() ?: return Result.success()
-        val review = try {
-            KnightApiAdapter(session.baseUrl, session.household, session.token).fetch()
-        } catch (_: Exception) {
-            return Result.success() // offline / unreachable — try next period
+        // The chain must continue whatever happened — an offline blip that skipped the re-arm would
+        // kill it until the 15-minute backstop noticed (SQUIRE-T-0144).
+        try {
+            val session = SessionStore(applicationContext).load() ?: return Result.success()
+            val review = try {
+                KnightApiAdapter(session.baseUrl, session.household, session.token).fetch()
+            } catch (_: Exception) {
+                return Result.success() // offline / unreachable — try again next tick
+            }
+            announce(applicationContext, review)
+        } finally {
+            if (SessionStore(applicationContext).load() != null) {
+                FastPoll.rearm(applicationContext, knight = true)
+            }
         }
-        announce(applicationContext, review)
         return Result.success()
     }
 
