@@ -475,8 +475,10 @@ pre {
 /* Board first (SQUIRE-T-0135): the list is what you came for; the form is a panel beside it. */
 .quests-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1.5rem; align-items: start; }
 .quests-make { order: 2; }
-/* Closed, the panel is just its button — give the board the width back. */
-.quests-grid:has(.quests-make:not([open])) { grid-template-columns: minmax(0, 1fr) auto; }
+/* Closed, the panel is just its button — give the board the width back (wide layouts only: the
+   :has() selector outranks the single-column media rule below, so it must not apply there). */
+@media (min-width: 1001px) { .quests-grid:has(.quests-make:not([open])) { grid-template-columns: minmax(0, 1fr) auto; } }
+details.compose > summary { white-space: nowrap; }
 .quests-board { order: 1; }
 .quests-make {
   background: var(--parch-light); border: 1px solid var(--line);
