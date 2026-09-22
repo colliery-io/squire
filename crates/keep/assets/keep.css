@@ -102,7 +102,23 @@ header h1 {
 }
 header .sub { margin: 3px 0 0; color: #AEB8D6; font-size: .8rem; }
 
-main { max-width: 64rem; margin: 1.4rem auto 3rem; padding: 0 1.4rem; }
+/* Two columns once signed in (SQUIRE-T-0135): a sticky sidebar of sections on the left, the
+   active panel on the right. The login card spans both. Collapses to one column on a phone, where
+   the sidebar becomes a horizontal strip. */
+main {
+  max-width: 72rem; margin: 1.4rem auto 3rem; padding: 0 1.4rem;
+  display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 1.25rem; align-items: start;
+}
+/* Grid children may shrink below their content (else the phone-width nav strip widens the page). */
+main > section { min-width: 0; }
+main > #login { grid-column: 1 / -1; max-width: 32rem; }
+main > #shell { grid-column: 1; position: sticky; top: 1rem; }
+main > section:not(#login):not(#shell) { grid-column: 2; }
+@media (max-width: 760px) {
+  main { grid-template-columns: 1fr; gap: .9rem; }
+  main > #shell { grid-column: 1; position: static; }
+  main > section:not(#login):not(#shell) { grid-column: 1; }
+}
 
 /* ── Panels / sections ───────────────────────────────────────────────────── */
 section {
@@ -113,18 +129,19 @@ section {
   box-shadow: var(--shadow-card);
 }
 
-/* The signed-in shell sits tight to the tab bar. */
-#shell { padding-bottom: .5rem; }
+/* The signed-in shell is the sidebar. */
+#shell { padding: 1rem .8rem; }
 #who-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; flex-wrap: wrap; margin-bottom: .25rem;
 }
 .who-chip {
-  display: inline-flex; align-items: center; gap: 9px;
+  display: flex; align-items: center; gap: 9px;
   background: var(--wash);
-  border-radius: 999px; padding: 5px 6px 5px 13px;
-  font-size: .85rem; color: var(--ink); font-weight: 500;
+  border-radius: 999px; padding: 5px 6px 5px 12px;
+  font-size: .8rem; color: var(--ink); font-weight: 500; min-width: 0;
 }
+.who-chip #who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .who-chip .avatar {
   width: 28px; height: 28px; border-radius: 50%;
   background: var(--ink);
@@ -156,33 +173,38 @@ h3 {
   margin: 1.3rem 0 .6rem;
 }
 
-/* ── Tabs ────────────────────────────────────────────────────────────────── */
-.tabs {
-  display: flex; flex-wrap: wrap; gap: 2px;
-  margin-top: .9rem;
-  border-bottom: 1px solid var(--line);
-}
+/* ── Sidebar navigation (SQUIRE-T-0135) ──────────────────────────────────────────────────── */
+.tabs { display: flex; flex-direction: column; gap: .9rem; margin-top: .9rem; }
+.nav-group { display: flex; flex-direction: column; gap: 1px; }
+.nav-label { font-size: .72rem; color: var(--stone); padding: 0 .6rem .3rem; }
 .tabs .tab {
-  display: inline-flex; align-items: center; gap: 7px;
-  color: var(--stone); font-weight: 400; font-size: .88rem;
+  display: flex; align-items: center; gap: 9px;
+  color: var(--ink); font-weight: 400; font-size: .9rem;
   text-decoration: none;
-  padding: .55rem .8rem;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: color .12s ease, border-color .12s ease;
+  padding: .45rem .6rem; border-radius: 8px;
+  transition: background .12s ease;
 }
-.tabs .tab svg { opacity: .8; }
+.tabs .tab svg { flex: none; opacity: .75; }
 .tabs .tab svg [stroke] { stroke: currentColor; }
-.tabs .tab:hover { color: var(--ink); }
-.tabs .tab:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 6px; }
-.tabs .tab.active { color: var(--ink); font-weight: 500; border-bottom-color: var(--azure); }
+.tabs .tab:hover { background: var(--wash); }
+.tabs .tab:focus-visible { outline: none; box-shadow: var(--focus); }
+.tabs .tab.active { background: var(--ink); color: #fff; font-weight: 500; }
+.tabs .tab.active svg { opacity: 1; }
 /* What is waiting for the Knight's seal — so it wears the seal, not gold. */
 .tabs .tab .count {
-  background: var(--seal); color: #fff;
+  margin-left: auto; background: var(--seal); color: #fff;
   font-weight: 600; font-size: .68rem;
   min-width: 18px; height: 18px; padding: 0 5px;
   border-radius: 9px; display: inline-grid; place-items: center;
 }
+@media (max-width: 760px) {
+  .tabs { flex-direction: row; overflow-x: auto; gap: .6rem; padding-bottom: .2rem; }
+  .nav-group { flex-direction: row; gap: 2px; flex: none; }
+  .nav-label { display: none; }
+  .tabs .tab { white-space: nowrap; padding: .4rem .55rem; font-size: .85rem; }
+}
+#review-actions { margin: -.4rem 0 .6rem; }
+#review-actions button { margin-top: 0; }
 
 /* ── Forms ───────────────────────────────────────────────────────────────── */
 label { display: block; margin: .55rem 0; font-size: .8rem; font-weight: 500; color: var(--stone); }
@@ -433,7 +455,10 @@ pre {
 }
 
 /* ── Two-column Quests layout (form ⋮ board) ─────────────────────────────── */
-.quests-grid { display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; align-items: start; }
+/* Board first (SQUIRE-T-0135): the list is what you came for; the form is a panel beside it. */
+.quests-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1.5rem; align-items: start; }
+.quests-make { order: 2; }
+.quests-board { order: 1; }
 .quests-make {
   background: var(--parch-light); border: 1px solid var(--line);
   border-radius: 12px; padding: 1.1rem 1.2rem;
@@ -443,7 +468,7 @@ pre {
   margin-bottom: .25rem;
 }
 .quests-board .board-head .count { color: var(--stone); font-weight: 400; font-size: .9rem; }
-@media (max-width: 760px) { .quests-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .quests-grid { grid-template-columns: 1fr; } .quests-make { order: 1; } .quests-board { order: 2; } }
 
 /* Empty-state hint — opportunity, never failure. */
 .empty {

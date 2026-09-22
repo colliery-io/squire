@@ -23,6 +23,14 @@
   const TINCTURES = ["gules", "azure", "vert", "purpure", "tenne", "sable"];
   const TINCTURE_HEX = { gules: "#C22B3A", azure: "#2457C5", vert: "#187A4F", purpure: "#6B3FA0", tenne: "#B8561B", sable: "#2E3440" };
 
+  // "today" / "yesterday" / "Mon 15 Sep" from the server's day numbers — never "day 20624".
+  function whenLabel(on, today) {
+    const d = today - on;
+    if (d === 0) return "today";
+    if (d === 1) return "yesterday";
+    return new Date(on * 86400000).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  }
+
   const QUEST_EMOJI = [
     [/bed|wake|morning/i, "🛏"], [/tidy|room|clean|vacuum|dust/i, "🧹"],
     [/dog|walk|pet|biscuit|cat|feed/i, "🐕"], [/piano|music|practice|guitar|violin/i, "🎹"],
@@ -89,7 +97,22 @@
 
   function currentTab() {
     const name = (location.hash || "").replace("#", "");
-    return TABS.some((t) => t.tab === name) ? name : "quests";
+    return TABS.some((t) => t.tab === name) ? name : landingTab;
+  }
+  // Where the Keep opens with no hash (SQUIRE-T-0135): Review when anything is waiting, else Quests.
+  let landingTab = "quests";
+  async function refreshReviewCount() {
+    try {
+      const r = await fetch("/api/review");
+      if (!r.ok) return 0;
+      const v = await r.json();
+      const n = (v.pending_claims || []).length + (v.pending_requests || []).length + (v.pending_cashouts || []).length;
+      const badge = document.getElementById("review-count");
+      badge.textContent = n;
+      badge.hidden = n === 0;
+      landingTab = n > 0 ? "review" : "quests";
+      return n;
+    } catch (_) { return 0; }
   }
 
   function showTab(name) {
@@ -104,13 +127,14 @@
   // Reveal the authenticated shell and land on the active tab. Shared by login + first-run
   // register. Eager-loads only the catalogs that feed cross-tab dropdowns (item gate ←
   // achievements, achievement scope ← quests); each tab loads its own data on activation.
-  function enterShell(who, fallbackName) {
+  async function enterShell(who, fallbackName) {
     document.getElementById("login").hidden = true;
     document.getElementById("who").textContent = `${who.display_name || fallbackName} (#${who.user})`;
     document.getElementById("shell").hidden = false;
     loadAchScopeQuests();
     loadCatalog("achievements", "achievement-list");
     loadLibrary();
+    await refreshReviewCount(); // decides the landing tab when there is no hash
     showTab(currentTab());
   }
 
@@ -153,7 +177,19 @@
   async function reviewAction(path, body) {
     await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     loadReview();
+    refreshReviewCount();
   }
+  // Seal all (SQUIRE-T-0135): every pending claim + request, one tap. Same calls the per-row
+  // buttons make, fired together, one reload at the end.
+  document.getElementById("seal-all").addEventListener("click", async () => {
+    const calls = [];
+    for (const c of pendingClaims) calls.push(fetch("/api/review/claim", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claim_id: c.claim_id, decision: "approve" }) }));
+    for (const q of pendingRequests) calls.push(fetch("/api/review/redemption", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request_id: q.request_id, decision: "approve" }) }));
+    await Promise.all(calls);
+    loadReview();
+    refreshReviewCount();
+  });
+  let pendingClaims = [], pendingRequests = [];
 
   // An inline "Reject — type a reason" editor (T-0080): replaces the old browser prompt(). Reveals a
   // reason field + Confirm/Cancel in place; Confirm posts the reject with the typed reason (optional).
@@ -167,7 +203,7 @@
       input.placeholder = "Reason (optional — the child sees this)";
       input.className = "reject-reason";
       const confirm = document.createElement("button");
-      confirm.textContent = "Confirm reject";
+      confirm.textContent = "Send";
       confirm.className = "confirm-reject";
       const cancel = document.createElement("button");
       cancel.textContent = "Cancel";
@@ -184,6 +220,8 @@
     const res = await fetch("/api/review");
     if (!res.ok) return;
     const r = await res.json();
+    // The review carries each squire's name (and tincture): never "Squire #2" (SQUIRE-T-0135).
+    for (const s of r.squires || []) squiresById[s.squire] = s.display_name;
     const claims = document.getElementById("claim-queue");
     const reqs = document.getElementById("request-queue");
     const sqs = document.getElementById("squire-balances");
@@ -191,18 +229,20 @@
     reqs.innerHTML = "";
     sqs.innerHTML = "";
     document.getElementById("review-empty").hidden = r.pending_claims.length + r.pending_requests.length > 0;
+    pendingClaims = r.pending_claims; pendingRequests = r.pending_requests;
+    document.getElementById("review-actions").hidden = r.pending_claims.length + r.pending_requests.length < 2;
 
     for (const c of r.pending_claims) {
       const li = el("li", "review-card");
       const rowEl = el("div", "card-row");
       rowEl.appendChild(medallion(pickEmoji(c.quest_title, QUEST_EMOJI, "📜")));
       const who = squiresById[c.squire] || ("Squire #" + c.squire);
-      rowEl.appendChild(cardBody(c.quest_title, [who, "awaiting review"]));
+      rowEl.appendChild(cardBody(c.quest_title, [who, whenLabel(c.on, r.today)]));
       li.appendChild(rowEl);
       const actions = el("div", "card-actions");
-      const ok = el("button", "approve", "✓ Approve");
+      const ok = el("button", "approve", "Seal it");
       ok.addEventListener("click", () => reviewAction("/api/review/claim", { claim_id: c.claim_id, decision: "approve" }));
-      const no = el("button", "reject", "Reject");
+      const no = el("button", "reject", "Not yet…");
       attachRejectEditor(li, no, (reason) =>
         reviewAction("/api/review/claim", { claim_id: c.claim_id, decision: { reject: { reason } } }));
       actions.append(ok, no);
@@ -217,9 +257,9 @@
       rowEl.appendChild(cardBody(q.item_name, [who, "wants to redeem · " + q.cost + " ★"]));
       li.appendChild(rowEl);
       const actions = el("div", "card-actions");
-      const ok = el("button", "approve", "✓ Grant");
+      const ok = el("button", "approve", "Grant it");
       ok.addEventListener("click", () => reviewAction("/api/review/redemption", { request_id: q.request_id, decision: "approve" }));
-      const no = el("button", "reject", "Reject");
+      const no = el("button", "reject", "Not yet…");
       attachRejectEditor(li, no, (reason) =>
         reviewAction("/api/review/redemption", { request_id: q.request_id, decision: { reject: { reason } } }));
       actions.append(ok, no);

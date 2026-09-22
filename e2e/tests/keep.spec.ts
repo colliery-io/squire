@@ -5,15 +5,31 @@ const SCREENS = "screens";
 fs.mkdirSync(SCREENS, { recursive: true });
 
 /** Sign in as the demo admin Knight (UserId 1 / "demo") and wait for the tabbed shell. */
-async function login(page: Page) {
+/** Sign in, then open `tab` (default Quests). The Keep lands on Review whenever anything is
+ *  waiting for the Knight's seal (SQUIRE-T-0135) — and the demo seeds two claims — so tests that
+ *  work the quest board must navigate there rather than assume it. */
+async function login(page: Page, tab = "quests") {
   await page.goto("/");
   await page.fill("#login-form input[name=user]", "1");
   await page.fill("#login-form input[name=secret]", "demo");
   await page.click("#login-form button[type=submit]");
   await expect(page.locator("#tabs .tab.active")).toBeVisible();
+  await page.locator(`#tabs .tab[data-tab=${tab}]`).click();
 }
 
-test("login lands on the Quests tab", async ({ page }) => {
+test("login lands on Review when something is waiting (SQUIRE-T-0135)", async ({ page }) => {
+  await page.goto("/");
+  await page.fill("#login-form input[name=user]", "1");
+  await page.fill("#login-form input[name=secret]", "demo");
+  await page.click("#login-form button[type=submit]");
+  // The demo seeds pending claims, so the Keep opens on the queue with a count badge.
+  await expect(page.locator("#tabs .tab.active")).toHaveAttribute("data-tab", "review");
+  await expect(page.locator("#review-count")).toBeVisible();
+  await expect(page.locator("#review-panel")).toBeVisible();
+  await page.screenshot({ path: `${SCREENS}/01-review-landing.png`, fullPage: true });
+});
+
+test("the Quests tab shows the board", async ({ page }) => {
   await login(page);
   await expect(page.locator("#tabs .tab.active")).toHaveText("Quests");
   await expect(page.locator("#quests-panel")).toBeVisible();

@@ -21,7 +21,7 @@ Given("the Review tab is open", async ({ page }) => {
 When("the operator approves the claim for {string}", async ({ page }, quest: string) => {
   const row = page.locator("#claim-queue li", { hasText: quest });
   await expect(row).toBeVisible();
-  await row.getByRole("button", { name: "Approve" }).click();
+  await row.getByRole("button", { name: "Seal it" }).click();
 });
 
 When(
