@@ -8,7 +8,7 @@ src = "src"
 [output.html]
 default-theme = "rust"
 preferred-dark-theme = "ayu"
-git-repository-url = "https://github.com/colliery-io/squire"
+git-repository-url = "https://github.com/colliery-io/squire-core"
 edit-url-template = "https://github.com/colliery-io/squire-core/edit/main/docs/{path}"
 no-section-label = true
 

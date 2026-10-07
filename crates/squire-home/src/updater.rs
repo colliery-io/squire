@@ -1,6 +1,6 @@
-//! Server self-update (SQUIRE-T-0089 / ADR SQUIRE-A-0012): on startup the running squire-serve checks
-//! the public dist repo's latest GitHub Release for a newer build of itself for this platform,
-//! downloads + replaces its own binary, and **re-execs** into it.
+//! Server self-update (SQUIRE-T-0089 / ADR SQUIRE-A-0012, SQUIRE-A-0018): on startup the running
+//! squire-serve checks the public release repo's latest GitHub Release for a newer build of itself
+//! for this platform, downloads + replaces its own binary, and **re-execs** into it.
 //!
 //! Silent + best-effort: any failure logs and the current binary keeps running. `SQUIRE_SELF_UPDATE=off`
 //! disables it; a dev build (`cargo run`, exe under `target/`) is skipped so a working tree isn't
@@ -17,9 +17,11 @@ pub fn maybe_self_update() {
         return; // never replace a `cargo run` build
     }
 
-    let repo =
-        std::env::var("SQUIRE_DIST_REPO").unwrap_or_else(|_| "colliery-io/squire".to_string());
-    let (owner, name) = repo.split_once('/').unwrap_or(("colliery-io", "squire"));
+    let repo = std::env::var("SQUIRE_DIST_REPO")
+        .unwrap_or_else(|_| crate::apk_sync::DEFAULT_REPO.to_string());
+    let (owner, name) = repo
+        .split_once('/')
+        .unwrap_or(("colliery-io", "squire-core"));
 
     // Authenticate the GitHub API calls when a token is configured (SQUIRE-T-0117): unauthenticated
     // is 60 req/hr/IP and 403s under repeated restarts; a token lifts it to 5000/hr. Optional —
@@ -57,7 +59,7 @@ pub fn maybe_self_update() {
 }
 
 /// A GitHub token for the update API calls — raises the 60→5000 req/hr rate limit (SQUIRE-T-0117).
-/// Reads `SQUIRE_UPDATE_TOKEN`, then `GITHUB_TOKEN`. For the **public** dist repo any valid token
+/// Reads `SQUIRE_UPDATE_TOKEN`, then `GITHUB_TOKEN`. For the **public** release repo any valid token
 /// works (no scopes needed). `None` ⇒ unauthenticated (rate-limited but functional).
 pub(crate) fn update_token() -> Option<String> {
     ["SQUIRE_UPDATE_TOKEN", "GITHUB_TOKEN"]

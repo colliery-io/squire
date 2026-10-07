@@ -1,7 +1,7 @@
 """Docs tasks: build/serve the mdBook doc site and refresh its screenshots.
 
-The site lives in ``docs/`` (mdBook). It's authored here and published to the PUBLIC dist repo
-(``colliery-io/squire``) GitHub Pages by ``.github/workflows/docs.yml`` — see SQUIRE-T-0119 and
+The site lives in ``docs/`` (mdBook). It's authored here and published to this repo's
+GitHub Pages by ``.github/workflows/docs.yml`` — see SQUIRE-T-0119 and
 ``.github/RELEASING.md``. Screenshots are committed under ``docs/src/images/`` so the CI docs build
 stays fast; ``angreal docs shots`` regenerates them from the live Keep (Playwright) and the Android
 Paparazzi goldens.

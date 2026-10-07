@@ -1,15 +1,15 @@
 # Releasing Squire
 
-Delivery follows **ADR SQUIRE-A-0012**: the source repo (`colliery-io/squire-core`) stays **private**;
-signed artifacts are published to the **public** repo (`colliery-io/squire`); home servers + the
-install QR pull from there unauthenticated.
+Delivery follows **ADR SQUIRE-A-0018** (which supersedes the two-repo split of SQUIRE-A-0012): this
+repo (`colliery-io/squire-core`) is **public**, and CI publishes the signed artifacts to **its own**
+GitHub Releases; home servers + the install QR pull from there unauthenticated.
 
-> Repo layout: **`colliery-io/squire-core`** = private source (this repo). **`colliery-io/squire`** =
-> public, artifacts only. Both already exist.
+> `colliery-io/squire` was the old artifacts-only repo. It is frozen: it holds the releases up to the
+> bridge release, so servers installed before the move update onto a build that follows this repo.
 
 ## One-time setup
 
-Set the signing + cross-repo secrets on the **source** repo (`squire-core`, i.e. this repo). The
+Set the signing secrets on the **source** repo (`squire-core`, i.e. this repo). The
 release keystore must reach CI to sign the APK; encode it and store it (and the passwords from
 `clients/squire-android/keystore.properties`) as Actions secrets — nothing sensitive is committed.
 
@@ -19,13 +19,9 @@ gh secret set SIGNING_KEYSTORE_B64   < <(base64 -i clients/squire-android/keysto
 gh secret set SIGNING_STORE_PASSWORD --body '<storePassword from keystore.properties>'
 gh secret set SIGNING_KEY_PASSWORD   --body '<keyPassword from keystore.properties>'
 gh secret set SIGNING_KEY_ALIAS      --body 'squire'
-
-# A fine-grained PAT with Contents: read+write on colliery-io/squire ONLY, so CI can publish the
-# release across repos (the default GITHUB_TOKEN can't write to another repo).
-gh secret set DIST_REPO_TOKEN        --body '<PAT with contents:write on colliery-io/squire>'
 ```
 
-Verify: `gh secret list` should show all five.
+Verify: `gh secret list` should show all four. Publishing uses the built-in `GITHUB_TOKEN`; no PAT.
 
 ## Cutting a release
 
@@ -38,7 +34,8 @@ Verify: `gh secret list` should show all five.
    ```
 
 3. The **Release phone APK** workflow builds + signs `squire-<versionCode>.apk` and publishes it to a
-   Release in `colliery-io/squire` (public). Watch it with `gh run watch` (or the Actions tab).
+   Release on this repo. **Release server binaries** attaches the four server builds to the same
+   Release. Watch it with `gh run watch` (or the Actions tab).
 
 That's the whole publish — no manual `cp`/manifest editing. Home servers pick up the new APK on their
 next pull (see ADR SQUIRE-A-0012, server startup-pull); phones update over LAN via content-hash OTA.
@@ -47,16 +44,10 @@ next pull (see ADR SQUIRE-A-0012, server startup-pull); phones update over LAN v
 
 The public doc site (`docs/`, mdBook) is **decoupled from releases**. Any push to `main` that
 touches `docs/**` triggers **Publish docs** (`.github/workflows/docs.yml`), which builds the book and
-force-pushes the rendered site to the `gh-pages` branch of `colliery-io/squire` using the **same
-`DIST_REPO_TOKEN`** — no extra secret. Edit docs and merge to `main`; that's the whole publish.
+force-pushes the rendered site to this repo's `gh-pages` branch with the built-in `GITHUB_TOKEN`.
+Edit docs and merge to `main`; that's the whole publish.
 
-One-time on `colliery-io/squire`: enable **Pages** with source = `gh-pages` branch (root). Refresh
+One-time on this repo: enable **Pages** with source = `gh-pages` branch (root). Refresh
 the in-repo screenshots with `angreal docs shots` (re-runs the Keep Playwright gallery and copies the
 Android Paparazzi goldens into `docs/src/images/`); build/preview locally with `angreal docs serve`.
 
-## What's NOT here yet (tracked under SQUIRE-I-0002)
-
-- Server startup-pull from `colliery-io/squire` (auto-populate the OTA updates dir + manifest).
-- QR "click to install" in the Keep (encodes the LAN APK URL).
-- Cross-platform server binaries + server self-update.
-- Android background (foreground-service) sync + update polling.

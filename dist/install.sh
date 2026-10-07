@@ -1,7 +1,7 @@
 #!/bin/sh
-# Squire one-line installer (SQUIRE-T-0091 / ADR SQUIRE-A-0012).
+# Squire one-line installer (SQUIRE-T-0091 / ADR SQUIRE-A-0018).
 #
-#   curl -fsSL https://raw.githubusercontent.com/colliery-io/squire/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/colliery-io/squire-core/main/dist/install.sh | sh
 #
 # Downloads the latest signed `squire-serve` for this machine from the public release repo, installs
 # it to ~/.local/bin, and on macOS creates a double-clickable Squire.app (in ~/Applications) that
@@ -10,7 +10,7 @@
 # "First run? Create the admin Knight" form). Honors SQUIRE_BIN_DIR / SQUIRE_APP_DIR for testing.
 set -eu
 
-REPO="colliery-io/squire"
+REPO="colliery-io/squire-core"
 BIN_DIR="${SQUIRE_BIN_DIR:-$HOME/.local/bin}"
 APP_DIR="${SQUIRE_APP_DIR:-$HOME/Applications}"
 OS="$(uname -s)"
@@ -45,7 +45,7 @@ if [ "$OS" = "Darwin" ]; then
   # ── Always-up background service (launchd LaunchAgent) ──────────────────────────────────────────
   # Runs the home server on login, KEEPS IT ALIVE (auto-restart within ~10s if it ever exits), and
   # survives reboots. Self-update + APK sync are ON (the gold release path) — the server pulls newer
-  # builds of itself and the phone APK from the dist repo. The released binary is ad-hoc/linker-signed
+  # builds of itself and the phone APK from the release repo. The released binary is ad-hoc/linker-signed
   # (Apple Silicon), so it runs cleanly under launchd. SQUIRE_NO_SERVICE=1 skips this.
   if [ "${SQUIRE_NO_SERVICE:-0}" != "1" ]; then
     LA_DIR="${SQUIRE_LAUNCHAGENT_DIR:-$HOME/Library/LaunchAgents}"

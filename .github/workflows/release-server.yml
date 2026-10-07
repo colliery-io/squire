@@ -1,12 +1,12 @@
 name: Release server binaries
 
-# Build the squire-serve home server for macOS / Windows / Linux and publish the binaries to the
-# PUBLIC dist repo (colliery-io/squire), per ADR SQUIRE-A-0012. Households run these and the server
+# Build the squire-serve home server for macOS / Windows / Linux and publish the binaries to a
+# Release on this (public) repo, per ADR SQUIRE-A-0018. Households run these and the server
 # self-updates from here. SQLite is bundled (libsqlite3-sys `bundled`), so the builds need no system
 # deps and compile natively on each runner.
 #
 # Triggers: a `v*` tag (alongside the APK), or manual dispatch against an existing tag (for testing
-# the builds without cutting a new release). Uses secrets.DIST_REPO_TOKEN to publish across repos.
+# the builds without cutting a new release).
 
 on:
   push:
@@ -19,10 +19,7 @@ on:
         required: true
 
 permissions:
-  contents: read
-
-env:
-  DIST_REPO: colliery-io/squire
+  contents: write # create the Release + upload the binaries
 
 jobs:
   server:
@@ -75,13 +72,13 @@ jobs:
           fi
           echo "asset=$OUT" >> "$GITHUB_OUTPUT"
 
-      - name: Publish to the dist repo
+      - name: Publish the Release
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           # The APK workflow usually creates the release; create-if-missing makes this order-independent.
-          gh release create "$TAG" --repo "$DIST_REPO" --title "Squire ${TAG#v}" \
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Squire ${TAG#v}" \
             --notes "Automated release ${TAG}." 2>/dev/null || true
-          gh release upload "$TAG" "${{ steps.pkg.outputs.asset }}" --repo "$DIST_REPO" --clobber
+          gh release upload "$TAG" "${{ steps.pkg.outputs.asset }}" --repo "$GITHUB_REPOSITORY" --clobber

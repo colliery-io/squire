@@ -182,7 +182,7 @@ pub async fn run_home_server() -> Result<(), BoxErr> {
     }
     println!("════════════════════════════════════════════════════════════════════");
 
-    // Keep the LAN-served phone APK current from the public dist repo (SQUIRE-T-0087 / A-0012).
+    // Keep the LAN-served phone APK current from the public release repo (SQUIRE-T-0087 / A-0018).
     spawn_apk_sync(apk_dir);
 
     serve(store, identity, handle, api_port, keep_port).await

@@ -16,11 +16,11 @@ identity = { path = "../identity" }
 api = { path = "../api" }
 keep = { path = "../keep" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
-# Server-side APK pull from the public dist repo (SQUIRE-T-0087 / ADR SQUIRE-A-0012): fetch the
+# Server-side APK pull from the public release repo (SQUIRE-T-0087 / ADR SQUIRE-A-0012): fetch the
 # latest release asset over HTTPS. rustls to avoid a system OpenSSL/libssl dependency.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde_json = "1"
-# Server self-update from the public dist repo's GitHub Releases (SQUIRE-T-0089 / ADR SQUIRE-A-0012):
+# Server self-update from the public release repo's GitHub Releases (SQUIRE-T-0089 / ADR SQUIRE-A-0012):
 # pull a newer squire-serve binary for this platform, replace the running exe, then re-exec. rustls
 # (no system OpenSSL); tar.gz on unix, zip on Windows.
 self_update = { version = "0.42", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2"] }

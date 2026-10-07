@@ -1,14 +1,10 @@
 name: Publish docs
 
-# Build the mdBook doc site (docs/) and publish it to GitHub Pages on the PUBLIC dist repo
-# (colliery-io/squire), per ADR SQUIRE-A-0012 — source stays private, the rendered site is an
-# artifact in the public repo. Runs on docs changes only, decoupled from release tags so docs ship
+# Build the mdBook doc site (docs/) and publish it to this repo's GitHub Pages (gh-pages branch),
+# per ADR SQUIRE-A-0018. Runs on docs changes only, decoupled from release tags so docs ship
 # independently of APKs/server binaries. See .github/RELEASING.md and SQUIRE-T-0119.
 #
-# Required repository secret (already set for the APK release — same PAT, no new secret):
-#   DIST_REPO_TOKEN   fine-grained PAT with Contents: read+write on colliery-io/squire
-#
-# One-time on colliery-io/squire: enable Pages with source = gh-pages branch (root).
+# One-time on this repo: enable Pages with source = gh-pages branch (root).
 
 on:
   push:
@@ -19,14 +15,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # push the gh-pages branch
 
 concurrency:
   group: docs-publish
   cancel-in-progress: true
 
 env:
-  DIST_REPO: colliery-io/squire
   MDBOOK_VERSION: "0.5.2"
 
 jobs:
@@ -47,15 +42,11 @@ jobs:
           mdbook build docs
           test -f docs/book/index.html || { echo "::error::mdbook produced no index.html"; exit 1; }
 
-      - name: Publish to gh-pages on the public dist repo
+      - name: Publish to gh-pages
         env:
-          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.sha }}
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::error::DIST_REPO_TOKEN is empty — set the cross-repo PAT (see .github/RELEASING.md)"
-            exit 1
-          fi
           cd docs/book
           touch .nojekyll                       # serve files verbatim; don't run Jekyll
           git init -q
@@ -64,4 +55,4 @@ jobs:
           git checkout -q -b gh-pages
           git add -A
           git commit -q -m "docs: deploy from squire-core@${SHA}"
-          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${DIST_REPO}.git" gh-pages
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages

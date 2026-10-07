@@ -1,7 +1,7 @@
-//! Server startup-pull of the phone APK from the public distribution repo (SQUIRE-T-0087 / ADR
-//! SQUIRE-A-0012).
+//! Server startup-pull of the phone APK from the public release repo (SQUIRE-T-0087 / ADR
+//! SQUIRE-A-0012, SQUIRE-A-0018).
 //!
-//! On startup the server fetches the **latest GitHub Release** of `colliery-io/squire` (public — no
+//! On startup the server fetches the **latest GitHub Release** of `colliery-io/squire-core` (public — no
 //! auth), finds the `squire-<versionCode>.apk` asset, downloads it into the OTA updates dir, and
 //! writes the `manifest.json` the LAN `/app/*` endpoints serve (the server injects the sha256,
 //! SQUIRE-T-0085). It then refreshes on an interval so a long-running server keeps current.
@@ -12,7 +12,9 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-const DEFAULT_REPO: &str = "colliery-io/squire";
+/// The public repo whose Releases carry the APK and server binaries (SQUIRE-A-0018). Also the
+/// self-update default ([`crate::updater`]). Overridable via `SQUIRE_DIST_REPO`.
+pub(crate) const DEFAULT_REPO: &str = "colliery-io/squire-core";
 const REFRESH: Duration = Duration::from_secs(6 * 60 * 60); // 6h
 
 /// Spawn the background APK sync: an immediate pull, then a refresh loop. No-op (logs) when

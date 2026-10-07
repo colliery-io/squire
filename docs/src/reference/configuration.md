@@ -32,9 +32,9 @@ authoritative list, sourced from the server binary
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SQUIRE_APK_DIR` | `<data_dir>/updates` | Where the OTA phone-app builds are stored and served from. |
-| `SQUIRE_APK_SYNC` | on | Background pull of the latest phone APK from the public dist repo. Set `off` to disable. |
-| `SQUIRE_DIST_REPO` | `colliery-io/squire` | The public release repo to pull the app + server updates from (`owner/name`). |
-| `SQUIRE_SELF_UPDATE` | on | Server self-update from the dist repo on start. Set `off` to disable. |
+| `SQUIRE_APK_SYNC` | on | Background pull of the latest phone APK from the public release repo. Set `off` to disable. |
+| `SQUIRE_DIST_REPO` | `colliery-io/squire-core` | The public release repo to pull the app + server updates from (`owner/name`). |
+| `SQUIRE_SELF_UPDATE` | on | Server self-update from the release repo on start. Set `off` to disable. |
 | `SQUIRE_UPDATE_TOKEN` | — | GitHub token for the update/APK-sync API calls, to avoid unauthenticated rate limits. |
 
 ## Network & discovery

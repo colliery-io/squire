@@ -19,7 +19,7 @@ The home server (`squire-serve`) is a single Rust binary. It:
 On the home computer (macOS or Linux), run the one-line installer:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/colliery-io/squire/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/colliery-io/squire-core/main/dist/install.sh | sh
 ```
 
 This downloads the latest signed `squire-serve` for your machine into `~/.local/bin`. What happens

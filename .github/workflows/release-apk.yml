@@ -1,15 +1,14 @@
 name: Release phone APK
 
-# Build + sign the Squire phone APK on a version tag and publish it to the PUBLIC distribution
-# repo (colliery-io/squire), per ADR SQUIRE-A-0012. Home servers + the install QR pull the
-# artifact from there unauthenticated; the source repo stays private.
+# Build + sign the Squire phone APK on a version tag and publish it to a Release on this (public)
+# repo, per ADR SQUIRE-A-0018. Home servers + the install QR pull the artifact from there
+# unauthenticated.
 #
 # Required repository secrets (set with `gh secret set` — see .github/RELEASING.md):
 #   SIGNING_KEYSTORE_B64    base64 of clients/squire-android/keystore/squire-release.jks
 #   SIGNING_STORE_PASSWORD  keystore store password
 #   SIGNING_KEY_PASSWORD    signing key password
 #   SIGNING_KEY_ALIAS       signing key alias (e.g. "squire")
-#   DIST_REPO_TOKEN         PAT with contents:write on colliery-io/squire
 
 on:
   push:
@@ -25,10 +24,7 @@ on:
         required: true
 
 permissions:
-  contents: read
-
-env:
-  DIST_REPO: colliery-io/squire
+  contents: write # create the Release + upload the APK
 
 jobs:
   apk:
@@ -99,20 +95,20 @@ jobs:
           "$BT/apksigner" verify --print-certs "$RUNNER_TEMP/squire-${{ steps.stage.outputs.vc }}.apk" \
             | grep -i "SHA-256 digest"
 
-      - name: Publish to the public dist repo
+      - name: Publish the Release
         env:
-          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
           VC: ${{ steps.stage.outputs.vc }}
           VN: ${{ steps.stage.outputs.vn }}
         run: |
           APK="$RUNNER_TEMP/squire-$VC.apk"
           # Create the release if it doesn't exist yet; otherwise just add/replace the asset.
-          if gh release view "$TAG" --repo "$DIST_REPO" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK" --repo "$DIST_REPO" --clobber
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --repo "$GITHUB_REPOSITORY" --clobber
           else
             gh release create "$TAG" "$APK" \
-              --repo "$DIST_REPO" \
+              --repo "$GITHUB_REPOSITORY" \
               --title "Squire $VN" \
               --notes "Automated release — Squire $VN (versionCode $VC)."
           fi
