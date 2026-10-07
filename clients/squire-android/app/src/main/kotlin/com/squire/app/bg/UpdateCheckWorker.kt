@@ -31,19 +31,19 @@ class UpdateCheckWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
             BuildConfig.VERSION_CODE,
         ) ?: return Result.success() // up to date / unreachable
 
-        notifyUpdateAvailable(applicationContext, info.versionName)
+        notifyUpdateAvailable(applicationContext, info.versionName, info.sha256)
         return Result.success()
     }
 
-    private fun notifyUpdateAvailable(ctx: Context, versionName: String) {
+    private fun notifyUpdateAvailable(ctx: Context, versionName: String, sha256: String?) {
         // Through the one Notifier (SQUIRE-T-0138) so this shares the channel set, the
-        // POST_NOTIFICATIONS handling and the never-twice ledger. Keyed by version, so a build the
-        // household has already been told about is not re-announced every six hours — which the
-        // ad-hoc version did, because it re-posted the same notification id each run.
+        // POST_NOTIFICATIONS handling and the never-twice ledger. Keyed by the build's content hash
+        // (SQUIRE-T-0085), so a build the household has already been told about is not re-announced
+        // every six hours, and a same-version rebuild is still announced once.
         Notifier.post(
             ctx = ctx,
             channel = Notifier.Channel.Updates,
-            key = "update:$versionName",
+            key = "update:${sha256 ?: versionName}",
             title = "Squire update available",
             text = "Tap to install v$versionName over your home Wi-Fi.",
             // An app update is worth hearing whenever it lands; it is not a child's nag.

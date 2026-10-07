@@ -49,4 +49,6 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+
+    testImplementation(kotlin("test"))
 }

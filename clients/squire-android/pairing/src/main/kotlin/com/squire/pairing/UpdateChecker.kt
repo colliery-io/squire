@@ -62,36 +62,35 @@ data class UpdateInfo(
  * SQUIRE-T-0051). When one is offered, [UpdateBanner] downloads and installs it **in-app** via
  * [AppUpdater] (SQUIRE-T-0059) — the system install prompt, no browser.
  *
- * Detection is **content-hash based** (SQUIRE-T-0085): an update is offered when the server's
- * `sha256` differs from the hash we last installed (persisted locally — the phone trusts the
- * server's advertised hash as the identity of what it installed, it does not re-hash itself). This
- * is phase 1 of the migration, so `versionCode` is retained as the bootstrap-baseline signal and as
- * the fallback against pre-hash servers; a later release drops it for pure hash.
+ * Detection is **content-hash based** (SQUIRE-T-0085, phase 2): an update is offered when the
+ * server's `sha256` differs from the SHA-256 of this app's own installed APK. A single-APK install
+ * keeps the exact bytes as `base.apk`, so the hash names what is really installed. Phase 1 kept a
+ * stored "last installed" hash instead, which went wrong when the user cancelled the install prompt.
+ * `versionCode` is only a downgrade guard now (see [UpdateDecision.shouldOffer]).
  */
 object UpdateChecker {
     private val json = Json { ignoreUnknownKeys = true }
     private val client = OkHttpClient()
 
     private const val PREFS = "squire_ota"
-    private fun hashKey(appKey: String) = "installed_sha256_$appKey"
-
-    /** The content hash we last installed for [appKey], or null if we've never recorded one. */
-    private fun installedHash(context: Context, appKey: String): String? =
-        context.applicationContext
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(hashKey(appKey), null)
+    private const val KEY_HASHED_APK = "self_hash_of"
+    private const val KEY_HASH = "self_sha256"
 
     /**
-     * Record [sha256] as the build we now have for [appKey]. Called when an install is committed so
-     * the just-installed build doesn't immediately re-advertise itself as an update.
+     * SHA-256 of this app's installed APK, or null when it can't be read. Cached against the APK
+     * path and install time, so the APK is hashed once per install, not on every poll.
      */
-    fun markInstalled(context: Context, appKey: String, sha256: String) {
-        context.applicationContext
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(hashKey(appKey), sha256)
-            .apply()
-    }
+    private fun installedApkHash(context: Context): String? = runCatching {
+        val app = context.applicationContext
+        val apk = app.applicationInfo.sourceDir
+        val installedAt = app.packageManager.getPackageInfo(app.packageName, 0).lastUpdateTime
+        val identity = "$apk@$installedAt"
+        val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs.getString(KEY_HASH, null)?.takeIf { prefs.getString(KEY_HASHED_APK, null) == identity }
+            ?: UpdateDecision.sha256Hex(java.io.File(apk)).also { hash ->
+                prefs.edit().putString(KEY_HASHED_APK, identity).putString(KEY_HASH, hash).apply()
+            }
+    }.getOrNull()
 
     /**
      * Returns an [UpdateInfo] when the server offers a build of [appKey] (`"squire"` or `"knight"`)
@@ -114,26 +113,14 @@ object UpdateChecker {
                     val rel = (if (appKey == "knight") manifest.knight else manifest.squire)
                         ?: return@use null
 
-                    fun offer() = UpdateInfo(
-                        appKey, rel.versionCode, rel.versionName, "$baseUrl/app/${rel.file}", rel.sha256,
+                    val offer = UpdateDecision.shouldOffer(
+                        serverHash = rel.sha256,
+                        installedHash = installedApkHash(context),
+                        serverVersionCode = rel.versionCode,
+                        currentVersionCode = currentVersionCode,
                     )
-
-                    val serverHash = rel.sha256
-                    val stored = installedHash(context, appKey)
-                    when {
-                        // Hash-aware server.
-                        serverHash != null -> when {
-                            stored != null -> if (serverHash != stored) offer() else null
-                            // No baseline yet: a higher versionCode means we're genuinely the older
-                            // build (legacy version-delivered) — offer it. Otherwise the server's
-                            // current build IS us, so seed the baseline silently (no prompt).
-                            rel.versionCode > currentVersionCode -> offer()
-                            else -> { markInstalled(context, appKey, serverHash); null }
-                        }
-                        // Pre-hash server: fall back to versionCode comparison.
-                        rel.versionCode > currentVersionCode -> offer()
-                        else -> null
-                    }
+                    if (!offer) return@use null
+                    UpdateInfo(appKey, rel.versionCode, rel.versionName, "$baseUrl/app/${rel.file}", rel.sha256)
                 }
             }.getOrNull()
         }
@@ -156,7 +143,7 @@ private sealed interface BannerState {
 fun UpdateBanner(info: UpdateInfo) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var state by remember(info.versionCode) { mutableStateOf<BannerState>(BannerState.Idle) }
+    var state by remember(info.sha256 ?: info.versionCode) { mutableStateOf<BannerState>(BannerState.Idle) }
 
     Surface(color = MaterialTheme.colorScheme.tertiaryContainer, modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -202,11 +189,6 @@ fun UpdateBanner(info: UpdateInfo) {
                     scope.launch {
                         val err = AppUpdater.downloadAndInstall(context, info.downloadUrl) { pct ->
                             state = BannerState.Downloading(pct)
-                        }
-                        if (err == null) {
-                            // The exact advertised bytes are staged + committed; record this as the
-                            // build we now have so it doesn't re-advertise itself (SQUIRE-T-0085).
-                            info.sha256?.let { UpdateChecker.markInstalled(context, info.appKey, it) }
                         }
                         state = if (err == null) BannerState.Installing else BannerState.Failed(err)
                     }
