@@ -2605,7 +2605,7 @@ dependencies = [
 
 [[package]]
 name = "squire-home"
-version = "0.7.27"
+version = "0.7.28"
 dependencies = [
  "api",
  "dirs",
