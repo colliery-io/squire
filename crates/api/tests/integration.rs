@@ -389,6 +389,57 @@ async fn authored_quest_description_reaches_the_card() {
     );
 }
 
+/// The Kotlin SDK sends `"cash": null` when a quest has no cash award (its model is `Long? = null`
+/// with `encodeDefaults = true`). The server must read that as "no cash", not reject it with a 400
+/// (SQUIRE-T-0147, the same trap as `AdjustReq.currency` in SQUIRE-T-0109).
+#[tokio::test]
+async fn quest_with_explicit_null_cash_is_accepted() {
+    let (state, _store, _dir, _today) = app();
+    let reg = register(&state, "The Round Table", "Arthur", "excalibur").await;
+    let handle = reg.household.0.clone();
+    let knight = reg.token.0.clone();
+    add_squire_and_login(&state, &knight, &handle, "Lancelot", "lake").await;
+
+    for (title, cash) in [("Null cash", json!(null)), ("Three dollars", json!(3))] {
+        let (st, body) = post_json(
+            &state,
+            "/admin/quests",
+            &knight,
+            &handle,
+            json!({
+                "title": title,
+                "reward": 5,
+                "cash": cash,
+                "cadence": "Daily",
+                "completion": "EachAssignee",
+                "assign_all": true,
+                "repeatable_within_day": false,
+                "auto_approve": false,
+            }),
+        )
+        .await;
+        assert_eq!(
+            st,
+            StatusCode::OK,
+            "{title}: expected 200, got {st}: {body}"
+        );
+    }
+
+    let (st, quests) = get(&state, "/admin/quests", &knight, &handle).await;
+    assert_eq!(st, StatusCode::OK);
+    let cash_of = |title: &str| {
+        quests
+            .as_array()
+            .expect("quest list")
+            .iter()
+            .find(|q| q["title"] == title)
+            .unwrap_or_else(|| panic!("{title} is listed"))["cash"]
+            .clone()
+    };
+    assert_eq!(cash_of("Null cash"), 0, "null cash is no cash");
+    assert_eq!(cash_of("Three dollars"), 3, "a numeric cash still lands");
+}
+
 // ═════════════════════════════════════════════════════════════════════════════════════════════
 // Trust boundary (the crux).
 // ═════════════════════════════════════════════════════════════════════════════════════════════

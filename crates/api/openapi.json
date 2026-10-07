@@ -2450,9 +2450,12 @@
             "$ref": "#/components/schemas/CadenceKind"
           },
           "cash": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int64",
-            "description": "Real-money award in whole dollars (SQUIRE-T-0099); omitted ⇒ 0 (no cash), back-compat."
+            "description": "Real-money award in whole dollars (SQUIRE-T-0099); absent or null ⇒ 0 (no cash). **`Option` is\ndeliberate** (SQUIRE-T-0147): the Kotlin SDK sends an explicit `\"cash\": null`, which a plain\n`#[serde(default)] i64` rejects."
           },
           "category": {
             "type": [

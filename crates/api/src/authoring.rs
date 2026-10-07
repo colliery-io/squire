@@ -111,9 +111,11 @@ pub struct CreateQuestReq {
     #[serde(default)]
     pub description: Option<String>,
     pub reward: i64,
-    /// Real-money award in whole dollars (SQUIRE-T-0099); omitted ⇒ 0 (no cash), back-compat.
+    /// Real-money award in whole dollars (SQUIRE-T-0099); absent or null ⇒ 0 (no cash). **`Option` is
+    /// deliberate** (SQUIRE-T-0147): the Kotlin SDK sends an explicit `"cash": null`, which a plain
+    /// `#[serde(default)] i64` rejects.
     #[serde(default)]
-    pub cash: i64,
+    pub cash: Option<i64>,
     /// Optional free-text grouping (e.g. "Bedroom").
     pub category: Option<String>,
     pub cadence: CadenceKind,
@@ -238,7 +240,7 @@ pub async fn create_quest(
             .filter(|c| !c.is_empty())
             .map(domain_core::contract::Category),
         reward: req.reward.max(0) as u32,
-        cash: req.cash.max(0) as u32,
+        cash: req.cash.unwrap_or(0).max(0) as u32,
         cadence,
         assignment,
         completion: req.completion.into(),
