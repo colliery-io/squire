@@ -54,5 +54,5 @@ jobs:
           git config user.email "docs@colliery.io"
           git checkout -q -b gh-pages
           git add -A
-          git commit -q -m "docs: deploy from squire-core@${SHA}"
+          git commit -q -m "docs: deploy from squire@${SHA}"
           git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages

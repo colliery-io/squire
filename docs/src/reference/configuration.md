@@ -33,7 +33,7 @@ authoritative list, sourced from the server binary
 |----------|---------|---------|
 | `SQUIRE_APK_DIR` | `<data_dir>/updates` | Where the OTA phone-app builds are stored and served from. |
 | `SQUIRE_APK_SYNC` | on | Background pull of the latest phone APK from the public release repo. Set `off` to disable. |
-| `SQUIRE_DIST_REPO` | `colliery-io/squire-core` | The public release repo to pull the app + server updates from (`owner/name`). |
+| `SQUIRE_DIST_REPO` | `colliery-io/squire` | The public release repo to pull the app + server updates from (`owner/name`). |
 | `SQUIRE_SELF_UPDATE` | on | Server self-update from the release repo on start. Set `off` to disable. |
 | `SQUIRE_UPDATE_TOKEN` | — | GitHub token for the update/APK-sync API calls, to avoid unauthenticated rate limits. |
 
@@ -42,7 +42,7 @@ authoritative list, sourced from the server binary
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SQUIRE_MDNS` | on | Advertise `_squire._tcp` on the LAN so phones discover the server. Set `off` for internet-only deployments. |
-| `SQUIRE_PAIR_HOST` / `SQUIRE_PAIR_PORT` | — | Override the host/port encoded into pairing QR codes (e.g. when behind a tunnel). |
+| `SQUIRE_PAIR_HOST` / `SQUIRE_PAIR_PORT` | — | Override the host/port encoded into pairing QR codes (e.g. a Tailscale name when the server runs in a container). |
 | `SQUIRE_SIGNING_KEY` | persisted | Override the persisted token-signing key. Normally generated once and stored. |
 | `SQUIRE_TZ` | host zone | Household timezone seed on first run (also settable in the Keep's Settings tab). |
 
@@ -76,6 +76,3 @@ API_PORT=8080 KEEP_PORT=4920 \
 SQUIRE_ADMIN_NAME="Mom" SQUIRE_ADMIN_SECRET="…" \
 squire-serve
 ```
-
-> Some variables (`SQUIRE_MDNS=off`, `SQUIRE_PAIR_HOST`) matter mainly for the planned
-> [internet-mode deployment](../how-to/cloudflare-tunnel.md).

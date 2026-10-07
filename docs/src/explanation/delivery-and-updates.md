@@ -7,7 +7,7 @@ your phones.
 
 ## One repository
 
-`colliery-io/squire-core` is public: it holds the source code (engine, apps, this documentation),
+`colliery-io/squire` is public: it holds the source code (engine, apps, this documentation),
 and its GitHub Releases hold the signed artifacts: the phone APK and the server binaries. Home
 servers and the install QR fetch them **unauthenticated**. This site is served from the same
 repository's GitHub Pages.
@@ -16,7 +16,7 @@ repository's GitHub Pages.
 
 ```
                 build + sign (CI)
-squire-core  ───────────────────────▶  GitHub Release on  colliery-io/squire-core
+squire  ───────────────────────▶  GitHub Release on  colliery-io/squire
  (public)                                        │
                                                  │  pull (no auth)
                                                  ▼
@@ -26,7 +26,7 @@ squire-core  ──────────────────────�
                                            phones update in place
 ```
 
-1. A release is cut by tagging `squire-core`; CI builds and **signs** the phone APK and server
+1. A release is cut by tagging `squire`; CI builds and **signs** the phone APK and server
    binaries and publishes them to a Release on the same repository.
 2. Your **home server** checks that repo's Releases on a schedule and on startup:
    - it **self-updates** its own binary, and

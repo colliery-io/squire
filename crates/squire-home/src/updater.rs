@@ -19,9 +19,7 @@ pub fn maybe_self_update() {
 
     let repo = std::env::var("SQUIRE_DIST_REPO")
         .unwrap_or_else(|_| crate::apk_sync::DEFAULT_REPO.to_string());
-    let (owner, name) = repo
-        .split_once('/')
-        .unwrap_or(("colliery-io", "squire-core"));
+    let (owner, name) = repo.split_once('/').unwrap_or(("colliery-io", "squire"));
 
     // Authenticate the GitHub API calls when a token is configured (SQUIRE-T-0117): unauthenticated
     // is 60 req/hr/IP and 403s under repeated restarts; a token lifts it to 5000/hr. Optional —

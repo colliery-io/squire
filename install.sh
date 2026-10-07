@@ -1,7 +1,7 @@
 #!/bin/sh
 # Squire one-line installer (SQUIRE-T-0091 / ADR SQUIRE-A-0018).
 #
-#   curl -fsSL https://raw.githubusercontent.com/colliery-io/squire-core/main/dist/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/colliery-io/squire/main/install.sh | sh
 #
 # Downloads the latest signed `squire-serve` for this machine from the public release repo, installs
 # it to ~/.local/bin, and on macOS creates a double-clickable Squire.app (in ~/Applications) that
@@ -10,7 +10,7 @@
 # "First run? Create the admin Knight" form). Honors SQUIRE_BIN_DIR / SQUIRE_APP_DIR for testing.
 set -eu
 
-REPO="colliery-io/squire-core"
+REPO="colliery-io/squire"
 BIN_DIR="${SQUIRE_BIN_DIR:-$HOME/.local/bin}"
 APP_DIR="${SQUIRE_APP_DIR:-$HOME/Applications}"
 OS="$(uname -s)"

@@ -5,9 +5,8 @@ Run the home server as a Docker Compose stack and, optionally, join it to your
 cellular, at school, travelling. Traffic is WireGuard-encrypted and only devices signed in to *your*
 tailnet can reach the server; nothing is exposed to the public internet and no router port is opened.
 
-This is a **from-source** path (a checkout of `squire-core` with Docker + Compose v2). It is private
-remote access for your own household — not the public, multi-household
-[Cloudflare Tunnel](cloudflare-tunnel.md) deployment.
+This is a **from-source** path (a checkout of `squire` with Docker + Compose v2). It is private
+remote access for your own household.
 
 ## What ends up reachable from where
 

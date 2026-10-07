@@ -69,5 +69,5 @@ the next sync.
 ## Where the data lives
 
 On *your* machine. The home server keeps everything in its data directory; there is no Squire cloud
-in the loop. The optional [internet exposure](../how-to/cloudflare-tunnel.md) still routes to your
-own home server — it changes how phones reach it, not where the data lives.
+in the loop. Remote access over [Tailscale](../how-to/docker-tailscale.md) still routes to your own home
+server — it changes how phones reach it, not where the data lives.

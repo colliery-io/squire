@@ -25,7 +25,7 @@ You only pair once per phone.
   new one.
 - **Re-pairing** a phone (new device, or wiped app) is the same flow — mint a fresh code.
 - **Same Wi‑Fi required** for pairing, because the phone finds the server over the LAN. To use a
-  phone away from home afterward, set up [internet access](cloudflare-tunnel.md).
+  phone away from home afterward, set up [Tailscale](docker-tailscale.md).
 
 ## Troubleshooting
 

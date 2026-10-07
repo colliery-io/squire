@@ -19,7 +19,7 @@ The home server (`squire-serve`) is a single Rust binary. It:
 On the home computer (macOS or Linux), run the one-line installer:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/colliery-io/squire-core/main/dist/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/colliery-io/squire/main/install.sh | sh
 ```
 
 This downloads the latest signed `squire-serve` for your machine into `~/.local/bin`. What happens
@@ -53,6 +53,6 @@ whenever they're on the network.
 
 ## Next steps
 
-- **Use it from outside the house** (a parent's phone on cellular): [Expose it over the internet](../how-to/cloudflare-tunnel.md).
+- **Use it from outside the house** (a parent's phone on cellular): [Run it over Tailscale](../how-to/docker-tailscale.md).
 - **Protect the data**: [Back up & restore](../how-to/backup-restore.md).
 - **Tune it**: [Server configuration](../reference/configuration.md).

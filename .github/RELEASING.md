@@ -1,20 +1,21 @@
 # Releasing Squire
 
 Delivery follows **ADR SQUIRE-A-0018** (which supersedes the two-repo split of SQUIRE-A-0012): this
-repo (`colliery-io/squire-core`) is **public**, and CI publishes the signed artifacts to **its own**
+repo (`colliery-io/squire`) is **public**, and CI publishes the signed artifacts to **its own**
 GitHub Releases; home servers + the install QR pull from there unauthenticated.
 
-> `colliery-io/squire` was the old artifacts-only repo. It is frozen: it holds the releases up to the
-> bridge release, so servers installed before the move update onto a build that follows this repo.
+> This repo was `colliery-io/squire-core` (private source) until 2026-10-06. The old artifacts-only
+> repo was renamed to `colliery-io/squire-releases` and frozen with releases up to v0.7.26; servers
+> installed before the move already point at `colliery-io/squire`, so they follow this repo.
 
 ## One-time setup
 
-Set the signing secrets on the **source** repo (`squire-core`, i.e. this repo). The
+Set the signing secrets on the **source** repo (`squire`, i.e. this repo). The
 release keystore must reach CI to sign the APK; encode it and store it (and the passwords from
 `clients/squire-android/keystore.properties`) as Actions secrets — nothing sensitive is committed.
 
 ```sh
-# from the repo root (origin = colliery-io/squire-core)
+# from the repo root (origin = colliery-io/squire)
 gh secret set SIGNING_KEYSTORE_B64   < <(base64 -i clients/squire-android/keystore/squire-release.jks)
 gh secret set SIGNING_STORE_PASSWORD --body '<storePassword from keystore.properties>'
 gh secret set SIGNING_KEY_PASSWORD   --body '<keyPassword from keystore.properties>'

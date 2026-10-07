@@ -17,12 +17,6 @@ straightforward: snapshot the export somewhere safe, and restore by importing it
 3. Store it off the machine — another disk, or object storage.
 4. Start the server again.
 
-## Offsite backups (planned)
-
-> **Status: planned.** Automated per-tenant export to **Cloudflare R2** (offsite object storage)
-> with a rehearsed restore drill is on the roadmap. The intent: a scheduled job exports each
-> tenant and uploads it to R2, and the restore path is tested — not assumed.
-
 ## Restore
 
 1. Stand up a server pointed at an empty `SQUIRE_DATA_DIR`.

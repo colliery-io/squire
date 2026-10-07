@@ -13,7 +13,7 @@ an always-on background service. For first-time install use the
 squire-serve
 ```
 
-**From source** (a checkout of `squire-core`):
+**From source** (a checkout of `squire`):
 
 ```sh
 angreal serve            # debug
@@ -71,5 +71,5 @@ angreal add-admin --name "Dad" --secret "a-secret"
 
 ## Next
 
-- [Expose it over the internet](cloudflare-tunnel.md) so phones work away from home.
+- [Run it in Docker, reachable over Tailscale](docker-tailscale.md) so phones work away from home.
 - [Back up & restore](backup-restore.md).
