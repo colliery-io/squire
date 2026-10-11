@@ -1,4 +1,6 @@
-# Back up & restore
+---
+title: "Back up & restore"
+---
 
 All of a household's data lives in the server's data directory (`SQUIRE_DATA_DIR`). Squire's store
 supports a **single-file per-tenant export/import**, which makes backups and restores
@@ -27,5 +29,5 @@ straightforward: snapshot the export somewhere safe, and restore by importing it
 ## Why restores are trustworthy
 
 Squire never stores balances as mutable counters — every number is derived by replaying an
-append-only event log ([How Squire works](../explanation/how-squire-works.md)). A restored log
+append-only event log ([How Squire works](../../explanation/how-squire-works/)). A restored log
 therefore reproduces exactly the same balances, streaks, and history.

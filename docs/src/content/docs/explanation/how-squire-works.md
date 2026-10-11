@@ -1,4 +1,6 @@
-# How Squire works
+---
+title: "How Squire works"
+---
 
 Squire is built so that a child can act freely — even offline — while **only the parent's computer
 can ever move a balance**. This isn't enforced by hiding buttons; it's true by construction. This
@@ -49,14 +51,14 @@ This has real consequences for families:
 - **Explainable.** Any balance or streak can be justified by replaying the events behind it — open
   the Log tab and see exactly how a number happened.
 
-  ![The Keep — event log](../images/keep-log.png)
+  ![The Keep — event log](../../../assets/images/keep-log.png)
 
 - **History never silently changes.** Reward values are snapshotted at approval, so editing a
   quest's payout later doesn't rewrite points already earned.
 - **Archiving ≠ deleting.** Archiving a quest or reward hides it going forward while its history
   stays valid.
 - **Restores are exact.** Re-importing the log reconstructs identical balances and streaks — which
-  is why [backup & restore](../how-to/backup-restore.md) is trustworthy.
+  is why [backup & restore](../../how-to/backup-restore/) is trustworthy.
 
 ## Offline by design
 
@@ -69,5 +71,5 @@ the next sync.
 ## Where the data lives
 
 On *your* machine. The home server keeps everything in its data directory; there is no Squire cloud
-in the loop. Remote access over [Tailscale](../how-to/docker-tailscale.md) still routes to your own home
+in the loop. Remote access over [Tailscale](../../how-to/docker-tailscale/) still routes to your own home
 server — it changes how phones reach it, not where the data lives.

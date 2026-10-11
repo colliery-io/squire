@@ -1,8 +1,10 @@
-# Stand up a home server
+---
+title: "Stand up a home server"
+---
 
 This tutorial gets the Squire **home server** running on a computer in your house, so the phones on
 your LAN can reach it. Allow about 15 minutes. When you're done, hand off to
-[Set up Squire for your family](family-setup.md) to add members and chores.
+[Set up Squire for your family](../family-setup/) to add members and chores.
 
 ## What you're installing
 
@@ -12,7 +14,7 @@ The home server (`squire-serve`) is a single Rust binary. It:
 - keeps all household data in a durable folder on this machine — nothing leaves your network,
 - advertises itself on the LAN (mDNS) so phones can discover it,
 - pulls the latest phone app and updates itself in the background (see
-  [Delivery & updates](../explanation/delivery-and-updates.md)).
+  [Delivery & updates](../../explanation/delivery-and-updates/)).
 
 ## 1. Install
 
@@ -32,9 +34,9 @@ next depends on your OS:
   that opens the Keep (the background service is what keeps the server running). Skip the service
   with `SQUIRE_NO_SERVICE=1`.
 - **Linux** — you get the binary only. Start it with `squire-serve`, and set up your own service to
-  keep it running — see [Run the home server](../how-to/run-server.md).
+  keep it running — see [Run the home server](../../how-to/run-server/).
 
-(Prefer to run from source instead? See [Run the home server](../how-to/run-server.md).)
+(Prefer to run from source instead? See [Run the home server](../../how-to/run-server/).)
 
 ## 2. Open the Keep & create your admin
 
@@ -47,12 +49,12 @@ credentials on the command line.)
 
 ## 3. You're ready
 
-Logged into the Keep, you can now [add members and create chores](family-setup.md). The server keeps
+Logged into the Keep, you can now [add members and create chores](../family-setup/). The server keeps
 running in the background (macOS) or under whatever service you set up (Linux), so phones can sync
 whenever they're on the network.
 
 ## Next steps
 
-- **Use it from outside the house** (a parent's phone on cellular): [Run it over Tailscale](../how-to/docker-tailscale.md).
-- **Protect the data**: [Back up & restore](../how-to/backup-restore.md).
-- **Tune it**: [Server configuration](../reference/configuration.md).
+- **Use it from outside the house** (a parent's phone on cellular): [Run it over Tailscale](../../how-to/docker-tailscale/).
+- **Protect the data**: [Back up & restore](../../how-to/backup-restore/).
+- **Tune it**: [Server configuration](../../reference/configuration/).

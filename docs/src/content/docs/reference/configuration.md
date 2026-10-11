@@ -1,4 +1,6 @@
-# Server configuration
+---
+title: "Server configuration"
+---
 
 `squire-serve` is configured entirely through environment variables — no config file. This is the
 authoritative list, sourced from the server binary
@@ -10,7 +12,7 @@ authoritative list, sourced from the server binary
 |----------|---------|---------|
 | `API_PORT` | `8080` | Local API the phones connect to. |
 | `KEEP_PORT` | `4920` | The Keep (parent admin web UI). |
-| `KEEP_BIND` | `127.0.0.1` | Interface the Keep binds — an IP or hostname. Leave it alone on a normal install: loopback is what keeps the admin UI off the network. It exists for containers, where a port mapping cannot reach loopback; see [Docker + Tailscale](../how-to/docker-tailscale.md). |
+| `KEEP_BIND` | `127.0.0.1` | Interface the Keep binds — an IP or hostname. Leave it alone on a normal install: loopback is what keeps the admin UI off the network. It exists for containers, where a port mapping cannot reach loopback; see [Docker + Tailscale](../../how-to/docker-tailscale/). |
 | `SQUIRE_DATA_DIR` | OS data dir (`…/squire`) | Durable data directory. Everything persists here. |
 | `SQUIRE_HOUSEHOLD` | `home` | Tenant handle for this household. |
 
@@ -65,7 +67,7 @@ container stack): same account, new secret.
 The Keep's **Settings** tab exposes the live household timezone (and other per-household settings)
 without touching the environment:
 
-![The Keep — Settings tab](../images/keep-settings.png)
+![The Keep — Settings tab](../../../assets/images/keep-settings.png)
 
 ## Example
 

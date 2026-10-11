@@ -1,4 +1,6 @@
-# Create chores & rewards
+---
+title: "Create chores & rewards"
+---
 
 Authoring is keyboard-first and lives in the **Keep**. This guide covers the three things you'll
 create most: quests (chores), rewards, and achievements. Parents can also do quick authoring from
@@ -14,11 +16,11 @@ In the Keep's **Quests** tab, create a quest with:
 - **Assignee** — which Squire(s) it's for.
 - **Cadence** — one-off, **Daily**, **Weekly** (pick the days), or **Every N days**.
 - **Reward** — what completing it pays: coins, real dollars, or both
-  ([Squire supports multiple currencies](../reference/glossary.md#currency)).
+  ([Squire supports multiple currencies](../../reference/glossary/#currency)).
 - **Auto-approve** — on for trivial chores (the point lands without review); off to route it through
-  the [review queue](../explanation/how-squire-works.md#the-review-loop).
+  the [review queue](../../explanation/how-squire-works/#the-review-loop).
 
-![The Keep — Quests tab](../images/keep-quests.png)
+![The Keep — Quests tab](../../../assets/images/keep-quests.png)
 
 > **Editing is safe for history.** Reward values are snapshotted when a completion is approved, so
 > changing a quest's payout later never rewrites points already earned. Archiving a quest hides it
@@ -26,7 +28,7 @@ In the Keep's **Quests** tab, create a quest with:
 
 From the phone, a parent can author quests in the **Knight** app's Manage screen:
 
-![The Knight — manage quests](../images/knight-manage-quests.png)
+![The Knight — manage quests](../../../assets/images/knight-manage-quests.png)
 
 ### Starter library
 
@@ -57,5 +59,5 @@ want consequences as well as rewards. Configure them alongside your quests in th
 
 ## See also
 
-- [Cash out a balance](cash-out.md) — turning a dollar balance into real money.
-- [How Squire works](../explanation/how-squire-works.md) — why the child can never self-approve.
+- [Cash out a balance](../cash-out/) — turning a dollar balance into real money.
+- [How Squire works](../../explanation/how-squire-works/) — why the child can never self-approve.
