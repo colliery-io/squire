@@ -1,4 +1,7 @@
-# Squire
+---
+title: "Squire"
+description: "Squire, a self-hosted chores and allowance app for families. Docs for households and self-hosters."
+---
 
 **Squire turns a child's chores into a game they want to play — while every point and reward
 stays firmly under a parent's control.**
@@ -20,15 +23,15 @@ family's data, and no subscription. The phones talk to that home server over you
 | **The Knight** | Parent / quick-admin | The same phone app in parent mode. Approve or reject from anywhere, mark a quest done, redeem a reward, add funds. |
 
 > The two phone roles are one Android app — which role you get is decided when the phone is
-> [paired](how-to/pair-phone.md).
+> [paired](how-to/pair-phone/).
 
 ## Where to start
 
 - **A parent setting up Squire for your kids?** Start with
-  [Set up Squire for your family](tutorials/family-setup.md).
+  [Set up Squire for your family](tutorials/family-setup/).
 - **Running the home server yourself?** Start with
-  [Stand up a home server](tutorials/self-host-setup.md).
-- **Want to understand the design?** Read [How Squire works](explanation/how-squire-works.md).
+  [Stand up a home server](tutorials/self-host-setup/).
+- **Want to understand the design?** Read [How Squire works](explanation/how-squire-works/).
 
 This site is organized by [Diátaxis](https://diataxis.fr/): **Tutorials** get you from zero to
 working, **How-to guides** solve one task, **Reference** is the lookup material, and **Explanation**

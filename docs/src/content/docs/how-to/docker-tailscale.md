@@ -1,4 +1,6 @@
-# Run it in Docker, reachable over Tailscale
+---
+title: "Run it in Docker, reachable over Tailscale"
+---
 
 Run the home server as a Docker Compose stack and, optionally, join it to your
 [Tailscale](https://tailscale.com) tailnet so paired phones keep syncing away from home Wi‑Fi — on
@@ -103,5 +105,5 @@ IP and you want discovery back, run `deploy/advertise-mdns.sh` on the host (it a
 
 ## See also
 
-- [Server configuration](../reference/configuration.md) — every variable, including `KEEP_BIND`.
-- [Back up & restore](backup-restore.md)
+- [Server configuration](../../reference/configuration/) — every variable, including `KEEP_BIND`.
+- [Back up & restore](../backup-restore/)

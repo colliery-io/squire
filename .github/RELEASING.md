@@ -43,12 +43,15 @@ next pull (see ADR SQUIRE-A-0012, server startup-pull); phones update over LAN v
 
 ## Publishing the docs
 
-The public doc site (`docs/`, mdBook) is **decoupled from releases**. Any push to `main` that
-touches `docs/**` triggers **Publish docs** (`.github/workflows/docs.yml`), which builds the book and
-force-pushes the rendered site to this repo's `gh-pages` branch with the built-in `GITHUB_TOKEN`.
-Edit docs and merge to `main`; that's the whole publish.
+The public doc site (`docs/`, Astro Starlight with the starlight-aurora theme) is **decoupled from
+releases**. Any push to `main` that touches `docs/**` triggers **Publish docs**
+(`.github/workflows/docs.yml`), which builds the site and force-pushes the rendered site to this
+repo's `gh-pages` branch with the built-in `GITHUB_TOKEN`.
+A pull request that touches `docs/**` builds the site only. Edit docs and merge to `main`; that's
+the whole publish. Old mdBook addresses (`*.html`) redirect to the new pages.
 
 One-time on this repo: enable **Pages** with source = `gh-pages` branch (root). Refresh
 the in-repo screenshots with `angreal docs shots` (re-runs the Keep Playwright gallery and copies the
-Android Paparazzi goldens into `docs/src/images/`); build/preview locally with `angreal docs serve`.
+Android Paparazzi goldens into `docs/src/assets/images/`); build/preview locally with
+`angreal docs build` and `angreal docs serve` (Node 22 or later).
 

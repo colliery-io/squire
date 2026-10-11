@@ -1,4 +1,6 @@
-# Glossary
+---
+title: "Glossary"
+---
 
 ### The Keep
 The parent admin web app that runs on the home computer. It holds the Rust engine, the store, and
@@ -18,7 +20,7 @@ holds. Authoring stays keyboard-first in the Keep.
 
 ### Home server (`squire-serve`)
 The persistent binary that serves the Keep and the Local API and stores all household data on your
-machine. See [Run the home server](../how-to/run-server.md).
+machine. See [Run the home server](../../how-to/run-server/).
 
 ### Quest
 A chore. Has an assignee, a cadence (one-off / Daily / Weekly / Every N days), a reward, and an
@@ -33,7 +35,7 @@ Something a child spends a balance on. Has a cost, an availability (*Once* / *Re
 optional achievement gate. Spending one creates a **redemption request**.
 
 ### Redemption request
-A child's "I want that" against a reward (including [cash-out](../how-to/cash-out.md)). Affordability
+A child's "I want that" against a reward (including [cash-out](../../how-to/cash-out/)). Affordability
 is checked only at approval; nothing is reserved while it's pending.
 
 ### Achievement
@@ -45,16 +47,16 @@ A negative behavior that deducts coins or progress — consequences alongside re
 
 ### Currency
 Squire tracks balances in more than one currency: **coins** (an in-app score) and **dollars** (real
-money). Quests can pay either or both; dollars are settled via [cash-out](../how-to/cash-out.md).
+money). Quests can pay either or both; dollars are settled via [cash-out](../../how-to/cash-out/).
 
 ### Adjustment
 A direct, parent-only change to a balance. Requires a reason, which is recorded in the log.
 
 ### Pairing
 The one-time flow that links a phone to a household member and gives it that member's role, via a
-QR-encoded one-time code. See [Pair a phone](../how-to/pair-phone.md).
+QR-encoded one-time code. See [Pair a phone](../../how-to/pair-phone/).
 
 ### Event log
 The append-only record of everything that happened. Balances, streaks, and due-lists are **derived**
 from it, never stored as mutable counters — so every number is explainable by replay. See
-[How Squire works](../explanation/how-squire-works.md).
+[How Squire works](../../explanation/how-squire-works/).

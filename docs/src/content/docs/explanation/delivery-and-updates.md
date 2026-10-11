@@ -1,4 +1,6 @@
-# Delivery & updates
+---
+title: "Delivery & updates"
+---
 
 Squire isn't on an app store and has no update server you log into. Instead it uses a simple,
 auditable delivery model: **signed artifacts are published as GitHub Releases on the public source
@@ -42,7 +44,7 @@ squire  ───────────────────────▶
   accepting them (and macOS keeps its Local Network permission across server updates).
 - **You can pin or disable it.** `SQUIRE_SELF_UPDATE=off` and `SQUIRE_APK_SYNC=off` turn the
   automatic behavior off; `SQUIRE_DIST_REPO` points at a different release repo. See
-  [configuration](../reference/configuration.md).
+  [configuration](../../reference/configuration/).
 
 ## Why it's built this way
 

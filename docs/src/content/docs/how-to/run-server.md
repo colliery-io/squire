@@ -1,9 +1,11 @@
-# Run the home server
+---
+title: "Run the home server"
+---
 
 This guide covers running `squire-serve` for real: from source, with the right environment, and as
 an always-on background service. For first-time install use the
-[home-server tutorial](../tutorials/self-host-setup.md); for every knob see
-[Server configuration](../reference/configuration.md).
+[home-server tutorial](../../tutorials/self-host-setup/); for every knob see
+[Server configuration](../../reference/configuration/).
 
 ## Run it
 
@@ -21,13 +23,13 @@ angreal serve --release  # what production uses
 ```
 
 > **On macOS the installer already runs the server as a background service** (see the
-> [tutorial](../tutorials/self-host-setup.md)). Running `squire-serve` by hand as well will collide
+> [tutorial](../../tutorials/self-host-setup/)). Running `squire-serve` by hand as well will collide
 > on the ports — stop the service first (`launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/io.colliery.squire.plist`)
 > if you want to run it in the foreground.
 
 It listens on **`API_PORT`** (default `8080`) for the phones and **`KEEP_PORT`** (default `4920`)
 for the Keep, and stores data under `SQUIRE_DATA_DIR` (an OS data dir by default). See the
-[configuration reference](../reference/configuration.md) for the full list.
+[configuration reference](../../reference/configuration/) for the full list.
 
 A fresh household has no admin until you create one in the Keep's first-run form (you don't set it on
 the command line). If you ever need to inject one, see
@@ -71,5 +73,5 @@ angreal add-admin --name "Dad" --secret "a-secret"
 
 ## Next
 
-- [Run it in Docker, reachable over Tailscale](docker-tailscale.md) so phones work away from home.
-- [Back up & restore](backup-restore.md).
+- [Run it in Docker, reachable over Tailscale](../docker-tailscale/) so phones work away from home.
+- [Back up & restore](../backup-restore/).
